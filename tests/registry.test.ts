@@ -79,11 +79,11 @@ describe("createRegistry", () => {
     expect(results.length).toBe(0);
   });
 
-  it("publish throws not implemented", async () => {
+  it("publish resolves without error (no-op placeholder)", async () => {
     const registry = createRegistry(store);
     await expect(
       registry.publish(makeTool("pub-tool") as unknown as Parameters<typeof registry.publish>[0]),
-    ).rejects.toThrow("not yet implemented");
+    ).resolves.toBeUndefined();
   });
 
   it("works without store", async () => {

@@ -13,14 +13,20 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { randomBytes } from "node:crypto";
 import { unlinkSync } from "node:fs";
+import { isPrivateUrl, parseGithubOwnerRepo } from "./resolver.js";
 
 const MAX_REDIRECTS = 10;
+const MAX_DOWNLOAD_SIZE = 500 * 1024 * 1024; // 500MB for tarballs
 
-/** Download a file following redirects, return saved path */
+/** Download a file following redirects, with SSRF and size protection */
 function downloadFile(url: string, dest: string, redirectCount = 0): Promise<string> {
   return new Promise((resolve, reject) => {
     if (redirectCount > MAX_REDIRECTS) {
       reject(new Error(`Too many redirects (>${MAX_REDIRECTS}) downloading ${url}`));
+      return;
+    }
+    if (isPrivateUrl(url)) {
+      reject(new Error(`Refusing to download from private/internal URL: ${url}`));
       return;
     }
     const getter = url.startsWith("https") ? httpsGet : httpGet;
@@ -33,7 +39,23 @@ function downloadFile(url: string, dest: string, redirectCount = 0): Promise<str
         reject(new Error(`HTTP ${res.statusCode} downloading ${url}`));
         return;
       }
+      // Check Content-Length if available
+      const contentLength = parseInt(res.headers["content-length"] ?? "", 10);
+      if (contentLength > MAX_DOWNLOAD_SIZE) {
+        res.destroy();
+        reject(new Error(`Download too large (${contentLength} bytes, max ${MAX_DOWNLOAD_SIZE})`));
+        return;
+      }
+      let received = 0;
       const stream = createWriteStream(dest);
+      res.on("data", (chunk: Buffer) => {
+        received += chunk.length;
+        if (received > MAX_DOWNLOAD_SIZE) {
+          res.destroy();
+          stream.destroy();
+          reject(new Error(`Download exceeded size limit (${MAX_DOWNLOAD_SIZE} bytes)`));
+        }
+      });
       res.pipe(stream);
       stream.on("finish", () => { stream.close(); resolve(dest); });
       stream.on("error", reject);
@@ -84,13 +106,12 @@ async function installFromGithub(
 ): Promise<InstallResult> {
   const start = Date.now();
 
-  // Parse owner/repo
-  const match = /([a-zA-Z0-9_-]+)\/([a-zA-Z0-9_.-]+)/.exec(source.uri);
-  if (!match?.[1] || !match[2]) {
+  // Parse owner/repo using shared parser
+  const parsed = parseGithubOwnerRepo(source.uri);
+  if (!parsed) {
     throw new Error(`Cannot parse GitHub owner/repo from: ${source.uri}`);
   }
-  const owner = match[1];
-  const repo = match[2];
+  const { owner, repo } = parsed;
   const ref = source.ref ?? "main";
 
   // Download tarball

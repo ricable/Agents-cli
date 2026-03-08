@@ -6,11 +6,7 @@
 export type SourceFormat =
   | "github"
   | "npm"
-  | "pypi"
-  | "local"
-  | "url"
-  | "git"
-  | "tarball";
+  | "local";
 
 /** Tool installation status */
 export type InstallStatus =

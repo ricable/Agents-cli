@@ -55,7 +55,7 @@ describe("Guard: command-injection", () => {
       const format = detectFormat(pattern);
       // Injection patterns should not be detected as github or npm
       if (format !== null) {
-        expect(["local", "url"]).toContain(format);
+        expect(format).toBe("local");
       }
     }
   });
@@ -83,11 +83,12 @@ describe("Guard: size-limit", () => {
 });
 
 describe("Guard: network-scope", () => {
-  it("distinguishes between public and private URLs", () => {
+  it("only detects github.com URLs as github format", () => {
     expect(detectFormat("https://github.com/owner/repo")).toBe("github");
-    expect(detectFormat("http://127.0.0.1:8080/malicious")).toBe("url");
-    expect(detectFormat("http://localhost/evil")).toBe("url");
-    expect(detectFormat("http://169.254.169.254/metadata")).toBe("url");
+    // Non-GitHub URLs are no longer recognized as valid formats
+    expect(detectFormat("http://127.0.0.1:8080/malicious")).toBeNull();
+    expect(detectFormat("http://localhost/evil")).toBeNull();
+    expect(detectFormat("http://169.254.169.254/metadata")).toBeNull();
   });
 
   it("does not treat non-https URLs as github", () => {

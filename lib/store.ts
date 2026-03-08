@@ -1,6 +1,7 @@
 import type { ToolStore, Tool, StoreQuery, StoreQueryResult } from "./types.js";
-import { mkdirSync, existsSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, existsSync, readFileSync, writeFileSync, rmSync, renameSync } from "node:fs";
 import { join } from "node:path";
+import { randomBytes } from "node:crypto";
 
 const TOOLS_DIR = "tools";
 const STORE_FILE = "tools.json";
@@ -89,10 +90,12 @@ export function createStore(dataDir: string): ToolStore {
     return map;
   }
 
-  /** Persist tools to disk */
+  /** Persist tools to disk atomically (write to temp file, then rename) */
   function saveTools(tools: Map<string, Tool>): void {
     const data = Array.from(tools.values());
-    writeFileSync(storeFile, JSON.stringify(data, null, 2), "utf-8");
+    const tmpFile = `${storeFile}.${randomBytes(6).toString("hex")}.tmp`;
+    writeFileSync(tmpFile, JSON.stringify(data, null, 2), "utf-8");
+    renameSync(tmpFile, storeFile);
   }
 
   return {

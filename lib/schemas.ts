@@ -14,11 +14,7 @@ import type {
 export const sourceFormatSchema = z.enum([
   "github",
   "npm",
-  "pypi",
   "local",
-  "url",
-  "git",
-  "tarball",
 ]) satisfies z.ZodType<SourceFormat>;
 
 export const installStatusSchema = z.enum([

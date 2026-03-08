@@ -2,15 +2,37 @@ import type { ToolResolver, ResolveResult, ToolMeta, SourceFormat } from "./type
 import { get as httpsGet } from "node:https";
 import { get as httpGet } from "node:http";
 
+/** Private/reserved IP ranges that should not be followed via redirects (SSRF protection) */
+const PRIVATE_IP_PATTERNS = [
+  /^127\./, // loopback
+  /^10\./, // class A private
+  /^172\.(1[6-9]|2\d|3[01])\./, // class B private
+  /^192\.168\./, // class C private
+  /^169\.254\./, // link-local
+  /^0\./, // current network
+  /^\[::1\]/, // IPv6 loopback
+  /^\[fc/, // IPv6 unique local
+  /^\[fd/, // IPv6 unique local
+  /^\[fe80:/, // IPv6 link-local
+];
+
+/** Check if a URL points to a private/internal IP address */
+export function isPrivateUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname;
+    if (host === "localhost" || host === "[::1]") return true;
+    return PRIVATE_IP_PATTERNS.some((p) => p.test(host));
+  } catch {
+    return false;
+  }
+}
+
 /** Pattern matchers for source format detection */
 const FORMAT_PATTERNS: ReadonlyArray<{ pattern: RegExp; format: SourceFormat }> = [
   { pattern: /^@[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+$/, format: "npm" },
   { pattern: /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+$/, format: "github" },
   { pattern: /^https?:\/\/github\.com\//, format: "github" },
-  { pattern: /^https?:\/\/.*\.tar\.gz$/, format: "tarball" },
-  { pattern: /^https?:\/\/.*\.tgz$/, format: "tarball" },
-  { pattern: /^https?:\/\//, format: "url" },
-  { pattern: /^git(\+https?|@)/, format: "git" },
   { pattern: /^(\.\/|\/|~\/)/, format: "local" },
 ];
 
@@ -25,12 +47,17 @@ export function detectFormat(input: string): SourceFormat | null {
 }
 
 const MAX_REDIRECTS = 10;
+const MAX_JSON_SIZE = 1 * 1024 * 1024; // 1MB for JSON responses
 
-/** Fetch JSON from a URL (follows redirects) */
+/** Fetch JSON from a URL (follows redirects, with SSRF and size protection) */
 export function fetchJson(url: string, redirectCount = 0): Promise<unknown> {
   return new Promise((resolve, reject) => {
     if (redirectCount > MAX_REDIRECTS) {
       reject(new Error(`Too many redirects (>${MAX_REDIRECTS}) for ${url}`));
+      return;
+    }
+    if (isPrivateUrl(url)) {
+      reject(new Error(`Refusing to fetch private/internal URL: ${url}`));
       return;
     }
     const getter = url.startsWith("https") ? httpsGet : httpGet;
@@ -43,8 +70,24 @@ export function fetchJson(url: string, redirectCount = 0): Promise<unknown> {
         reject(new Error(`HTTP ${res.statusCode} for ${url}`));
         return;
       }
+      // Check Content-Length if available
+      const contentLength = parseInt(res.headers["content-length"] ?? "", 10);
+      if (contentLength > MAX_JSON_SIZE) {
+        res.destroy();
+        reject(new Error(`Response too large (${contentLength} bytes, max ${MAX_JSON_SIZE}) from ${url}`));
+        return;
+      }
       let data = "";
-      res.on("data", (chunk: Buffer) => { data += chunk.toString(); });
+      let received = 0;
+      res.on("data", (chunk: Buffer) => {
+        received += chunk.length;
+        if (received > MAX_JSON_SIZE) {
+          res.destroy();
+          reject(new Error(`Response exceeded size limit (${MAX_JSON_SIZE} bytes) from ${url}`));
+          return;
+        }
+        data += chunk.toString();
+      });
       res.on("end", () => {
         try { resolve(JSON.parse(data)); }
         catch { reject(new Error(`Invalid JSON from ${url}`)); }
@@ -96,7 +139,11 @@ async function resolveGithub(input: string): Promise<{ meta: Partial<ToolMeta>; 
 async function resolveNpm(input: string): Promise<{ meta: Partial<ToolMeta>; version?: string }> {
   const pkg = input.startsWith("@") ? input : input.split("/").pop() ?? input;
   try {
-    const data = await fetchJson(`https://registry.npmjs.org/${encodeURIComponent(pkg).replace("%40", "@")}`) as Record<string, unknown>;
+    // npm registry expects @scope%2fpkg format for scoped packages
+    const encodedPkg = pkg.startsWith("@")
+      ? `@${encodeURIComponent(pkg.slice(1))}`
+      : encodeURIComponent(pkg);
+    const data = await fetchJson(`https://registry.npmjs.org/${encodedPkg}`) as Record<string, unknown>;
     const latest = (data["dist-tags"] as Record<string, string> | undefined)?.latest ?? "";
     return {
       meta: {

@@ -47,7 +47,7 @@ export type {
   GuardConfig,
 } from "./types.js";
 
-export { createResolver, detectFormat, fetchJson, parseGithubOwnerRepo } from "./resolver.js";
+export { createResolver, detectFormat, fetchJson, parseGithubOwnerRepo, isPrivateUrl } from "./resolver.js";
 export { createInstaller } from "./installer.js";
 export { createAnalyzer, findMainBinary } from "./analyzer.js";
 export { createStore, generateContextMd, getToolInstallDir } from "./store.js";
