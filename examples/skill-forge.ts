@@ -58,6 +58,8 @@ import {
   generateSkillDirectory,
   installTool,
   writeLockfile,
+  generateInstallScript,
+  generateValidateScript,
 } from "../lib/skills.js";
 
 // Skill content (structural generation)
@@ -98,6 +100,22 @@ import { groupByDomain, generateDomainIndex, generateMasterIndex } from "../lib/
 // Domains
 import { DOMAIN_TRIGGERS } from "../lib/domains.js";
 
+// Trending (HTML scraping)
+import {
+  scrapeTrendingHtml,
+  isLikelyCli,
+  getWellKnownCliRepos,
+  type TrendingRepo,
+} from "../lib/classifier/github.js";
+
+// Curated tools registry
+import { loadAllTools, getCategories, type CliTool } from "../lib/curated-tools.js";
+
+// Workflow templates
+import { generateFromTemplate } from "../lib/pipeline/templates/template-engine.js";
+import { getAllTemplates } from "../lib/pipeline/templates/index.js";
+import type { WorkflowIntent } from "../lib/types.js";
+
 // Output
 import { success, failure, emit } from "../lib/output.js";
 
@@ -117,6 +135,7 @@ import { homedir } from "node:os";
 import { join, resolve, basename, dirname } from "node:path";
 import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, chmodSync, statSync, renameSync } from "node:fs";
 import { randomBytes } from "node:crypto";
+import { fileURLToPath } from "node:url";
 
 // ── Config ─────────────────────────────────────────────────────────────
 
@@ -134,6 +153,22 @@ interface CliArgs {
   limit: number;       // max packages in discovery mode
   json: boolean;       // structured JSON output
   strict: boolean;     // fail on quality gate
+  // Trending mode
+  trending: boolean;
+  language: string;    // --language for trending
+  since: string;       // --since daily|weekly|monthly
+  // Curated mode
+  curated: boolean;
+  category: string;    // --category filter
+  listCategories: boolean;
+  skipInstalled: boolean;
+  // Workflow mode
+  workflow: boolean;
+  out: string;         // --out dir for workflow output
+  list: boolean;       // --list templates
+  // Enhanced audit
+  ai: boolean;         // --ai scoring (Haiku)
+  domain: string;      // --domain filter
 }
 
 export function parseArgs(): CliArgs {
@@ -141,24 +176,45 @@ export function parseArgs(): CliArgs {
   const opts: CliArgs = {
     prompt: "", tool: "", deep: false, audit: false,
     dryRun: false, limit: 10, json: false, strict: false,
+    trending: false, language: "", since: "monthly",
+    curated: false, category: "", listCategories: false, skipInstalled: false,
+    workflow: false, out: "", list: false,
+    ai: false, domain: "",
   };
 
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
-    if (a === "--tool" && argv[i + 1])    { opts.tool = argv[++i]!; }
-    else if (a === "--deep")              { opts.deep = true; }
-    else if (a === "--audit")             { opts.audit = true; }
-    else if (a === "--dry-run")           { opts.dryRun = true; }
-    else if (a === "--limit" && argv[i+1]){
+    if (a === "--tool" && argv[i + 1])        { opts.tool = argv[++i]!; }
+    else if (a === "--deep")                  { opts.deep = true; }
+    else if (a === "--audit")                 { opts.audit = true; }
+    else if (a === "--dry-run")               { opts.dryRun = true; }
+    else if (a === "--limit" && argv[i+1])    {
       const parsed = parseInt(argv[++i]!, 10);
       if (Number.isNaN(parsed) || parsed < 1) {
         throw new Error(`Invalid --limit value: "${argv[i]}" (must be a positive integer)`);
       }
       opts.limit = parsed;
     }
-    else if (a === "--json")              { opts.json = true; }
-    else if (a === "--strict")            { opts.strict = true; }
-    else if (!a.startsWith("--"))         { opts.prompt += (opts.prompt ? " " : "") + a; }
+    else if (a === "--json")                  { opts.json = true; }
+    else if (a === "--strict")                { opts.strict = true; }
+    // Trending mode
+    else if (a === "--trending")              { opts.trending = true; }
+    else if (a === "--language" && argv[i+1]) { opts.language = argv[++i]!; }
+    else if (a === "--since" && argv[i+1])    { opts.since = argv[++i]!; }
+    // Curated mode
+    else if (a === "--curated")               { opts.curated = true; }
+    else if (a === "--category" && argv[i+1]) { opts.category = argv[++i]!.toLowerCase(); }
+    else if (a === "--list-categories")        { opts.listCategories = true; }
+    else if (a === "--skip-installed")         { opts.skipInstalled = true; }
+    // Workflow mode
+    else if (a === "--workflow")               { opts.workflow = true; }
+    else if (a === "--out" && argv[i+1])      { opts.out = argv[++i]!; }
+    else if (a === "--list")                  { opts.list = true; }
+    // Enhanced audit
+    else if (a === "--ai")                    { opts.ai = true; }
+    else if (a === "--domain" && argv[i+1])   { opts.domain = argv[++i]!; }
+    // Positional → prompt
+    else if (!a.startsWith("--"))             { opts.prompt += (opts.prompt ? " " : "") + a; }
   }
 
   return opts;
@@ -381,19 +437,14 @@ function forgeSkill(tool: Tool, dryRun: boolean): ForgedSkill {
     }
   }
 
-  // Build the full file set
+  // Build the full file set (generateSkillDirectory already provides
+  // references/*, scripts/install.sh, scripts/validate.py)
   const files: Record<string, string> = { ...directory.files };
 
   // Always add CONTEXT.md
   files["CONTEXT.md"] = generateContextMd(tool);
 
-  // Generate scripts/install.sh — npm/npx or uv depending on source
-  files["scripts/install.sh"] = generateInstallScript(tool);
-
-  // Generate scripts/validate.py — uv single-file script for validation
-  files["scripts/validate.py"] = generateValidateScript();
-
-  // Generate scripts/search.sh + scripts/grep.sh if we have a manifest entry
+  // Generate forge-specific scripts: search.sh + grep.sh
   const manifestEntry = toolToManifestEntry(tool);
   if (manifestEntry) {
     files["scripts/search.sh"] = generateSearchScript(manifestEntry);
@@ -499,207 +550,8 @@ function buildIndexes(tools: Tool[], dryRun: boolean): void {
   log(`  Indexes: master + ${byDomain.size} domain indexes${dryRun ? " (dry-run, not written)" : ""}`);
 }
 
-// ── Script Generators ──────────────────────────────────────────────────
-
-/** Shell-quote a value: wrap in single quotes with inner escaping */
-export function shellQuote(s: string): string {
-  return "'" + s.replace(/'/g, "'\\''") + "'";
-}
-
-export function generateInstallScript(tool: Tool): string {
-  // Validate before interpolating into shell
-  validateToolName(tool.meta.name);
-  const name = shellQuote(tool.meta.name);
-  const lines: string[] = [
-    "#!/usr/bin/env bash",
-    `# Install ${tool.meta.name} — auto-detected from source format`,
-    "set -euo pipefail",
-    "",
-  ];
-
-  // Strip registry prefix from URI for install commands
-  const pkg = shellQuote(tool.source.uri.replace(/^(pypi|crates|npm):/, ""));
-
-  switch (tool.source.format) {
-    case "npm":
-      lines.push(`# Install via npm (global)`, `npm install -g ${pkg}`, "");
-      lines.push(`# Or run without installing`, `npx ${pkg} --help`);
-      break;
-    case "pypi":
-      lines.push(`# Install via uv (recommended)`, `uv tool install ${pkg}`, "");
-      lines.push(`# Or run without installing`, `uvx ${pkg} --help`);
-      break;
-    case "crates":
-      lines.push(`# Install via cargo-binstall (fast, pre-built binaries)`, `cargo binstall ${pkg}`, "");
-      lines.push(`# Or build from source`, `cargo install ${pkg}`);
-      break;
-    case "github": {
-      const uri = shellQuote(tool.source.uri);
-      lines.push(`# Clone and build from source`);
-      lines.push(`git clone "https://github.com/"${uri}".git"`, `cd ${name}`);
-      lines.push(`# Follow README for build instructions`);
-      break;
-    }
-    default:
-      lines.push(`# Install from: ${tool.source.uri}`);
-      lines.push(`echo "See project README for installation instructions"`);
-  }
-
-  lines.push("");
-  lines.push(`# Verify installation`);
-  lines.push(`${name} --version 2>/dev/null || ${name} version 2>/dev/null || echo "${tool.meta.name} installed (no --version flag)"`);
-  lines.push("");
-
-  return lines.join("\n");
-}
-
-/**
- * Generate scripts/validate.py — a single-file uv script that validates
- * the skill directory structure and frontmatter compliance.
- *
- * Runs with: uv run scripts/validate.py
- * (uv auto-creates a venv and installs pyyaml from the inline metadata)
- */
-function generateValidateScript(): string {
-  return `#!/usr/bin/env -S uv run --script
-# /// script
-# requires-python = ">=3.10"
-# dependencies = ["pyyaml>=6.0"]
-# ///
-"""
-Validate skill directory structure and SKILL.md frontmatter.
-Checks compliance with Anthropic skill spec:
-  - name: kebab-case, max 64 chars, no reserved words
-  - description: non-empty, max 1024 chars, includes trigger phrase, no XML tags
-  - File structure: SKILL.md required, references/ one level deep
-  - No README.md inside skill folder
-
-Usage: uv run scripts/validate.py
-"""
-
-import sys
-import re
-from pathlib import Path
-
-try:
-    import yaml
-except ImportError:
-    print("WARN: pyyaml not available, using basic parsing")
-    yaml = None
-
-SKILL_DIR = Path(__file__).resolve().parent.parent
-SKILL_FILE = SKILL_DIR / "SKILL.md"
-
-def check(condition: bool, msg: str, issues: list[str]) -> None:
-    if not condition:
-        issues.append(msg)
-
-def validate() -> list[str]:
-    issues: list[str] = []
-
-    # File structure checks
-    check(SKILL_FILE.exists(), "SKILL.md not found (must be exactly SKILL.md, case-sensitive)", issues)
-    check(not (SKILL_DIR / "README.md").exists(), "README.md should not be inside skill folder", issues)
-    check(not (SKILL_DIR / "SKILL.MD").exists() or SKILL_FILE.exists(), "File must be SKILL.md not SKILL.MD", issues)
-
-    if not SKILL_FILE.exists():
-        return issues
-
-    content = SKILL_FILE.read_text(encoding="utf-8")
-
-    # Frontmatter delimiters
-    fm_match = re.match(r"^---\\r?\\n([\\s\\S]*?)\\r?\\n---", content)
-    check(fm_match is not None, "Missing --- frontmatter delimiters", issues)
-    if not fm_match:
-        return issues
-
-    fm_text = fm_match.group(1)
-
-    # Parse frontmatter
-    fields: dict = {}
-    if yaml:
-        try:
-            fields = yaml.safe_load(fm_text) or {}
-        except yaml.YAMLError as e:
-            issues.append(f"Invalid YAML frontmatter: {e}")
-            return issues
-    else:
-        for line in fm_text.split("\\n"):
-            m = re.match(r"^(\\w[\\w-]*):\\s*(.+)$", line)
-            if m:
-                fields[m.group(1)] = m.group(2).strip().strip("'\\"")
-
-    # name field
-    name = fields.get("name", "")
-    check(bool(name), "Missing required field: name", issues)
-    check(len(name) <= 64, f"name too long: {len(name)} chars (max 64)", issues)
-    check(bool(re.match(r"^[a-z0-9][a-z0-9-]*$", name)) if name else False,
-          f"name must be kebab-case (lowercase, hyphens only): '{name}'", issues)
-    check("claude" not in name.lower() and "anthropic" not in name.lower(),
-          "name must not contain reserved words: claude, anthropic", issues)
-
-    # description field
-    desc = fields.get("description", "")
-    check(bool(desc), "Missing required field: description", issues)
-    check(len(desc) <= 1024, f"description too long: {len(desc)} chars (max 1024)", issues)
-    check("<" not in desc and ">" not in desc, "description must not contain XML tags", issues)
-    check("use when" in desc.lower() or "use for" in desc.lower(),
-          "description should include trigger phrase ('Use when...')", issues)
-
-    # tags field
-    tags = fields.get("tags", [])
-    if isinstance(tags, list):
-        for tag in tags:
-            check(isinstance(tag, str), f"tag must be a string, got: {type(tag).__name__}", issues)
-            if isinstance(tag, str):
-                check(bool(re.match(r"^[a-z0-9][a-z0-9-]*$", tag)),
-                      f"tag must be kebab-case: '{tag}'", issues)
-    elif tags:
-        issues.append(f"tags must be a list, got: {type(tags).__name__}")
-
-    # Description quality
-    if desc:
-        words = desc.split()
-        check(len(words) >= 8, f"description too short: {len(words)} words (aim for 15+)", issues)
-
-        # Third person check (best practice)
-        check(not desc.lower().startswith("i ") and not desc.lower().startswith("you "),
-              "description should be third person (not 'I' or 'You')", issues)
-
-    # Progressive disclosure: SKILL.md body length
-    body = content[fm_match.end():].strip()
-    body_lines = body.split("\\n")
-    check(len(body_lines) <= 500, f"SKILL.md body too long: {len(body_lines)} lines (max 500)", issues)
-
-    # References depth check — should be one level deep from SKILL.md
-    refs_dir = SKILL_DIR / "references"
-    if refs_dir.exists():
-        for ref_file in refs_dir.rglob("*"):
-            if ref_file.is_file():
-                depth = len(ref_file.relative_to(refs_dir).parts)
-                check(depth <= 1, f"Reference too deep: {ref_file.relative_to(SKILL_DIR)} (keep one level)", issues)
-
-    # Forward slashes in file paths (no Windows backslashes)
-    if "\\\\\\\\" in content:
-        issues.append("Use forward slashes in file paths, not backslashes")
-
-    return issues
-
-
-if __name__ == "__main__":
-    issues = validate()
-
-    skill_name = SKILL_DIR.name
-    if not issues:
-        print(f"  PASS  {skill_name} — all checks passed")
-        sys.exit(0)
-    else:
-        print(f"  FAIL  {skill_name} — {len(issues)} issue(s):")
-        for issue in issues:
-            print(f"    - {issue}")
-        sys.exit(1)
-`;
-}
+// Script generators are now imported from lib/skills.ts:
+// generateInstallScript, generateValidateScript
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -758,13 +610,396 @@ export function fmtTable(rows: string[][], headers: string[]): string {
   ].join("\n");
 }
 
+// ── Mode: Trending (GitHub trending → skills) ─────────────────────────
+
+async function trendingMode(args: CliArgs, startTime: number): Promise<void> {
+  log(`  Mode:     trending`);
+  log(`  Language: ${args.language || "all"}`);
+  log(`  Period:   ${args.since}`);
+  log(`  Limit:    ${args.limit}`);
+  log(`  Dry run:  ${args.dryRun}`);
+  log("");
+
+  // Scrape trending repos
+  log(`  Scraping GitHub trending page...`);
+  let allRepos = await scrapeTrendingHtml(args.language, args.since);
+  log(`  Found ${allRepos.length} trending repos`);
+
+  if (allRepos.length === 0) {
+    log("  Scraping returned 0 repos — falling back to well-known CLI repos...");
+    allRepos = getWellKnownCliRepos();
+  }
+
+  // Filter for CLI tools
+  const cliCandidates: { repo: TrendingRepo; reason: string }[] = [];
+  const nonCli: TrendingRepo[] = [];
+
+  for (const repo of allRepos) {
+    const { likely, reason } = isLikelyCli(repo);
+    if (likely) {
+      cliCandidates.push({ repo, reason });
+    } else {
+      nonCli.push(repo);
+    }
+  }
+
+  // Supplement with well-known repos if few CLI matches
+  const supplementRepos = cliCandidates.length < 10 ? getWellKnownCliRepos() : [];
+  const seen = new Set(allRepos.map(r => r.fullName));
+  const extra = supplementRepos.filter(r => !seen.has(r.fullName));
+
+  const toProcess = [
+    ...cliCandidates.map(c => c.repo),
+    ...nonCli,
+    ...extra,
+  ].slice(0, args.limit);
+
+  log(`  CLI candidates: ${cliCandidates.length} (strong match)`);
+  for (const { repo, reason } of cliCandidates.slice(0, args.limit)) {
+    log(`    ${repo.fullName} — ${reason}`);
+  }
+
+  if (args.dryRun) {
+    log(`\n  Dry run complete. ${toProcess.length} repos would be processed.`);
+    if (args.json) {
+      emit(success("skill-forge:trending", {
+        repos: toProcess.map(r => ({ fullName: r.fullName, language: r.language, description: r.description })),
+        cliCandidates: cliCandidates.length,
+        total: toProcess.length,
+      }, startTime), true);
+    }
+    return;
+  }
+
+  // Process each repo through the forge pipeline
+  const results: Array<{ repo: TrendingRepo; tool: Tool; quality: QualityResult }> = [];
+  const failures: Array<{ repo: TrendingRepo; error: string }> = [];
+
+  for (const repo of toProcess) {
+    log(`\n  ── Forging: ${repo.fullName} ──`);
+    try {
+      const tool = await resolveInstallAnalyze(repo.fullName, args.deep);
+      const forged = forgeSkill(tool, false);
+      const quality = assessQuality(forged.skillMd, tool.meta.name);
+      results.push({ repo, tool, quality });
+      log(`  → ${quality.passed ? "PASS" : "FAIL"} (trigger: ${quality.triggerScore.toFixed(2)}, quality: ${quality.qualityScore}/10)`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      failures.push({ repo, error: msg });
+      log(`  → SKIP: ${msg}`);
+    }
+  }
+
+  // Build indexes
+  if (results.length > 0) {
+    log("\n  Building indexes...");
+    buildIndexes(results.map(r => r.tool), false);
+  }
+
+  // Summary
+  log("\n  ═══════════════════════════════════════════════════════");
+  log("  Trending Pipeline Summary");
+  log("  ═══════════════════════════════════════════════════════");
+  log(`  Processed: ${results.length} | Failed: ${failures.length}`);
+
+  if (results.length > 0) {
+    const rows = results.map(r => [
+      r.tool.meta.name.slice(0, 25),
+      r.repo.language,
+      `${r.tool.capabilities.commands.length}`,
+      r.quality.triggerScore.toFixed(2),
+      r.quality.passed ? "PASS" : "FAIL",
+    ]);
+    log(fmtTable(rows, ["Skill", "Lang", "Cmds", "Trigger", "Status"]));
+  }
+
+  if (args.json) {
+    emit(success("skill-forge:trending", {
+      processed: results.length,
+      failed: failures.length,
+      results: results.map(r => ({
+        name: r.tool.meta.name,
+        repo: r.repo.fullName,
+        commands: r.tool.capabilities.commands.length,
+        quality: r.quality,
+      })),
+    }, startTime), true);
+  }
+}
+
+// ── Mode: Curated (registry of known tools → skills) ──────────────────
+
+async function curatedMode(args: CliArgs, startTime: number): Promise<void> {
+  const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+  const allTools = loadAllTools(projectRoot);
+
+  // --list-categories
+  if (args.listCategories) {
+    const cats = new Map<string, number>();
+    for (const t of allTools) {
+      cats.set(t.category, (cats.get(t.category) ?? 0) + 1);
+    }
+    log(`\n  ${allTools.length} tools across ${cats.size} categories:\n`);
+    const sorted = [...cats.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    for (const [cat, count] of sorted) {
+      log(`    ${cat.padEnd(35)} ${count} tools`);
+    }
+    log(`\n  Filter with: --category <name>  (partial match, e.g. "ai-ml" or "security")\n`);
+    if (args.json) {
+      emit(success("skill-forge:curated", {
+        total: allTools.length,
+        categories: Object.fromEntries(sorted),
+      }, startTime), true);
+    }
+    return;
+  }
+
+  // Filter by category
+  let tools = allTools;
+  if (args.category) {
+    tools = tools.filter(t => t.category.toLowerCase().includes(args.category));
+  }
+
+  // Apply limit
+  if (args.limit > 0) {
+    tools = tools.slice(0, args.limit);
+  }
+
+  log(`  Mode:     curated`);
+  log(`  Tools:    ${tools.length} / ${allTools.length}`);
+  if (args.category) log(`  Category: ${args.category}`);
+  log(`  Dry run:  ${args.dryRun}`);
+  log("");
+
+  // Group by category for display
+  const categories = new Map<string, CliTool[]>();
+  for (const t of tools) {
+    if (!categories.has(t.category)) categories.set(t.category, []);
+    categories.get(t.category)!.push(t);
+  }
+
+  for (const [cat, catTools] of categories) {
+    log(`  ${cat} (${catTools.length})`);
+    for (const t of catTools) {
+      const srcLabel = t.sourceType === "npm" ? `npm:${t.source}` : t.source;
+      log(`    ${t.name.padEnd(16)} ${srcLabel.padEnd(35)} ${t.description.slice(0, 50)}`);
+    }
+    log("");
+  }
+
+  if (args.dryRun) {
+    log(`  Dry run complete. ${tools.length} tools would be processed.`);
+    if (args.json) {
+      emit(success("skill-forge:curated", {
+        tools: tools.map(t => ({ name: t.name, source: t.source, category: t.category })),
+        total: tools.length,
+      }, startTime), true);
+    }
+    return;
+  }
+
+  // Process each tool
+  const store = createStore(DATA_DIR);
+  const results: Array<{ meta: CliTool; tool: Tool; quality: QualityResult }> = [];
+  const failures: Array<{ meta: CliTool; error: string }> = [];
+  const skipped: CliTool[] = [];
+
+  for (const meta of tools) {
+    // Skip installed if requested
+    if (args.skipInstalled) {
+      const skillPath = join(OUTPUT_DIR, meta.name, "SKILL.md");
+      if (existsSync(skillPath)) {
+        log(`  Skipping ${meta.name} (already has SKILL.md)`);
+        skipped.push(meta);
+        continue;
+      }
+    }
+
+    log(`\n  ── Forging: ${meta.name} ──`);
+    try {
+      // Convert CliTool source to forge-compatible source
+      const source = meta.sourceType === "npm"
+        ? (meta.source.startsWith("@") ? meta.source : `npm:${meta.source}`)
+        : meta.source;
+
+      const tool = await resolveInstallAnalyze(source, args.deep);
+      const forged = forgeSkill(tool, false);
+      const quality = assessQuality(forged.skillMd, tool.meta.name);
+      results.push({ meta, tool, quality });
+      log(`  → ${quality.passed ? "PASS" : "FAIL"} (trigger: ${quality.triggerScore.toFixed(2)}, quality: ${quality.qualityScore}/10)`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      failures.push({ meta, error: msg });
+      log(`  → SKIP: ${msg}`);
+    }
+  }
+
+  // Build indexes
+  if (results.length > 0) {
+    log("\n  Building indexes...");
+    buildIndexes(results.map(r => r.tool), false);
+  }
+
+  // Summary
+  log("\n  ═══════════════════════════════════════════════════════");
+  log("  Curated Pipeline Summary");
+  log("  ═══════════════════════════════════════════════════════");
+  log(`  Processed: ${results.length} | Failed: ${failures.length} | Skipped: ${skipped.length}`);
+
+  if (results.length > 0) {
+    const rows = results.map(r => [
+      r.tool.meta.name.slice(0, 25),
+      r.meta.category,
+      `${r.tool.capabilities.commands.length}`,
+      r.quality.triggerScore.toFixed(2),
+      r.quality.passed ? "PASS" : "FAIL",
+    ]);
+    log(fmtTable(rows, ["Skill", "Category", "Cmds", "Trigger", "Status"]));
+  }
+
+  if (args.json) {
+    emit(success("skill-forge:curated", {
+      processed: results.length,
+      failed: failures.length,
+      skipped: skipped.length,
+      results: results.map(r => ({
+        name: r.tool.meta.name,
+        category: r.meta.category,
+        commands: r.tool.capabilities.commands.length,
+        quality: r.quality,
+      })),
+    }, startTime), true);
+  }
+}
+
+// ── Mode: Workflow (NL prompt → agent code from templates) ─────────────
+
+function workflowMode(args: CliArgs, startTime: number): void {
+  const outDir = resolve(args.out || "examples/generated-workflows");
+
+  // --list: show available templates
+  if (args.list) {
+    const templates = getAllTemplates();
+    log("\n  Available workflow templates:\n");
+    for (const t of templates) {
+      log(`  ${t.name}`);
+      log(`    Strategy: ${t.strategy}`);
+      log(`    ${t.description}\n`);
+    }
+    if (args.json) {
+      emit(success("skill-forge:workflow", {
+        templates: templates.map(t => ({ name: t.name, strategy: t.strategy, description: t.description })),
+      }, startTime), true);
+    }
+    return;
+  }
+
+  if (!args.prompt) {
+    log('  Usage: npx tsx examples/skill-forge.ts --workflow "build a code review council"');
+    log("         npx tsx examples/skill-forge.ts --workflow --list");
+    return;
+  }
+
+  // Analyze prompt
+  const intent = classifyIntent(args.prompt);
+  const parsed = parsePrompt(args.prompt);
+  const entities = extractEntities(args.prompt);
+
+  // Build synthetic discovered packages from entities
+  const packages = entities
+    .filter(e => e.packageName)
+    .map(e => ({
+      name: e.packageName!,
+      repo: e.repoSlug ?? "",
+      source: e.source,
+      domain: e.domain,
+      description: `${e.name} package`,
+      quality_score: 0.8,
+    }));
+
+  log(`  Mode:         workflow`);
+  log(`  Prompt:       ${args.prompt}`);
+  log(`  Intent:       ${intent.intent} (${(intent.confidence * 100).toFixed(0)}%)`);
+  log(`  Capabilities: ${parsed.capabilities.join(", ") || "none"}`);
+  log(`  Entities:     ${entities.map(e => e.name).join(", ") || "none"}`);
+
+  if (args.dryRun) {
+    log(`\n  (dry-run — no files written)\n`);
+    if (args.json) {
+      emit(success("skill-forge:workflow", {
+        prompt: args.prompt,
+        intent: { type: intent.intent, confidence: intent.confidence },
+        capabilities: parsed.capabilities,
+        entities: entities.map(e => ({ name: e.name, type: e.type })),
+      }, startTime), true);
+    }
+    return;
+  }
+
+  // Generate agent code from template
+  const result = generateFromTemplate(
+    intent.intent as WorkflowIntent,
+    packages,
+    entities,
+    { name: args.prompt.slice(0, 30) },
+  );
+
+  if (!result) {
+    log(`\n  No matching workflow template for intent "${intent.intent}".`);
+    log(`  Available: ${getAllTemplates().map(t => t.name).join(", ")}`);
+    log(`  Try: "code review council", "content publishing", "e-commerce", "personal assistant"\n`);
+    return;
+  }
+
+  log(`  Template:     ${result.template.name}`);
+  log(`  Strategy:     ${result.template.strategy}`);
+
+  // Write to output directory
+  const slugName = args.prompt
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 40);
+  const outPath = join(outDir, slugName);
+  mkdirSync(outPath, { recursive: true });
+
+  atomicWrite(join(outPath, "agent.ts"), result.code);
+
+  if (result.envVars.length > 0) {
+    atomicWrite(join(outPath, ".env.example"), result.envVars.map((v: string) => `${v}=`).join("\n") + "\n");
+  }
+
+  log(`\n  Generated workflow:`);
+  log(`  Output:   ${outPath}/`);
+  log(`  Agent:    ${result.code.split("\n").length} lines`);
+  if (result.envVars.length > 0) {
+    log(`  Env vars: ${result.envVars.join(", ")}`);
+  }
+
+  const preview = result.code.split("\n").slice(0, 8).map((l: string) => `    ${l}`).join("\n");
+  log(`\n  Preview:\n${preview}\n    ...\n`);
+
+  if (args.json) {
+    emit(success("skill-forge:workflow", {
+      template: { name: result.template.name, strategy: result.template.strategy },
+      output: outPath,
+      lines: result.code.split("\n").length,
+      envVars: result.envVars,
+    }, startTime), true);
+  }
+}
+
 // ── Mode: Audit existing skills ────────────────────────────────────────
 
-function runAudit(strict: boolean, jsonMode: boolean, startTime: number): void {
+async function runAudit(strict: boolean, jsonMode: boolean, startTime: number, domain?: string, ai?: boolean): Promise<void> {
   log("\n  Skill Quality Audit");
-  log(`  Directory: ${OUTPUT_DIR}\n`);
+  log(`  Directory: ${OUTPUT_DIR}`);
+  if (domain) log(`  Domain:    ${domain}`);
+  if (ai) log(`  AI:        enabled (Haiku scoring)`);
+  log("");
 
-  const results = testAllSkillsSync(OUTPUT_DIR);
+  // testAllSkillsSync supports domain filtering
+  const results = testAllSkillsSync(OUTPUT_DIR, domain);
 
   if (results.length === 0) {
     log("  No skills found to audit.");
@@ -774,20 +1009,23 @@ function runAudit(strict: boolean, jsonMode: boolean, startTime: number): void {
     return;
   }
 
-  // Group by domain
-  const domainGroups = new Map<string, typeof results>();
+  // Group by domain using the indexes module
+  const entries: ManifestEntry[] = [];
   for (const r of results) {
     try {
       const content = readFileSync(r.skillPath, "utf-8");
-      const domainMatch = content.match(/domain:\s*(\S+)/);
-      const domain = domainMatch?.[1] ?? "unknown";
-      if (!domainGroups.has(domain)) domainGroups.set(domain, []);
-      domainGroups.get(domain)!.push(r);
-    } catch {
-      if (!domainGroups.has("unknown")) domainGroups.set("unknown", []);
-      domainGroups.get("unknown")!.push(r);
-    }
+      const fm = parseFrontmatter(content);
+      if (fm) {
+        entries.push({
+          name: fm.name,
+          repo: "",
+          domain: (fm as unknown as Record<string, unknown>).domain as string ?? "uncategorized",
+          description: fm.description ?? "",
+        });
+      }
+    } catch { /* skip */ }
   }
+  const grouped = groupByDomain(entries);
 
   printQualityReport(results);
 
@@ -796,21 +1034,64 @@ function runAudit(strict: boolean, jsonMode: boolean, startTime: number): void {
 
   // Domain summary
   log("  Domain Distribution:");
-  for (const [domain, group] of domainGroups) {
-    const p = group.filter(r => r.passed).length;
-    log(`    ${domain.padEnd(20)} ${group.length} skills (${p} pass, ${group.length - p} fail)`);
+  for (const [d, items] of [...grouped].sort((a, b) => b[1].length - a[1].length)) {
+    const count = String(items.length).padStart(4);
+    const triggers = DOMAIN_TRIGGERS[d];
+    const hint = triggers ? ` (${triggers.split(",").slice(0, 3).map(s => s.trim()).join(", ")})` : "";
+    log(`    ${d.padEnd(20)} ${count} skills${hint}`);
   }
+  log("");
+
+  // Optional AI scoring
+  let aiScores: Array<{ name: string; score: number | null }> | null = null;
+  if (ai) {
+    log("  Running AI quality scoring...");
+    try {
+      const { testAllSkills } = await import("../lib/skill-tester.js");
+      const fullResults = await testAllSkills(OUTPUT_DIR, true, domain);
+      aiScores = fullResults.map(r => ({
+        name: r.skillName,
+        score: r.qualityScore,
+      }));
+      const scored = aiScores.filter(a => a.score !== null);
+      if (scored.length > 0) {
+        const avg = scored.reduce((s, a) => s + (a.score ?? 0), 0) / scored.length;
+        log(`  AI Quality Scores (${scored.length} scored):`);
+        log(`    Average: ${avg.toFixed(1)}/10`);
+        const low = scored.filter(a => (a.score ?? 10) < 6);
+        if (low.length > 0) {
+          log(`    Below threshold: ${low.length}`);
+          for (const a of low) log(`      - ${a.name}: ${a.score}/10`);
+        }
+        log("");
+      }
+    } catch (err) {
+      log(`  AI scoring failed: ${(err as Error).message}`);
+    }
+  }
+
+  // Summary stats
+  const avgTrigger = results.reduce((s, r) => s + r.triggerScore, 0) / results.length;
+  const avgQuality = results.reduce((s, r) => s + r.qualityScore, 0) / results.length;
+  log(`  Summary:`);
+  log(`    Total:       ${results.length}`);
+  log(`    Passed:      ${passed} (${((passed / results.length) * 100).toFixed(0)}%)`);
+  log(`    Avg trigger: ${avgTrigger.toFixed(2)}`);
+  log(`    Avg quality: ${avgQuality.toFixed(1)}/10`);
+  log(`    Domains:     ${grouped.size}`);
   log("");
 
   if (jsonMode) {
     const domains: Record<string, { total: number; passed: number }> = {};
-    for (const [domain, group] of domainGroups) {
-      domains[domain] = { total: group.length, passed: group.filter(r => r.passed).length };
+    for (const [d, items] of grouped) {
+      domains[d] = { total: items.length, passed: 0 };
     }
     emit(success("skill-forge:audit", {
       total: results.length,
       passed,
       failed,
+      avgTriggerScore: avgTrigger,
+      avgQualityScore: avgQuality,
       domains,
       results: results.map(r => ({
         name: r.name,
@@ -818,6 +1099,7 @@ function runAudit(strict: boolean, jsonMode: boolean, startTime: number): void {
         triggerScore: r.triggerScore,
         qualityScore: r.qualityScore,
         issues: r.issues,
+        aiScore: aiScores?.find(a => a.name === r.name)?.score ?? null,
       })),
     }, startTime), true);
   }
@@ -841,9 +1123,27 @@ async function main(): Promise<void> {
   log("  ╚═══════════════════════════════════════════════════════╝");
   log("");
 
+  // ── Mode: Trending ──
+  if (args.trending) {
+    await trendingMode(args, startTime);
+    return;
+  }
+
+  // ── Mode: Curated ──
+  if (args.curated || args.listCategories) {
+    await curatedMode(args, startTime);
+    return;
+  }
+
+  // ── Mode: Workflow ──
+  if (args.workflow) {
+    workflowMode(args, startTime);
+    return;
+  }
+
   // ── Mode: Audit ──
   if (args.audit) {
-    runAudit(args.strict, args.json, startTime);
+    await runAudit(args.strict, args.json, startTime, args.domain || undefined, args.ai || undefined);
     return;
   }
 
@@ -886,7 +1186,11 @@ async function main(): Promise<void> {
     log("  Usage:");
     log('    npx tsx examples/skill-forge.ts "build a RAG pipeline"');
     log("    npx tsx examples/skill-forge.ts --tool ruff --deep");
-    log("    npx tsx examples/skill-forge.ts --audit");
+    log("    npx tsx examples/skill-forge.ts --audit [--domain X] [--ai]");
+    log("    npx tsx examples/skill-forge.ts --trending [--language rust] [--since weekly]");
+    log("    npx tsx examples/skill-forge.ts --curated [--category ai-ml] [--skip-installed]");
+    log('    npx tsx examples/skill-forge.ts --workflow "build a code review council"');
+    log("    npx tsx examples/skill-forge.ts --workflow --list");
     log("");
     return;
   }
