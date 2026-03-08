@@ -1,0 +1,4018 @@
+[
+  {
+    "name": "ollama",
+    "source": "ollama/ollama",
+    "sourceType": "github",
+    "description": "Run LLMs locally with a single binary and model registry",
+    "subcategory": "LLM Inference",
+    "agentValue": "Local model serving for agent backends without cloud dependency"
+  },
+  {
+    "name": "llama.cpp",
+    "source": "ggml-org/llama.cpp",
+    "sourceType": "github",
+    "description": "LLM inference in C/C++ with broad model support",
+    "subcategory": "LLM Inference",
+    "agentValue": "High-performance local inference engine agents can call directly"
+  },
+  {
+    "name": "vllm",
+    "source": "vllm-project/vllm",
+    "sourceType": "github",
+    "description": "High-throughput LLM serving with PagedAttention",
+    "subcategory": "LLM Inference",
+    "agentValue": "Production-grade serving for agent-facing LLM endpoints"
+  },
+  {
+    "name": "localai",
+    "source": "mudler/LocalAI",
+    "sourceType": "github",
+    "description": "OpenAI-compatible local API for multiple model backends",
+    "subcategory": "LLM Inference",
+    "agentValue": "Drop-in OpenAI replacement enabling agents to run fully offline"
+  },
+  {
+    "name": "text-generation-webui",
+    "source": "oobabooga/text-generation-webui",
+    "sourceType": "github",
+    "description": "Feature-rich web UI for running local LLMs",
+    "subcategory": "LLM Inference",
+    "agentValue": "Flexible local LLM backend with API for agent integration"
+  },
+  {
+    "name": "jan",
+    "source": "janhq/jan",
+    "sourceType": "github",
+    "description": "Open-source ChatGPT alternative that runs offline",
+    "subcategory": "LLM Inference",
+    "agentValue": "Desktop LLM client with API server for local agent workflows"
+  },
+  {
+    "name": "koboldcpp",
+    "source": "LostRuins/koboldcpp",
+    "sourceType": "github",
+    "description": "Run GGUF models with KoboldAI UI in a single file",
+    "subcategory": "LLM Inference",
+    "agentValue": "Zero-install local inference for quick agent prototyping"
+  },
+  {
+    "name": "gpt4all",
+    "source": "nomic-ai/gpt4all",
+    "sourceType": "github",
+    "description": "Run open-source LLMs locally on consumer hardware",
+    "subcategory": "LLM Inference",
+    "agentValue": "Cross-platform local LLM with Python bindings for agent use"
+  },
+  {
+    "name": "llamafile",
+    "source": "Mozilla-Ocho/llamafile",
+    "sourceType": "github",
+    "description": "Distribute and run LLMs with a single executable file",
+    "subcategory": "LLM Inference",
+    "agentValue": "Single-file LLM distribution simplifies agent deployment"
+  },
+  {
+    "name": "mlc-llm",
+    "source": "mlc-ai/mlc-llm",
+    "sourceType": "github",
+    "description": "Universal LLM deployment on any hardware via ML compilation",
+    "subcategory": "LLM Inference",
+    "agentValue": "Deploy LLMs on edge devices for embedded agent scenarios"
+  },
+  {
+    "name": "exllamav2",
+    "source": "turboderp-org/exllamav2",
+    "sourceType": "github",
+    "description": "Fast inference library for LLMs on consumer GPUs",
+    "subcategory": "LLM Inference",
+    "agentValue": "Optimized GPU inference for latency-sensitive agent workloads"
+  },
+  {
+    "name": "open-webui",
+    "source": "open-webui/open-webui",
+    "sourceType": "github",
+    "description": "User-friendly AI interface supporting Ollama and OpenAI APIs",
+    "subcategory": "LLM Inference",
+    "agentValue": "Web UI with built-in RAG for human-in-the-loop agent workflows"
+  },
+  {
+    "name": "litellm",
+    "source": "BerriAI/litellm",
+    "sourceType": "github",
+    "description": "Unified API gateway for 100+ LLM providers",
+    "subcategory": "LLM Inference",
+    "agentValue": "Single interface to switch LLM providers in agent pipelines"
+  },
+  {
+    "name": "anything-llm",
+    "source": "Mintplex-Labs/anything-llm",
+    "sourceType": "github",
+    "description": "All-in-one AI app with built-in RAG and agent support",
+    "subcategory": "LLM Inference",
+    "agentValue": "Privacy-first RAG platform with built-in AI agent capabilities"
+  },
+  {
+    "name": "privateGPT",
+    "source": "zylon-ai/private-gpt",
+    "sourceType": "github",
+    "description": "Private document Q&A using local LLMs",
+    "subcategory": "LLM Inference",
+    "agentValue": "Enables agents to query private documents without data leakage"
+  },
+  {
+    "name": "lmdeploy",
+    "source": "InternLM/lmdeploy",
+    "sourceType": "github",
+    "description": "Toolkit for compressing, deploying and serving LLMs",
+    "subcategory": "LLM Inference",
+    "agentValue": "Efficient LLM deployment toolkit for production agent systems"
+  },
+  {
+    "name": "sglang",
+    "source": "sgl-project/sglang",
+    "sourceType": "github",
+    "description": "Structured generation language for LLMs",
+    "subcategory": "LLM Inference",
+    "agentValue": "Structured output generation critical for agent tool-use patterns"
+  },
+  {
+    "name": "tgi",
+    "source": "huggingface/text-generation-inference",
+    "sourceType": "github",
+    "description": "Production-ready text generation inference server",
+    "subcategory": "LLM Inference",
+    "agentValue": "HuggingFace's optimized inference server for agent backends"
+  },
+  {
+    "name": "candle",
+    "source": "huggingface/candle",
+    "sourceType": "github",
+    "description": "Minimalist ML framework for Rust",
+    "subcategory": "LLM Inference",
+    "agentValue": "Rust ML inference for high-performance agent components"
+  },
+  {
+    "name": "tabbyAPI",
+    "source": "theroyallab/tabbyAPI",
+    "sourceType": "github",
+    "description": "OpenAI-compatible exllamav2 API server",
+    "subcategory": "LLM Inference",
+    "agentValue": "Lightweight local API server for agent model access"
+  },
+  {
+    "name": "aider",
+    "source": "Aider-AI/aider",
+    "sourceType": "github",
+    "description": "AI pair programming in your terminal",
+    "subcategory": "AI Coding",
+    "agentValue": "Terminal coding agent that edits files and manages git"
+  },
+  {
+    "name": "claude-code",
+    "source": "@anthropic-ai/claude-code",
+    "sourceType": "npm",
+    "description": "Anthropic's terminal-native AI coding agent",
+    "subcategory": "AI Coding",
+    "agentValue": "Full-autonomy coding agent with deep codebase understanding"
+  },
+  {
+    "name": "codex",
+    "source": "openai/codex",
+    "sourceType": "github",
+    "description": "OpenAI's lightweight terminal coding agent",
+    "subcategory": "AI Coding",
+    "agentValue": "Fast terminal agent for code generation and refactoring"
+  },
+  {
+    "name": "continue",
+    "source": "continuedev/continue",
+    "sourceType": "github",
+    "description": "Open-source AI code assistant for VS Code and JetBrains",
+    "subcategory": "AI Coding",
+    "agentValue": "Customizable coding assistant with any LLM backend"
+  },
+  {
+    "name": "cody",
+    "source": "sourcegraph/cody",
+    "sourceType": "github",
+    "description": "AI assistant with deep codebase understanding",
+    "subcategory": "AI Coding",
+    "agentValue": "Codebase-aware assistant leveraging Sourcegraph search"
+  },
+  {
+    "name": "tabby",
+    "source": "TabbyML/tabby",
+    "sourceType": "github",
+    "description": "Self-hosted AI coding assistant",
+    "subcategory": "AI Coding",
+    "agentValue": "Private code completion server for secure agent deployments"
+  },
+  {
+    "name": "sweep",
+    "source": "sweepai/sweep",
+    "sourceType": "github",
+    "description": "AI agent for automating pull request creation",
+    "subcategory": "AI Coding",
+    "agentValue": "Automated PR generation from issue descriptions"
+  },
+  {
+    "name": "mentat",
+    "source": "AbanteAI/mentat",
+    "sourceType": "github",
+    "description": "AI coding assistant for command-line development",
+    "subcategory": "AI Coding",
+    "agentValue": "Multi-file editing agent with project context awareness"
+  },
+  {
+    "name": "gpt-engineer",
+    "source": "gpt-engineer-org/gpt-engineer",
+    "sourceType": "github",
+    "description": "Build full applications from natural language specs",
+    "subcategory": "AI Coding",
+    "agentValue": "Scaffold entire projects from agent-generated specifications"
+  },
+  {
+    "name": "opencode",
+    "source": "opencode-ai/opencode",
+    "sourceType": "github",
+    "description": "Open-source AI coding agent for the terminal",
+    "subcategory": "AI Coding",
+    "agentValue": "Privacy-first coding agent with 75+ model provider support"
+  },
+  {
+    "name": "goose",
+    "source": "block/goose",
+    "sourceType": "github",
+    "description": "Block's open-source AI developer agent with MCP support",
+    "subcategory": "AI Coding",
+    "agentValue": "Extensible agent with native MCP integration for tool use"
+  },
+  {
+    "name": "plandex",
+    "source": "plandex-ai/plandex",
+    "sourceType": "github",
+    "description": "Terminal AI agent for large multi-file coding tasks",
+    "subcategory": "AI Coding",
+    "agentValue": "Plans and executes complex multi-step coding workflows"
+  },
+  {
+    "name": "cline",
+    "source": "cline/cline",
+    "sourceType": "github",
+    "description": "Autonomous coding agent for VS Code",
+    "subcategory": "AI Coding",
+    "agentValue": "VS Code agent that creates/edits files and runs commands"
+  },
+  {
+    "name": "cursor",
+    "source": "getcursor/cursor",
+    "sourceType": "github",
+    "description": "AI-first code editor forked from VS Code",
+    "subcategory": "AI Coding",
+    "agentValue": "IDE with integrated AI agent for code generation and editing"
+  },
+  {
+    "name": "devika",
+    "source": "stitionai/devika",
+    "sourceType": "github",
+    "description": "AI software engineer that plans and writes code",
+    "subcategory": "AI Coding",
+    "agentValue": "Autonomous agent that researches, plans, and writes code"
+  },
+  {
+    "name": "swe-agent",
+    "source": "princeton-nlp/SWE-agent",
+    "sourceType": "github",
+    "description": "Agent for automatically resolving GitHub issues",
+    "subcategory": "AI Coding",
+    "agentValue": "Autonomous bug-fixing agent benchmarked on real GitHub issues"
+  },
+  {
+    "name": "smol-developer",
+    "source": "smol-ai/developer",
+    "sourceType": "github",
+    "description": "Personal junior developer AI agent",
+    "subcategory": "AI Coding",
+    "agentValue": "Lightweight agent for scaffolding small projects from prompts"
+  },
+  {
+    "name": "gemini-cli",
+    "source": "google-gemini/gemini-cli",
+    "sourceType": "github",
+    "description": "Google's AI coding agent for the terminal",
+    "subcategory": "AI Coding",
+    "agentValue": "Terminal agent powered by Gemini models with tool use"
+  },
+  {
+    "name": "fabric",
+    "source": "danielmiessler/fabric",
+    "sourceType": "github",
+    "description": "Framework for augmenting humans with AI using modular prompts",
+    "subcategory": "AI Coding",
+    "agentValue": "Crowdsourced prompt patterns agents can compose into workflows"
+  },
+  {
+    "name": "promptfoo",
+    "source": "promptfoo",
+    "sourceType": "npm",
+    "description": "CLI for testing, evaluating, and red-teaming LLM apps",
+    "subcategory": "Prompt Engineering",
+    "agentValue": "Automated eval and regression testing for agent prompt quality"
+  },
+  {
+    "name": "dspy",
+    "source": "stanfordnlp/dspy",
+    "sourceType": "github",
+    "description": "Framework for programming rather than prompting LLMs",
+    "subcategory": "Prompt Engineering",
+    "agentValue": "Systematic prompt optimization for reliable agent reasoning"
+  },
+  {
+    "name": "guidance",
+    "source": "guidance-ai/guidance",
+    "sourceType": "github",
+    "description": "Language for controlling LLM output structure",
+    "subcategory": "Prompt Engineering",
+    "agentValue": "Constrained generation ensures agents produce valid structured output"
+  },
+  {
+    "name": "outlines",
+    "source": "dottxt-ai/outlines",
+    "sourceType": "github",
+    "description": "Structured text generation with regex and JSON schema",
+    "subcategory": "Prompt Engineering",
+    "agentValue": "Guarantees agent outputs conform to schemas and grammars"
+  },
+  {
+    "name": "instructor",
+    "source": "instructor-ai/instructor",
+    "sourceType": "github",
+    "description": "Structured outputs from LLMs using Pydantic",
+    "subcategory": "Prompt Engineering",
+    "agentValue": "Type-safe LLM extraction for agent data processing pipelines"
+  },
+  {
+    "name": "langsmith",
+    "source": "langchain-ai/langsmith-sdk",
+    "sourceType": "github",
+    "description": "LLM observability and prompt management platform",
+    "subcategory": "Prompt Engineering",
+    "agentValue": "Trace and debug agent chains with prompt versioning"
+  },
+  {
+    "name": "promptflow",
+    "source": "microsoft/promptflow",
+    "sourceType": "github",
+    "description": "Suite for building LLM-based AI applications",
+    "subcategory": "Prompt Engineering",
+    "agentValue": "Visual DAG builder for agent prompt orchestration flows"
+  },
+  {
+    "name": "haystack",
+    "source": "deepset-ai/haystack",
+    "sourceType": "github",
+    "description": "Framework for building LLM applications and RAG pipelines",
+    "subcategory": "Prompt Engineering",
+    "agentValue": "Composable pipeline framework for agent RAG and search"
+  },
+  {
+    "name": "mirascope",
+    "source": "Mirascope/mirascope",
+    "sourceType": "github",
+    "description": "Pythonic toolkit for building LLM applications",
+    "subcategory": "Prompt Engineering",
+    "agentValue": "Clean Python abstractions for building agent tool-use patterns"
+  },
+  {
+    "name": "chromadb",
+    "source": "chroma-core/chroma",
+    "sourceType": "github",
+    "description": "Open-source embedding database for AI applications",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "Lightweight vector store for agent memory and retrieval"
+  },
+  {
+    "name": "qdrant",
+    "source": "qdrant/qdrant",
+    "sourceType": "github",
+    "description": "High-performance vector similarity search engine in Rust",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "Production vector search with filtering for agent knowledge bases"
+  },
+  {
+    "name": "weaviate",
+    "source": "weaviate/weaviate",
+    "sourceType": "github",
+    "description": "Open-source vector database for AI applications",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "GraphQL-based vector DB for complex agent queries"
+  },
+  {
+    "name": "milvus",
+    "source": "milvus-io/milvus",
+    "sourceType": "github",
+    "description": "Cloud-native vector database for scalable similarity search",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "Billion-scale vector search for large agent knowledge stores"
+  },
+  {
+    "name": "pgvector",
+    "source": "pgvector/pgvector",
+    "sourceType": "github",
+    "description": "PostgreSQL extension for vector similarity search",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "Add vector search to existing Postgres agent data stores"
+  },
+  {
+    "name": "fastembed",
+    "source": "qdrant/fastembed",
+    "sourceType": "github",
+    "description": "Fast and lightweight embedding generation library",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "Quick local embeddings for agent retrieval without GPU"
+  },
+  {
+    "name": "sentence-transformers",
+    "source": "UKPLab/sentence-transformers",
+    "sourceType": "github",
+    "description": "Framework for sentence, text and image embeddings",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "State-of-the-art embeddings for agent semantic search"
+  },
+  {
+    "name": "lancedb",
+    "source": "lancedb/lancedb",
+    "sourceType": "github",
+    "description": "Embedded vector database for multimodal AI",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "Serverless embedded vector DB for lightweight agent deployments"
+  },
+  {
+    "name": "llamaindex",
+    "source": "run-llama/llama_index",
+    "sourceType": "github",
+    "description": "Data framework for LLM applications with RAG",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "Comprehensive RAG framework with agent tool integrations"
+  },
+  {
+    "name": "llamaindex-ts",
+    "source": "llamaindex",
+    "sourceType": "npm",
+    "description": "TypeScript data framework for LLM applications",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "TypeScript RAG and agent framework for Node.js backends"
+  },
+  {
+    "name": "faiss",
+    "source": "facebookresearch/faiss",
+    "sourceType": "github",
+    "description": "Library for efficient similarity search and clustering",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "High-speed vector similarity search for agent retrieval"
+  },
+  {
+    "name": "annoy",
+    "source": "spotify/annoy",
+    "sourceType": "github",
+    "description": "Approximate nearest neighbors in C++/Python",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "Memory-efficient ANN search for agent embedding lookup"
+  },
+  {
+    "name": "unstructured",
+    "source": "Unstructured-IO/unstructured",
+    "sourceType": "github",
+    "description": "ETL toolkit for ingesting unstructured documents",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "Document parsing pipeline feeding agent knowledge bases"
+  },
+  {
+    "name": "docling",
+    "source": "docling-project/docling",
+    "sourceType": "github",
+    "description": "Convert documents to structured formats for gen AI",
+    "subcategory": "Document AI",
+    "agentValue": "PDF/doc extraction for agent document understanding pipelines"
+  },
+  {
+    "name": "marker",
+    "source": "datalab-to/marker",
+    "sourceType": "github",
+    "description": "Convert PDF to markdown with high accuracy",
+    "subcategory": "Document AI",
+    "agentValue": "PDF-to-markdown conversion for agent-readable document ingestion"
+  },
+  {
+    "name": "surya",
+    "source": "datalab-to/surya",
+    "sourceType": "github",
+    "description": "OCR and layout analysis in 90+ languages",
+    "subcategory": "Document AI",
+    "agentValue": "Multilingual OCR enabling agents to read scanned documents"
+  },
+  {
+    "name": "tesseract",
+    "source": "tesseract-ocr/tesseract",
+    "sourceType": "github",
+    "description": "Open-source OCR engine",
+    "subcategory": "Document AI",
+    "agentValue": "Standard OCR tool for agent document processing pipelines"
+  },
+  {
+    "name": "mlflow",
+    "source": "mlflow/mlflow",
+    "sourceType": "github",
+    "description": "Open-source ML lifecycle management platform",
+    "subcategory": "ML Experiment Tracking",
+    "agentValue": "Track agent model experiments with versioned artifacts"
+  },
+  {
+    "name": "wandb",
+    "source": "wandb/wandb",
+    "sourceType": "github",
+    "description": "ML experiment tracking and visualization platform",
+    "subcategory": "ML Experiment Tracking",
+    "agentValue": "Log and compare agent training runs with rich dashboards"
+  },
+  {
+    "name": "neptune",
+    "source": "neptune-ai/neptune-client",
+    "sourceType": "github",
+    "description": "Metadata store for ML experiment tracking",
+    "subcategory": "ML Experiment Tracking",
+    "agentValue": "Track agent fine-tuning experiments with team collaboration"
+  },
+  {
+    "name": "clearml",
+    "source": "allegroai/clearml",
+    "sourceType": "github",
+    "description": "End-to-end ML/DL platform with experiment tracking",
+    "subcategory": "ML Experiment Tracking",
+    "agentValue": "Full MLOps suite for managing agent model development"
+  },
+  {
+    "name": "aim",
+    "source": "aimhubio/aim",
+    "sourceType": "github",
+    "description": "Open-source experiment tracker with rich UI",
+    "subcategory": "ML Experiment Tracking",
+    "agentValue": "Visualize and compare agent model training metrics"
+  },
+  {
+    "name": "sacred",
+    "source": "IDSIA/sacred",
+    "sourceType": "github",
+    "description": "Tool to configure, organize, and log experiments",
+    "subcategory": "ML Experiment Tracking",
+    "agentValue": "Reproducible experiment configuration for agent training"
+  },
+  {
+    "name": "guild-ai",
+    "source": "guildai/guildai",
+    "sourceType": "github",
+    "description": "Experiment tracking and optimization for ML",
+    "subcategory": "ML Experiment Tracking",
+    "agentValue": "CLI-first experiment tracking for agent model development"
+  },
+  {
+    "name": "comet-ml",
+    "source": "comet-ml/comet-examples",
+    "sourceType": "github",
+    "description": "ML experiment platform with auto-logging",
+    "subcategory": "ML Experiment Tracking",
+    "agentValue": "Track agent model metrics with automatic code logging"
+  },
+  {
+    "name": "dvc",
+    "source": "iterative/dvc",
+    "sourceType": "github",
+    "description": "Data version control for ML projects",
+    "subcategory": "ML Experiment Tracking",
+    "agentValue": "Version control for agent training data and model files"
+  },
+  {
+    "name": "cml",
+    "source": "iterative/cml",
+    "sourceType": "github",
+    "description": "Continuous ML with GitHub/GitLab CI/CD",
+    "subcategory": "ML Experiment Tracking",
+    "agentValue": "CI/CD for agent model training and evaluation pipelines"
+  },
+  {
+    "name": "bentoml",
+    "source": "bentoml/BentoML",
+    "sourceType": "github",
+    "description": "Framework for building production AI applications",
+    "subcategory": "Model Serving",
+    "agentValue": "Package and serve agent models as production microservices"
+  },
+  {
+    "name": "seldon-core",
+    "source": "SeldonIO/seldon-core",
+    "sourceType": "github",
+    "description": "ML model deployment on Kubernetes",
+    "subcategory": "Model Serving",
+    "agentValue": "Kubernetes-native model serving for scalable agent backends"
+  },
+  {
+    "name": "kserve",
+    "source": "kserve/kserve",
+    "sourceType": "github",
+    "description": "Kubernetes-native model inference platform",
+    "subcategory": "Model Serving",
+    "agentValue": "Standardized model serving for multi-model agent systems"
+  },
+  {
+    "name": "triton",
+    "source": "triton-inference-server/server",
+    "sourceType": "github",
+    "description": "NVIDIA's multi-framework inference server",
+    "subcategory": "Model Serving",
+    "agentValue": "High-throughput multi-model serving for agent inference"
+  },
+  {
+    "name": "torchserve",
+    "source": "pytorch/serve",
+    "sourceType": "github",
+    "description": "Serve PyTorch models in production",
+    "subcategory": "Model Serving",
+    "agentValue": "Production PyTorch model serving for agent ML components"
+  },
+  {
+    "name": "ray-serve",
+    "source": "ray-project/ray",
+    "sourceType": "github",
+    "description": "Scalable model serving built on Ray",
+    "subcategory": "Model Serving",
+    "agentValue": "Distributed model serving for agent inference at scale"
+  },
+  {
+    "name": "litserve",
+    "source": "Lightning-AI/LitServe",
+    "sourceType": "github",
+    "description": "Lightning-fast model serving engine",
+    "subcategory": "Model Serving",
+    "agentValue": "Simple high-performance serving for agent model endpoints"
+  },
+  {
+    "name": "label-studio",
+    "source": "HumanSignal/label-studio",
+    "sourceType": "github",
+    "description": "Multi-type data labeling and annotation tool",
+    "subcategory": "Data Labeling",
+    "agentValue": "Create training datasets for agent fine-tuning"
+  },
+  {
+    "name": "argilla",
+    "source": "argilla-io/argilla",
+    "sourceType": "github",
+    "description": "Collaboration platform for AI data quality",
+    "subcategory": "Data Labeling",
+    "agentValue": "Curate and annotate data for agent model improvement"
+  },
+  {
+    "name": "cleanlab",
+    "source": "cleanlab/cleanlab",
+    "sourceType": "github",
+    "description": "Automatically detect data quality issues in ML datasets",
+    "subcategory": "Data Labeling",
+    "agentValue": "Find mislabeled data that degrades agent model performance"
+  },
+  {
+    "name": "snorkel",
+    "source": "snorkel-team/snorkel",
+    "sourceType": "github",
+    "description": "Programmatic training data generation with weak supervision",
+    "subcategory": "Data Labeling",
+    "agentValue": "Generate labeled training data for agent models at scale"
+  },
+  {
+    "name": "doccano",
+    "source": "doccano/doccano",
+    "sourceType": "github",
+    "description": "Open-source text annotation tool",
+    "subcategory": "Data Labeling",
+    "agentValue": "Annotate text data for agent NLP model training"
+  },
+  {
+    "name": "ultralytics",
+    "source": "ultralytics/ultralytics",
+    "sourceType": "github",
+    "description": "YOLO object detection and segmentation framework",
+    "subcategory": "Computer Vision",
+    "agentValue": "State-of-the-art vision models for agent perception tasks"
+  },
+  {
+    "name": "detectron2",
+    "source": "facebookresearch/detectron2",
+    "sourceType": "github",
+    "description": "Facebook's object detection and segmentation platform",
+    "subcategory": "Computer Vision",
+    "agentValue": "Advanced detection models for agent visual understanding"
+  },
+  {
+    "name": "mmdetection",
+    "source": "open-mmlab/mmdetection",
+    "sourceType": "github",
+    "description": "OpenMMLab detection toolbox and benchmark",
+    "subcategory": "Computer Vision",
+    "agentValue": "Comprehensive detection toolkit for agent vision pipelines"
+  },
+  {
+    "name": "supervision",
+    "source": "roboflow/supervision",
+    "sourceType": "github",
+    "description": "Reusable computer vision tools for any model",
+    "subcategory": "Computer Vision",
+    "agentValue": "Model-agnostic CV utilities for agent image processing"
+  },
+  {
+    "name": "opencv",
+    "source": "opencv/opencv",
+    "sourceType": "github",
+    "description": "Open-source computer vision library",
+    "subcategory": "Computer Vision",
+    "agentValue": "Core image processing library for agent vision capabilities"
+  },
+  {
+    "name": "mmpose",
+    "source": "open-mmlab/mmpose",
+    "sourceType": "github",
+    "description": "OpenMMLab pose estimation toolbox",
+    "subcategory": "Computer Vision",
+    "agentValue": "Human pose estimation for agent interaction understanding"
+  },
+  {
+    "name": "mmsegmentation",
+    "source": "open-mmlab/mmsegmentation",
+    "sourceType": "github",
+    "description": "OpenMMLab semantic segmentation toolbox",
+    "subcategory": "Computer Vision",
+    "agentValue": "Scene understanding through segmentation for agent vision"
+  },
+  {
+    "name": "segment-anything",
+    "source": "facebookresearch/segment-anything",
+    "sourceType": "github",
+    "description": "Meta's promptable image segmentation model",
+    "subcategory": "Computer Vision",
+    "agentValue": "Zero-shot segmentation for agent visual grounding tasks"
+  },
+  {
+    "name": "groundingdino",
+    "source": "IDEA-Research/GroundingDINO",
+    "sourceType": "github",
+    "description": "Open-set object detection with text prompts",
+    "subcategory": "Computer Vision",
+    "agentValue": "Text-guided object detection for agent visual search"
+  },
+  {
+    "name": "depth-anything",
+    "source": "LiheYoung/Depth-Anything",
+    "sourceType": "github",
+    "description": "Monocular depth estimation foundation model",
+    "subcategory": "Computer Vision",
+    "agentValue": "Depth perception for agent spatial understanding"
+  },
+  {
+    "name": "transformers",
+    "source": "huggingface/transformers",
+    "sourceType": "github",
+    "description": "State-of-the-art ML models for NLP, vision, and audio",
+    "subcategory": "NLP",
+    "agentValue": "Foundation model library powering most agent ML backends"
+  },
+  {
+    "name": "spacy",
+    "source": "explosion/spaCy",
+    "sourceType": "github",
+    "description": "Industrial-strength NLP library in Python",
+    "subcategory": "NLP",
+    "agentValue": "Fast NLP processing for agent text understanding pipelines"
+  },
+  {
+    "name": "nltk",
+    "source": "nltk/nltk",
+    "sourceType": "github",
+    "description": "Natural Language Toolkit for Python",
+    "subcategory": "NLP",
+    "agentValue": "Text processing utilities for agent language analysis"
+  },
+  {
+    "name": "stanza",
+    "source": "stanfordnlp/stanza",
+    "sourceType": "github",
+    "description": "Stanford NLP library with pretrained models for 70+ languages",
+    "subcategory": "NLP",
+    "agentValue": "Multilingual NLP for agent text processing across languages"
+  },
+  {
+    "name": "flair",
+    "source": "flairNLP/flair",
+    "sourceType": "github",
+    "description": "Framework for state-of-the-art NLP",
+    "subcategory": "NLP",
+    "agentValue": "High-accuracy NER and classification for agent text extraction"
+  },
+  {
+    "name": "gensim",
+    "source": "piskvorky/gensim",
+    "sourceType": "github",
+    "description": "Topic modeling and document similarity",
+    "subcategory": "NLP",
+    "agentValue": "Topic analysis for agent document understanding"
+  },
+  {
+    "name": "textblob",
+    "source": "sloria/TextBlob",
+    "sourceType": "github",
+    "description": "Simplified text processing library",
+    "subcategory": "NLP",
+    "agentValue": "Quick sentiment analysis for agent text classification"
+  },
+  {
+    "name": "tokenizers",
+    "source": "huggingface/tokenizers",
+    "sourceType": "github",
+    "description": "Fast tokenizer implementations in Rust",
+    "subcategory": "NLP",
+    "agentValue": "High-speed tokenization for agent text preprocessing"
+  },
+  {
+    "name": "datasets",
+    "source": "huggingface/datasets",
+    "sourceType": "github",
+    "description": "Access and share ML datasets efficiently",
+    "subcategory": "NLP",
+    "agentValue": "Load training and evaluation data for agent model development"
+  },
+  {
+    "name": "whisper",
+    "source": "openai/whisper",
+    "sourceType": "github",
+    "description": "Robust speech recognition via large-scale weak supervision",
+    "subcategory": "Audio/Speech",
+    "agentValue": "Transcribe audio input for voice-enabled agents"
+  },
+  {
+    "name": "whisper.cpp",
+    "source": "ggml-org/whisper.cpp",
+    "sourceType": "github",
+    "description": "Port of Whisper model in C/C++ for local inference",
+    "subcategory": "Audio/Speech",
+    "agentValue": "Fast local speech recognition for offline agent voice input"
+  },
+  {
+    "name": "bark",
+    "source": "suno-ai/bark",
+    "sourceType": "github",
+    "description": "Text-to-audio model for speech, music, and sound effects",
+    "subcategory": "Audio/Speech",
+    "agentValue": "Generate natural speech output for agent voice responses"
+  },
+  {
+    "name": "piper",
+    "source": "rhasspy/piper",
+    "sourceType": "github",
+    "description": "Fast local neural text-to-speech system",
+    "subcategory": "Audio/Speech",
+    "agentValue": "Low-latency local TTS for agent voice interfaces"
+  },
+  {
+    "name": "coqui-tts",
+    "source": "coqui-ai/TTS",
+    "sourceType": "github",
+    "description": "Deep learning toolkit for text-to-speech",
+    "subcategory": "Audio/Speech",
+    "agentValue": "Advanced TTS with voice cloning for agent voice output"
+  },
+  {
+    "name": "tortoise-tts",
+    "source": "neonbjb/tortoise-tts",
+    "sourceType": "github",
+    "description": "High-quality multi-voice text-to-speech",
+    "subcategory": "Audio/Speech",
+    "agentValue": "Expressive multi-voice TTS for lifelike agent speech"
+  },
+  {
+    "name": "faster-whisper",
+    "source": "SYSTRAN/faster-whisper",
+    "sourceType": "github",
+    "description": "CTranslate2-based Whisper for 4x faster transcription",
+    "subcategory": "Audio/Speech",
+    "agentValue": "Optimized speech recognition for real-time agent voice processing"
+  },
+  {
+    "name": "whisperspeech",
+    "source": "WhisperSpeech/WhisperSpeech",
+    "sourceType": "github",
+    "description": "Open-source TTS built by inverting Whisper",
+    "subcategory": "Audio/Speech",
+    "agentValue": "Open-source TTS alternative for agent speech generation"
+  },
+  {
+    "name": "silero-vad",
+    "source": "snakers4/silero-vad",
+    "sourceType": "github",
+    "description": "Pre-trained voice activity detection models",
+    "subcategory": "Audio/Speech",
+    "agentValue": "Detect speech segments for agent voice interface triggers"
+  },
+  {
+    "name": "audiocraft",
+    "source": "facebookresearch/audiocraft",
+    "sourceType": "github",
+    "description": "Audio generation library with MusicGen and AudioGen",
+    "subcategory": "Audio/Speech",
+    "agentValue": "Generate audio content for agent multimedia outputs"
+  },
+  {
+    "name": "stable-diffusion-webui",
+    "source": "AUTOMATIC1111/stable-diffusion-webui",
+    "sourceType": "github",
+    "description": "Web UI for Stable Diffusion image generation",
+    "subcategory": "Image Generation",
+    "agentValue": "API-driven image generation for agent visual content creation"
+  },
+  {
+    "name": "comfyui",
+    "source": "comfyanonymous/ComfyUI",
+    "sourceType": "github",
+    "description": "Node-based UI for Stable Diffusion workflows",
+    "subcategory": "Image Generation",
+    "agentValue": "Composable image generation workflows for agent pipelines"
+  },
+  {
+    "name": "invokeai",
+    "source": "invoke-ai/InvokeAI",
+    "sourceType": "github",
+    "description": "Creative engine for Stable Diffusion models",
+    "subcategory": "Image Generation",
+    "agentValue": "Professional image generation with API for agent integration"
+  },
+  {
+    "name": "diffusers",
+    "source": "huggingface/diffusers",
+    "sourceType": "github",
+    "description": "State-of-the-art diffusion models library",
+    "subcategory": "Image Generation",
+    "agentValue": "Programmatic diffusion model access for agent image tasks"
+  },
+  {
+    "name": "fooocus",
+    "source": "lllyasviel/Fooocus",
+    "sourceType": "github",
+    "description": "Simplified Stable Diffusion with focus on prompting",
+    "subcategory": "Image Generation",
+    "agentValue": "Minimal-config image generation for agent visual outputs"
+  },
+  {
+    "name": "stable-diffusion-cpp",
+    "source": "leejet/stable-diffusion.cpp",
+    "sourceType": "github",
+    "description": "Diffusion model inference in pure C/C++",
+    "subcategory": "Image Generation",
+    "agentValue": "Lightweight local image generation for agent deployments"
+  },
+  {
+    "name": "kohya-ss",
+    "source": "kohya-ss/sd-scripts",
+    "sourceType": "github",
+    "description": "Training scripts for Stable Diffusion fine-tuning",
+    "subcategory": "Image Generation",
+    "agentValue": "Fine-tune image models for domain-specific agent visuals"
+  },
+  {
+    "name": "pytorch",
+    "source": "pytorch/pytorch",
+    "sourceType": "github",
+    "description": "Open-source deep learning framework",
+    "subcategory": "ML Frameworks",
+    "agentValue": "Core ML framework underlying most agent model training"
+  },
+  {
+    "name": "tensorflow",
+    "source": "tensorflow/tensorflow",
+    "sourceType": "github",
+    "description": "End-to-end open-source ML platform",
+    "subcategory": "ML Frameworks",
+    "agentValue": "Production ML framework for agent model deployment"
+  },
+  {
+    "name": "jax",
+    "source": "jax-ml/jax",
+    "sourceType": "github",
+    "description": "Composable transformations of NumPy programs for GPU/TPU",
+    "subcategory": "ML Frameworks",
+    "agentValue": "High-performance ML computation for agent model training"
+  },
+  {
+    "name": "keras",
+    "source": "keras-team/keras",
+    "sourceType": "github",
+    "description": "Deep learning API running on multiple backends",
+    "subcategory": "ML Frameworks",
+    "agentValue": "High-level API for rapid agent model prototyping"
+  },
+  {
+    "name": "scikit-learn",
+    "source": "scikit-learn/scikit-learn",
+    "sourceType": "github",
+    "description": "Machine learning library for classical ML algorithms",
+    "subcategory": "ML Frameworks",
+    "agentValue": "Classical ML algorithms for agent feature engineering and classification"
+  },
+  {
+    "name": "xgboost",
+    "source": "dmlc/xgboost",
+    "sourceType": "github",
+    "description": "Scalable gradient boosting framework",
+    "subcategory": "ML Frameworks",
+    "agentValue": "High-performance gradient boosting for agent prediction tasks"
+  },
+  {
+    "name": "lightgbm",
+    "source": "microsoft/LightGBM",
+    "sourceType": "github",
+    "description": "Fast gradient boosting framework by Microsoft",
+    "subcategory": "ML Frameworks",
+    "agentValue": "Efficient boosting for agent tabular data predictions"
+  },
+  {
+    "name": "catboost",
+    "source": "catboost/catboost",
+    "sourceType": "github",
+    "description": "Gradient boosting with categorical feature support",
+    "subcategory": "ML Frameworks",
+    "agentValue": "Handle categorical features natively in agent ML pipelines"
+  },
+  {
+    "name": "lightning",
+    "source": "Lightning-AI/pytorch-lightning",
+    "sourceType": "github",
+    "description": "Deep learning framework for professional AI researchers",
+    "subcategory": "ML Frameworks",
+    "agentValue": "Structured training framework for agent model development"
+  },
+  {
+    "name": "tinygrad",
+    "source": "tinygrad/tinygrad",
+    "sourceType": "github",
+    "description": "Simple and powerful neural network framework",
+    "subcategory": "ML Frameworks",
+    "agentValue": "Minimal ML framework for understanding agent model internals"
+  },
+  {
+    "name": "mxnet",
+    "source": "apache/mxnet",
+    "sourceType": "github",
+    "description": "Apache deep learning framework",
+    "subcategory": "ML Frameworks",
+    "agentValue": "Scalable deep learning for distributed agent training"
+  },
+  {
+    "name": "optuna",
+    "source": "optuna/optuna",
+    "sourceType": "github",
+    "description": "Hyperparameter optimization framework",
+    "subcategory": "AutoML",
+    "agentValue": "Optimize agent model hyperparameters automatically"
+  },
+  {
+    "name": "autogluon",
+    "source": "autogluon/autogluon",
+    "sourceType": "github",
+    "description": "AutoML for text, image, time series, and tabular data",
+    "subcategory": "AutoML",
+    "agentValue": "Auto-train models across modalities for agent prediction"
+  },
+  {
+    "name": "auto-sklearn",
+    "source": "automl/auto-sklearn",
+    "sourceType": "github",
+    "description": "Automated machine learning with scikit-learn",
+    "subcategory": "AutoML",
+    "agentValue": "Automated ML pipeline selection for agent model building"
+  },
+  {
+    "name": "ray-tune",
+    "source": "ray-project/ray",
+    "sourceType": "github",
+    "description": "Scalable hyperparameter tuning with Ray",
+    "subcategory": "AutoML",
+    "agentValue": "Distributed hyperparameter search for agent model optimization"
+  },
+  {
+    "name": "hyperopt",
+    "source": "hyperopt/hyperopt",
+    "sourceType": "github",
+    "description": "Distributed asynchronous hyperparameter optimization",
+    "subcategory": "AutoML",
+    "agentValue": "Bayesian optimization for agent model hyperparameters"
+  },
+  {
+    "name": "flaml",
+    "source": "microsoft/FLAML",
+    "sourceType": "github",
+    "description": "Fast lightweight AutoML library by Microsoft",
+    "subcategory": "AutoML",
+    "agentValue": "Cost-efficient AutoML for resource-constrained agent training"
+  },
+  {
+    "name": "nni",
+    "source": "microsoft/nni",
+    "sourceType": "github",
+    "description": "Neural architecture search and hyperparameter tuning toolkit",
+    "subcategory": "AutoML",
+    "agentValue": "Comprehensive AutoML with neural architecture search for agents"
+  },
+  {
+    "name": "featuretools",
+    "source": "alteryx/featuretools",
+    "sourceType": "github",
+    "description": "Automated feature engineering library",
+    "subcategory": "AutoML",
+    "agentValue": "Auto-generate features for agent ML model inputs"
+  },
+  {
+    "name": "kubeflow",
+    "source": "kubeflow/kubeflow",
+    "sourceType": "github",
+    "description": "ML toolkit for Kubernetes",
+    "subcategory": "MLOps Pipelines",
+    "agentValue": "Kubernetes-native ML pipelines for agent model training at scale"
+  },
+  {
+    "name": "prefect",
+    "source": "PrefectHQ/prefect",
+    "sourceType": "github",
+    "description": "Modern workflow orchestration platform",
+    "subcategory": "MLOps Pipelines",
+    "agentValue": "Orchestrate agent data processing and training workflows"
+  },
+  {
+    "name": "dagster",
+    "source": "dagster-io/dagster",
+    "sourceType": "github",
+    "description": "Data orchestration platform for ML pipelines",
+    "subcategory": "MLOps Pipelines",
+    "agentValue": "Asset-centric orchestration for agent data and model pipelines"
+  },
+  {
+    "name": "metaflow",
+    "source": "Netflix/metaflow",
+    "sourceType": "github",
+    "description": "ML infrastructure framework by Netflix",
+    "subcategory": "MLOps Pipelines",
+    "agentValue": "Productionize agent ML workflows with seamless scaling"
+  },
+  {
+    "name": "zenml",
+    "source": "zenml-io/zenml",
+    "sourceType": "github",
+    "description": "Extensible open-source MLOps framework",
+    "subcategory": "MLOps Pipelines",
+    "agentValue": "Reproducible ML pipelines for agent model lifecycle management"
+  },
+  {
+    "name": "airflow",
+    "source": "apache/airflow",
+    "sourceType": "github",
+    "description": "Programmatic workflow authoring and scheduling",
+    "subcategory": "MLOps Pipelines",
+    "agentValue": "Schedule and orchestrate agent data and training pipelines"
+  },
+  {
+    "name": "flyte",
+    "source": "flyteorg/flyte",
+    "sourceType": "github",
+    "description": "Scalable workflow orchestration for ML",
+    "subcategory": "MLOps Pipelines",
+    "agentValue": "Production-grade orchestration for agent ML pipelines"
+  },
+  {
+    "name": "kedro",
+    "source": "kedro-org/kedro",
+    "sourceType": "github",
+    "description": "Framework for creating reproducible data science pipelines",
+    "subcategory": "MLOps Pipelines",
+    "agentValue": "Modular data pipeline framework for agent feature engineering"
+  },
+  {
+    "name": "mage-ai",
+    "source": "mage-ai/mage-ai",
+    "sourceType": "github",
+    "description": "Data pipeline tool for transforming and integrating data",
+    "subcategory": "MLOps Pipelines",
+    "agentValue": "Visual data pipeline builder for agent data preparation"
+  },
+  {
+    "name": "hamilton",
+    "source": "DAGWorks-Inc/hamilton",
+    "sourceType": "github",
+    "description": "Micro-framework for dataflow definition",
+    "subcategory": "MLOps Pipelines",
+    "agentValue": "Define feature transforms as DAGs for agent ML pipelines"
+  },
+  {
+    "name": "great-expectations",
+    "source": "great-expectations/great_expectations",
+    "sourceType": "github",
+    "description": "Data validation and profiling framework",
+    "subcategory": "Data Processing",
+    "agentValue": "Validate agent training data quality before model training"
+  },
+  {
+    "name": "pandera",
+    "source": "unionai-oss/pandera",
+    "sourceType": "github",
+    "description": "Statistical data validation for dataframes",
+    "subcategory": "Data Processing",
+    "agentValue": "Schema validation for agent data processing pipelines"
+  },
+  {
+    "name": "polars",
+    "source": "pola-rs/polars",
+    "sourceType": "github",
+    "description": "Fast DataFrame library implemented in Rust",
+    "subcategory": "Data Processing",
+    "agentValue": "High-performance data processing for agent feature engineering"
+  },
+  {
+    "name": "dask",
+    "source": "dask/dask",
+    "sourceType": "github",
+    "description": "Parallel computing for analytics",
+    "subcategory": "Data Processing",
+    "agentValue": "Scale agent data processing beyond single-machine memory"
+  },
+  {
+    "name": "vaex",
+    "source": "vaexio/vaex",
+    "sourceType": "github",
+    "description": "Out-of-core DataFrame for lazy computation on big data",
+    "subcategory": "Data Processing",
+    "agentValue": "Process billion-row datasets for agent model training"
+  },
+  {
+    "name": "modin",
+    "source": "modin-project/modin",
+    "sourceType": "github",
+    "description": "Speed up pandas by changing one line of code",
+    "subcategory": "Data Processing",
+    "agentValue": "Drop-in pandas acceleration for agent data workflows"
+  },
+  {
+    "name": "arrow",
+    "source": "apache/arrow",
+    "sourceType": "github",
+    "description": "Columnar in-memory analytics and data interchange",
+    "subcategory": "Data Processing",
+    "agentValue": "Standard data format for efficient agent data exchange"
+  },
+  {
+    "name": "lakefs",
+    "source": "treeverse/lakeFS",
+    "sourceType": "github",
+    "description": "Git-like version control for data lakes",
+    "subcategory": "Data Processing",
+    "agentValue": "Version agent training datasets like code repositories"
+  },
+  {
+    "name": "onnxruntime",
+    "source": "microsoft/onnxruntime",
+    "sourceType": "github",
+    "description": "Cross-platform ML inference and training accelerator",
+    "subcategory": "Model Optimization",
+    "agentValue": "Optimize agent model inference across hardware platforms"
+  },
+  {
+    "name": "openvino",
+    "source": "openvinotoolkit/openvino",
+    "sourceType": "github",
+    "description": "Intel's toolkit for optimizing deep learning models",
+    "subcategory": "Model Optimization",
+    "agentValue": "Optimize agent models for Intel hardware deployment"
+  },
+  {
+    "name": "tensorrt",
+    "source": "NVIDIA/TensorRT",
+    "sourceType": "github",
+    "description": "NVIDIA's high-performance deep learning inference optimizer",
+    "subcategory": "Model Optimization",
+    "agentValue": "Maximize agent inference speed on NVIDIA GPUs"
+  },
+  {
+    "name": "neural-compressor",
+    "source": "intel/neural-compressor",
+    "sourceType": "github",
+    "description": "Model compression tool for Intel platforms",
+    "subcategory": "Model Optimization",
+    "agentValue": "Compress agent models for efficient CPU inference"
+  },
+  {
+    "name": "optimum",
+    "source": "huggingface/optimum",
+    "sourceType": "github",
+    "description": "Hardware optimization for Transformers models",
+    "subcategory": "Model Optimization",
+    "agentValue": "Optimize HuggingFace models for agent production deployment"
+  },
+  {
+    "name": "ct2",
+    "source": "OpenNMT/CTranslate2",
+    "sourceType": "github",
+    "description": "Fast inference engine for Transformer models",
+    "subcategory": "Model Optimization",
+    "agentValue": "Accelerate agent transformer inference with quantization"
+  },
+  {
+    "name": "tensorrt-llm",
+    "source": "NVIDIA/TensorRT-LLM",
+    "sourceType": "github",
+    "description": "NVIDIA's LLM inference optimization library",
+    "subcategory": "Model Optimization",
+    "agentValue": "Maximize LLM throughput for agent inference on NVIDIA GPUs"
+  },
+  {
+    "name": "llama-cpp-python",
+    "source": "abetlen/llama-cpp-python",
+    "sourceType": "github",
+    "description": "Python bindings for llama.cpp",
+    "subcategory": "Model Optimization",
+    "agentValue": "Python API for llama.cpp inference in agent backends"
+  },
+  {
+    "name": "ggml",
+    "source": "ggml-org/ggml",
+    "sourceType": "github",
+    "description": "Tensor library for machine learning",
+    "subcategory": "Model Optimization",
+    "agentValue": "Low-level tensor library powering efficient agent inference"
+  },
+  {
+    "name": "lm-eval-harness",
+    "source": "EleutherAI/lm-evaluation-harness",
+    "sourceType": "github",
+    "description": "Framework for evaluating language models on benchmarks",
+    "subcategory": "AI Evaluation",
+    "agentValue": "Benchmark agent LLM performance across standardized tasks"
+  },
+  {
+    "name": "helm",
+    "source": "stanford-crfm/helm",
+    "sourceType": "github",
+    "description": "Holistic Evaluation of Language Models",
+    "subcategory": "AI Evaluation",
+    "agentValue": "Comprehensive LLM evaluation for agent model selection"
+  },
+  {
+    "name": "deepeval",
+    "source": "confident-ai/deepeval",
+    "sourceType": "github",
+    "description": "LLM evaluation framework with 30+ built-in metrics",
+    "subcategory": "AI Evaluation",
+    "agentValue": "Unit test agent LLM outputs with built-in quality metrics"
+  },
+  {
+    "name": "ragas",
+    "source": "explodinggradients/ragas",
+    "sourceType": "github",
+    "description": "Evaluation framework for RAG pipelines",
+    "subcategory": "AI Evaluation",
+    "agentValue": "Measure agent RAG retrieval and generation quality"
+  },
+  {
+    "name": "inspect-ai",
+    "source": "UKGovernmentBEIS/inspect_ai",
+    "sourceType": "github",
+    "description": "UK AISI framework for LLM evaluation",
+    "subcategory": "AI Evaluation",
+    "agentValue": "Scripted eval plans for agent safety and capability testing"
+  },
+  {
+    "name": "promptbench",
+    "source": "microsoft/promptbench",
+    "sourceType": "github",
+    "description": "Unified library for benchmarking LLMs",
+    "subcategory": "AI Evaluation",
+    "agentValue": "Test agent prompt robustness against adversarial attacks"
+  },
+  {
+    "name": "trulens",
+    "source": "truera/trulens",
+    "sourceType": "github",
+    "description": "Evaluation and tracking for LLM applications",
+    "subcategory": "AI Evaluation",
+    "agentValue": "Evaluate agent chain quality with feedback functions"
+  },
+  {
+    "name": "phoenix",
+    "source": "Arize-ai/phoenix",
+    "sourceType": "github",
+    "description": "AI observability and evaluation platform",
+    "subcategory": "AI Evaluation",
+    "agentValue": "Monitor agent model performance and detect drift"
+  },
+  {
+    "name": "langchain",
+    "source": "langchain-ai/langchain",
+    "sourceType": "github",
+    "description": "Framework for developing LLM-powered applications",
+    "subcategory": "AI Agents",
+    "agentValue": "Comprehensive framework for building agent chains and tools"
+  },
+  {
+    "name": "langgraph",
+    "source": "langchain-ai/langgraph",
+    "sourceType": "github",
+    "description": "Build stateful multi-agent applications with LLMs",
+    "subcategory": "AI Agents",
+    "agentValue": "Graph-based state machine for complex multi-agent workflows"
+  },
+  {
+    "name": "crewai",
+    "source": "crewAIInc/crewAI",
+    "sourceType": "github",
+    "description": "Framework for orchestrating role-playing AI agents",
+    "subcategory": "AI Agents",
+    "agentValue": "Multi-agent collaboration with role-based task delegation"
+  },
+  {
+    "name": "autogen",
+    "source": "microsoft/autogen",
+    "sourceType": "github",
+    "description": "Multi-agent conversation framework by Microsoft",
+    "subcategory": "AI Agents",
+    "agentValue": "Collaborative multi-agent conversations for complex reasoning"
+  },
+  {
+    "name": "smolagents",
+    "source": "huggingface/smolagents",
+    "sourceType": "github",
+    "description": "Lightweight agent framework by HuggingFace",
+    "subcategory": "AI Agents",
+    "agentValue": "Simple ReAct agents with tool use for quick prototyping"
+  },
+  {
+    "name": "agno",
+    "source": "agno-agi/agno",
+    "sourceType": "github",
+    "description": "Composable agent framework (formerly Phidata)",
+    "subcategory": "AI Agents",
+    "agentValue": "Clean agent framework with memory and tool integrations"
+  },
+  {
+    "name": "agency-swarm",
+    "source": "VRSEN/agency-swarm",
+    "sourceType": "github",
+    "description": "Agent orchestration framework for multi-agent systems",
+    "subcategory": "AI Agents",
+    "agentValue": "Swarm-based multi-agent coordination for complex tasks"
+  },
+  {
+    "name": "autogpt",
+    "source": "Significant-Gravitas/AutoGPT",
+    "sourceType": "github",
+    "description": "Platform for building and deploying autonomous AI agents",
+    "subcategory": "AI Agents",
+    "agentValue": "Autonomous agent platform with continuous task execution"
+  },
+  {
+    "name": "babyagi",
+    "source": "yoheinakajima/babyagi",
+    "sourceType": "github",
+    "description": "AI-powered task management and agent system",
+    "subcategory": "AI Agents",
+    "agentValue": "Task-driven autonomous agent with priority management"
+  },
+  {
+    "name": "camel",
+    "source": "camel-ai/camel",
+    "sourceType": "github",
+    "description": "Communicative Agents for Mind Exploration of LLMs",
+    "subcategory": "AI Agents",
+    "agentValue": "Role-playing agent pairs for collaborative problem solving"
+  },
+  {
+    "name": "semantic-kernel",
+    "source": "microsoft/semantic-kernel",
+    "sourceType": "github",
+    "description": "Microsoft's AI orchestration SDK",
+    "subcategory": "AI Agents",
+    "agentValue": "Enterprise agent framework with plugin architecture"
+  },
+  {
+    "name": "taskweaver",
+    "source": "microsoft/TaskWeaver",
+    "sourceType": "github",
+    "description": "Code-first agent framework for data analytics",
+    "subcategory": "AI Agents",
+    "agentValue": "Data analytics agent that generates and executes code"
+  },
+  {
+    "name": "agentgpt",
+    "source": "reworkd/AgentGPT",
+    "sourceType": "github",
+    "description": "Deploy autonomous AI agents in the browser",
+    "subcategory": "AI Agents",
+    "agentValue": "Browser-based autonomous agent deployment platform"
+  },
+  {
+    "name": "superagi",
+    "source": "TransformerOptimus/SuperAGI",
+    "sourceType": "github",
+    "description": "Dev-first open-source autonomous AI agent framework",
+    "subcategory": "AI Agents",
+    "agentValue": "Developer-focused agent framework with concurrent execution"
+  },
+  {
+    "name": "llama-agents",
+    "source": "run-llama/llama-agents",
+    "sourceType": "github",
+    "description": "Multi-agent orchestration with LlamaIndex",
+    "subcategory": "AI Agents",
+    "agentValue": "Orchestrate multiple specialized LlamaIndex agents"
+  },
+  {
+    "name": "pydantic-ai",
+    "source": "pydantic/pydantic-ai",
+    "sourceType": "github",
+    "description": "Agent framework with Pydantic type safety",
+    "subcategory": "AI Agents",
+    "agentValue": "Type-safe agent development with structured outputs"
+  },
+  {
+    "name": "strands-agents",
+    "source": "strands-agents/sdk-python",
+    "sourceType": "github",
+    "description": "AWS-backed agent SDK for production systems",
+    "subcategory": "AI Agents",
+    "agentValue": "Production-ready agent SDK with AWS integrations"
+  },
+  {
+    "name": "gretel-synthetics",
+    "source": "gretelai/gretel-synthetics",
+    "sourceType": "github",
+    "description": "Synthetic data generators with differential privacy",
+    "subcategory": "Synthetic Data",
+    "agentValue": "Generate private synthetic data for agent training"
+  },
+  {
+    "name": "sdv",
+    "source": "sdv-dev/SDV",
+    "sourceType": "github",
+    "description": "Synthetic Data Vault for tabular and relational data",
+    "subcategory": "Synthetic Data",
+    "agentValue": "Generate realistic synthetic datasets for agent evaluation"
+  },
+  {
+    "name": "faker",
+    "source": "joke2k/faker",
+    "sourceType": "github",
+    "description": "Generate fake data for testing and development",
+    "subcategory": "Synthetic Data",
+    "agentValue": "Create test data for agent development and CI pipelines"
+  },
+  {
+    "name": "mimesis",
+    "source": "lk-geimfari/mimesis",
+    "sourceType": "github",
+    "description": "High-performance fake data generator with localization",
+    "subcategory": "Synthetic Data",
+    "agentValue": "Generate localized test data for multilingual agent testing"
+  },
+  {
+    "name": "huggingface-hub",
+    "source": "huggingface/huggingface_hub",
+    "sourceType": "github",
+    "description": "Client library for the Hugging Face Hub",
+    "subcategory": "Model Hub",
+    "agentValue": "Download and manage models for agent ML backends"
+  },
+  {
+    "name": "modelscope",
+    "source": "modelscope/modelscope",
+    "sourceType": "github",
+    "description": "Model-as-a-Service platform and hub",
+    "subcategory": "Model Hub",
+    "agentValue": "Access Chinese and international models for agent use"
+  },
+  {
+    "name": "gpustat",
+    "source": "wookayin/gpustat",
+    "sourceType": "github",
+    "description": "Simple CLI utility for querying GPU status",
+    "subcategory": "GPU Tools",
+    "agentValue": "Monitor GPU resources for agent inference workloads"
+  },
+  {
+    "name": "nvtop",
+    "source": "Syllo/nvtop",
+    "sourceType": "github",
+    "description": "GPU process monitoring for multiple vendors",
+    "subcategory": "GPU Tools",
+    "agentValue": "Monitor GPU utilization during agent model serving"
+  },
+  {
+    "name": "nvitop",
+    "source": "XuehaiPan/nvitop",
+    "sourceType": "github",
+    "description": "Interactive NVIDIA GPU process viewer",
+    "subcategory": "GPU Tools",
+    "agentValue": "Debug agent GPU memory issues with interactive monitoring"
+  },
+  {
+    "name": "nviwatch",
+    "source": "msminhas93/nviwatch",
+    "sourceType": "github",
+    "description": "Rust-based TUI for NVIDIA GPU monitoring",
+    "subcategory": "GPU Tools",
+    "agentValue": "Fast GPU monitoring for agent inference optimization"
+  },
+  {
+    "name": "jupyter",
+    "source": "jupyter/jupyter",
+    "sourceType": "github",
+    "description": "Interactive computing notebook platform",
+    "subcategory": "Notebooks",
+    "agentValue": "Interactive development environment for agent prototyping"
+  },
+  {
+    "name": "papermill",
+    "source": "nteract/papermill",
+    "sourceType": "github",
+    "description": "Parameterize and execute Jupyter notebooks",
+    "subcategory": "Notebooks",
+    "agentValue": "Automate agent experiment notebooks with parameters"
+  },
+  {
+    "name": "nbconvert",
+    "source": "jupyter/nbconvert",
+    "sourceType": "github",
+    "description": "Convert Jupyter notebooks to other formats",
+    "subcategory": "Notebooks",
+    "agentValue": "Export agent experiment notebooks to reports"
+  },
+  {
+    "name": "nbstripout",
+    "source": "kynan/nbstripout",
+    "sourceType": "github",
+    "description": "Strip output from Jupyter notebooks for version control",
+    "subcategory": "Notebooks",
+    "agentValue": "Clean notebook outputs for agent code version control"
+  },
+  {
+    "name": "marimo",
+    "source": "marimo-team/marimo",
+    "sourceType": "github",
+    "description": "Reactive notebook for Python with reproducibility",
+    "subcategory": "Notebooks",
+    "agentValue": "Reproducible notebooks for agent experiment development"
+  },
+  {
+    "name": "nbdev",
+    "source": "fastai/nbdev",
+    "sourceType": "github",
+    "description": "Write and publish libraries from Jupyter notebooks",
+    "subcategory": "Notebooks",
+    "agentValue": "Develop agent libraries directly in notebooks with tests"
+  },
+  {
+    "name": "jupytext",
+    "source": "mwouts/jupytext",
+    "sourceType": "github",
+    "description": "Pair Jupyter notebooks with text-based formats",
+    "subcategory": "Notebooks",
+    "agentValue": "Version control notebooks as scripts for agent dev workflows"
+  },
+  {
+    "name": "openai",
+    "source": "openai",
+    "sourceType": "npm",
+    "description": "Official OpenAI API client for Node.js",
+    "subcategory": "AI APIs",
+    "agentValue": "Access GPT models from TypeScript/Node agent backends"
+  },
+  {
+    "name": "@anthropic-ai/sdk",
+    "source": "@anthropic-ai/sdk",
+    "sourceType": "npm",
+    "description": "Official Anthropic API client for Node.js",
+    "subcategory": "AI APIs",
+    "agentValue": "Access Claude models from TypeScript/Node agent backends"
+  },
+  {
+    "name": "@google/generative-ai",
+    "source": "@google/generative-ai",
+    "sourceType": "npm",
+    "description": "Google Generative AI SDK for Node.js",
+    "subcategory": "AI APIs",
+    "agentValue": "Access Gemini models from TypeScript/Node agent backends"
+  },
+  {
+    "name": "ai",
+    "source": "ai",
+    "sourceType": "npm",
+    "description": "Vercel AI SDK for building AI applications",
+    "subcategory": "AI APIs",
+    "agentValue": "Unified TypeScript SDK for multi-provider agent development"
+  },
+  {
+    "name": "@ai-sdk/openai",
+    "source": "@ai-sdk/openai",
+    "sourceType": "npm",
+    "description": "OpenAI provider for Vercel AI SDK",
+    "subcategory": "AI APIs",
+    "agentValue": "OpenAI integration for Vercel AI SDK agent apps"
+  },
+  {
+    "name": "@ai-sdk/anthropic",
+    "source": "@ai-sdk/anthropic",
+    "sourceType": "npm",
+    "description": "Anthropic provider for Vercel AI SDK",
+    "subcategory": "AI APIs",
+    "agentValue": "Claude integration for Vercel AI SDK agent apps"
+  },
+  {
+    "name": "@ai-sdk/google",
+    "source": "@ai-sdk/google",
+    "sourceType": "npm",
+    "description": "Google Generative AI provider for Vercel AI SDK",
+    "subcategory": "AI APIs",
+    "agentValue": "Gemini integration for Vercel AI SDK agent apps"
+  },
+  {
+    "name": "@ai-sdk/mistral",
+    "source": "@ai-sdk/mistral",
+    "sourceType": "npm",
+    "description": "Mistral provider for Vercel AI SDK",
+    "subcategory": "AI APIs",
+    "agentValue": "Mistral integration for Vercel AI SDK agent apps"
+  },
+  {
+    "name": "@ai-sdk/cohere",
+    "source": "@ai-sdk/cohere",
+    "sourceType": "npm",
+    "description": "Cohere provider for Vercel AI SDK",
+    "subcategory": "AI APIs",
+    "agentValue": "Cohere integration for Vercel AI SDK agent apps"
+  },
+  {
+    "name": "@ai-sdk/groq",
+    "source": "@ai-sdk/groq",
+    "sourceType": "npm",
+    "description": "Groq provider for Vercel AI SDK",
+    "subcategory": "AI APIs",
+    "agentValue": "Groq fast inference for Vercel AI SDK agent apps"
+  },
+  {
+    "name": "@ai-sdk/togetherai",
+    "source": "@ai-sdk/togetherai",
+    "sourceType": "npm",
+    "description": "Together AI provider for Vercel AI SDK",
+    "subcategory": "AI APIs",
+    "agentValue": "Together AI integration for Vercel AI SDK agent apps"
+  },
+  {
+    "name": "replicate",
+    "source": "replicate",
+    "sourceType": "npm",
+    "description": "Replicate API client for running ML models",
+    "subcategory": "AI APIs",
+    "agentValue": "Run hosted ML models from agent Node.js backends"
+  },
+  {
+    "name": "@huggingface/inference",
+    "source": "@huggingface/inference",
+    "sourceType": "npm",
+    "description": "HuggingFace Inference API client",
+    "subcategory": "AI APIs",
+    "agentValue": "Access HuggingFace models from TypeScript agents"
+  },
+  {
+    "name": "@huggingface/transformers",
+    "source": "@huggingface/transformers",
+    "sourceType": "npm",
+    "description": "Run transformers models in the browser and Node.js",
+    "subcategory": "AI APIs",
+    "agentValue": "Local ML inference in TypeScript for agent pipelines"
+  },
+  {
+    "name": "langchain-js",
+    "source": "langchain",
+    "sourceType": "npm",
+    "description": "LangChain framework for JavaScript/TypeScript",
+    "subcategory": "AI APIs",
+    "agentValue": "Build LLM agent chains in TypeScript"
+  },
+  {
+    "name": "cohere-ai",
+    "source": "cohere-ai",
+    "sourceType": "npm",
+    "description": "Cohere API client for Node.js",
+    "subcategory": "AI APIs",
+    "agentValue": "Access Cohere embeddings and generation for agents"
+  },
+  {
+    "name": "@modelcontextprotocol/sdk",
+    "source": "@modelcontextprotocol/sdk",
+    "sourceType": "npm",
+    "description": "Official MCP SDK for TypeScript servers and clients",
+    "subcategory": "AI APIs",
+    "agentValue": "Build MCP servers/clients for agent tool integration"
+  },
+  {
+    "name": "mastra",
+    "source": "mastra-ai/mastra",
+    "sourceType": "github",
+    "description": "TypeScript framework for AI-powered applications",
+    "subcategory": "AI APIs",
+    "agentValue": "Full-stack TypeScript framework for building AI agents"
+  },
+  {
+    "name": "genkit",
+    "source": "firebase/genkit",
+    "sourceType": "github",
+    "description": "Firebase AI framework for building gen AI features",
+    "subcategory": "AI APIs",
+    "agentValue": "Google's framework for production agent feature development"
+  },
+  {
+    "name": "create-llama",
+    "source": "create-llama",
+    "sourceType": "npm",
+    "description": "CLI to scaffold LlamaIndex applications",
+    "subcategory": "AI APIs",
+    "agentValue": "Quick-start RAG and agent app scaffolding"
+  },
+  {
+    "name": "pinecone",
+    "source": "@pinecone-database/pinecone",
+    "sourceType": "npm",
+    "description": "Pinecone vector database client",
+    "subcategory": "Vector Search",
+    "agentValue": "Managed vector search for agent knowledge retrieval"
+  },
+  {
+    "name": "typesense",
+    "source": "typesense/typesense",
+    "sourceType": "github",
+    "description": "Open-source search engine with vector search support",
+    "subcategory": "Vector Search",
+    "agentValue": "Typo-tolerant search with vectors for agent queries"
+  },
+  {
+    "name": "vespa",
+    "source": "vespa-engine/vespa",
+    "sourceType": "github",
+    "description": "Big data serving engine with vector and text search",
+    "subcategory": "Vector Search",
+    "agentValue": "Hybrid search engine for agent retrieval at scale"
+  },
+  {
+    "name": "marqo",
+    "source": "marqo-ai/marqo",
+    "sourceType": "github",
+    "description": "Tensor search engine for multimodal data",
+    "subcategory": "Vector Search",
+    "agentValue": "Multimodal search for agent cross-modal retrieval"
+  },
+  {
+    "name": "feast",
+    "source": "feast-dev/feast",
+    "sourceType": "github",
+    "description": "Open-source feature store for ML",
+    "subcategory": "Feature Stores",
+    "agentValue": "Serve ML features to agent prediction models in production"
+  },
+  {
+    "name": "hopsworks",
+    "source": "logicalclocks/hopsworks",
+    "sourceType": "github",
+    "description": "Data-intensive AI platform with feature store",
+    "subcategory": "Feature Stores",
+    "agentValue": "End-to-end feature management for agent ML models"
+  },
+  {
+    "name": "bytewax",
+    "source": "bytewax/bytewax",
+    "sourceType": "github",
+    "description": "Python stream processing framework",
+    "subcategory": "Feature Stores",
+    "agentValue": "Real-time feature computation for agent prediction pipelines"
+  },
+  {
+    "name": "evidently",
+    "source": "evidentlyai/evidently",
+    "sourceType": "github",
+    "description": "ML and LLM observability framework",
+    "subcategory": "Model Monitoring",
+    "agentValue": "Monitor agent model drift and data quality in production"
+  },
+  {
+    "name": "whylogs",
+    "source": "whylabs/whylogs",
+    "sourceType": "github",
+    "description": "Data logging library for ML model monitoring",
+    "subcategory": "Model Monitoring",
+    "agentValue": "Profile agent data pipelines for quality monitoring"
+  },
+  {
+    "name": "nannyml",
+    "source": "NannyML/nannyml",
+    "sourceType": "github",
+    "description": "Post-deployment ML performance estimation",
+    "subcategory": "Model Monitoring",
+    "agentValue": "Estimate agent model performance without ground truth"
+  },
+  {
+    "name": "alibi-detect",
+    "source": "SeldonIO/alibi-detect",
+    "sourceType": "github",
+    "description": "Outlier, adversarial, and drift detection",
+    "subcategory": "Model Monitoring",
+    "agentValue": "Detect distribution drift in agent prediction inputs"
+  },
+  {
+    "name": "langfuse",
+    "source": "langfuse/langfuse",
+    "sourceType": "github",
+    "description": "Open-source LLM engineering platform",
+    "subcategory": "Model Monitoring",
+    "agentValue": "Trace and debug agent LLM calls with cost tracking"
+  },
+  {
+    "name": "openllmetry",
+    "source": "traceloop/openllmetry",
+    "sourceType": "github",
+    "description": "OpenTelemetry-based LLM observability",
+    "subcategory": "Model Monitoring",
+    "agentValue": "OTel-native tracing for agent LLM interactions"
+  },
+  {
+    "name": "garak",
+    "source": "NVIDIA/garak",
+    "sourceType": "github",
+    "description": "LLM vulnerability scanner",
+    "subcategory": "AI Security",
+    "agentValue": "Red-team agent LLMs for security vulnerabilities"
+  },
+  {
+    "name": "rebuff",
+    "source": "protectai/rebuff",
+    "sourceType": "github",
+    "description": "Prompt injection detection tool",
+    "subcategory": "AI Security",
+    "agentValue": "Protect agents from prompt injection attacks"
+  },
+  {
+    "name": "guardrails-ai",
+    "source": "guardrails-ai/guardrails",
+    "sourceType": "github",
+    "description": "Framework for LLM output validation",
+    "subcategory": "AI Security",
+    "agentValue": "Validate and constrain agent LLM outputs for safety"
+  },
+  {
+    "name": "nemo-guardrails",
+    "source": "NVIDIA/NeMo-Guardrails",
+    "sourceType": "github",
+    "description": "Programmable guardrails for LLM applications",
+    "subcategory": "AI Security",
+    "agentValue": "Add safety rails to agent conversational systems"
+  },
+  {
+    "name": "llm-guard",
+    "source": "protectai/llm-guard",
+    "sourceType": "github",
+    "description": "Security toolkit for LLM interactions",
+    "subcategory": "AI Security",
+    "agentValue": "Sanitize agent inputs/outputs against security threats"
+  },
+  {
+    "name": "vigil",
+    "source": "deadbits/vigil-llm",
+    "sourceType": "github",
+    "description": "LLM prompt injection detection and analysis",
+    "subcategory": "AI Security",
+    "agentValue": "Detect and prevent prompt injection in agent inputs"
+  },
+  {
+    "name": "graphrag",
+    "source": "microsoft/graphrag",
+    "sourceType": "github",
+    "description": "Graph-based retrieval-augmented generation",
+    "subcategory": "Knowledge Graphs",
+    "agentValue": "Enhanced RAG with knowledge graphs for agent reasoning"
+  },
+  {
+    "name": "neo4j-graphrag",
+    "source": "neo4j/neo4j-graphrag-python",
+    "sourceType": "github",
+    "description": "Neo4j GraphRAG package for Python",
+    "subcategory": "Knowledge Graphs",
+    "agentValue": "Graph-powered retrieval for agent knowledge management"
+  },
+  {
+    "name": "networkx",
+    "source": "networkx/networkx",
+    "sourceType": "github",
+    "description": "Network analysis library in Python",
+    "subcategory": "Knowledge Graphs",
+    "agentValue": "Build and analyze knowledge graphs for agent reasoning"
+  },
+  {
+    "name": "axolotl",
+    "source": "axolotl-ai-cloud/axolotl",
+    "sourceType": "github",
+    "description": "Flexible LLM fine-tuning framework",
+    "subcategory": "Fine-tuning",
+    "agentValue": "Fine-tune LLMs for specialized agent capabilities"
+  },
+  {
+    "name": "unsloth",
+    "source": "unslothai/unsloth",
+    "sourceType": "github",
+    "description": "Fine-tune LLMs 2x faster with 70% less memory",
+    "subcategory": "Fine-tuning",
+    "agentValue": "Efficient fine-tuning on consumer GPUs for custom agents"
+  },
+  {
+    "name": "llama-factory",
+    "source": "hiyouga/LLaMA-Factory",
+    "sourceType": "github",
+    "description": "Unified efficient fine-tuning of LLMs",
+    "subcategory": "Fine-tuning",
+    "agentValue": "UI-driven fine-tuning for domain-specific agent models"
+  },
+  {
+    "name": "litgpt",
+    "source": "Lightning-AI/litgpt",
+    "sourceType": "github",
+    "description": "Pretrain, finetune, and deploy LLMs efficiently",
+    "subcategory": "Fine-tuning",
+    "agentValue": "Lightning-native LLM training for custom agent models"
+  },
+  {
+    "name": "torchtune",
+    "source": "pytorch/torchtune",
+    "sourceType": "github",
+    "description": "PyTorch-native library for LLM fine-tuning",
+    "subcategory": "Fine-tuning",
+    "agentValue": "Official PyTorch fine-tuning for agent model customization"
+  },
+  {
+    "name": "trl",
+    "source": "huggingface/trl",
+    "sourceType": "github",
+    "description": "Transformer reinforcement learning library",
+    "subcategory": "Fine-tuning",
+    "agentValue": "RLHF and DPO training for agent alignment"
+  },
+  {
+    "name": "peft",
+    "source": "huggingface/peft",
+    "sourceType": "github",
+    "description": "Parameter-efficient fine-tuning methods",
+    "subcategory": "Fine-tuning",
+    "agentValue": "Efficient LoRA/QLoRA fine-tuning for agent model adaptation"
+  },
+  {
+    "name": "mergekit",
+    "source": "arcee-ai/mergekit",
+    "sourceType": "github",
+    "description": "Tools for merging pre-trained language models",
+    "subcategory": "Fine-tuning",
+    "agentValue": "Merge specialized models for multi-capability agents"
+  },
+  {
+    "name": "shell-gpt",
+    "source": "TheR1D/shell_gpt",
+    "sourceType": "github",
+    "description": "AI-powered command-line productivity tool",
+    "subcategory": "AI Coding",
+    "agentValue": "AI shell assistant for generating commands and scripts"
+  },
+  {
+    "name": "sgpt",
+    "source": "tbckr/sgpt",
+    "sourceType": "github",
+    "description": "CLI for OpenAI models with shell command generation",
+    "subcategory": "AI Coding",
+    "agentValue": "Generate shell commands and code from natural language"
+  },
+  {
+    "name": "tgpt",
+    "source": "aandrew-me/tgpt",
+    "sourceType": "github",
+    "description": "AI chatbots in terminal without API keys",
+    "subcategory": "AI Coding",
+    "agentValue": "Free terminal AI chat for quick agent prototyping"
+  },
+  {
+    "name": "aichat",
+    "source": "sigoden/aichat",
+    "sourceType": "github",
+    "description": "All-in-one LLM CLI with RAG, tools, and agents",
+    "subcategory": "AI Coding",
+    "agentValue": "Feature-rich CLI supporting 20+ providers with agent mode"
+  },
+  {
+    "name": "mods",
+    "source": "charmbracelet/mods",
+    "sourceType": "github",
+    "description": "AI for command-line pipelines",
+    "subcategory": "AI Coding",
+    "agentValue": "Pipe CLI output through LLMs for agent workflow automation"
+  },
+  {
+    "name": "llm",
+    "source": "simonw/llm",
+    "sourceType": "github",
+    "description": "CLI tool and Python library for interacting with LLMs",
+    "subcategory": "AI Coding",
+    "agentValue": "Plugin-extensible CLI for diverse LLM interactions"
+  },
+  {
+    "name": "gpt-cli",
+    "source": "kharvd/gpt-cli",
+    "sourceType": "github",
+    "description": "CLI for ChatGPT, Claude and other LLMs",
+    "subcategory": "AI Coding",
+    "agentValue": "Multi-provider chat CLI for quick LLM interaction"
+  },
+  {
+    "name": "chatgpt-cli",
+    "source": "kardolus/chatgpt-cli",
+    "sourceType": "github",
+    "description": "Multi-provider CLI with MCP and agent mode",
+    "subcategory": "AI Coding",
+    "agentValue": "CLI with MCP tools and agent mode for automation"
+  },
+  {
+    "name": "spacy-cli",
+    "source": "explosion/spacy-models",
+    "sourceType": "github",
+    "description": "spaCy CLI for model management and training",
+    "subcategory": "NLP",
+    "agentValue": "Manage NLP models for agent text processing"
+  },
+  {
+    "name": "accelerate",
+    "source": "huggingface/accelerate",
+    "sourceType": "github",
+    "description": "Simple way to train and use PyTorch models on any hardware",
+    "subcategory": "ML Frameworks",
+    "agentValue": "Multi-GPU/TPU training for agent model development"
+  },
+  {
+    "name": "safetensors",
+    "source": "huggingface/safetensors",
+    "sourceType": "github",
+    "description": "Safe and fast tensor serialization format",
+    "subcategory": "ML Frameworks",
+    "agentValue": "Secure model weight storage for agent model distribution"
+  },
+  {
+    "name": "bitsandbytes",
+    "source": "bitsandbytes-foundation/bitsandbytes",
+    "sourceType": "github",
+    "description": "Lightweight CUDA wrappers for 8-bit optimizers and quantization",
+    "subcategory": "Model Optimization",
+    "agentValue": "Quantize agent models to fit on consumer GPUs"
+  },
+  {
+    "name": "gptq",
+    "source": "AutoGPTQ/AutoGPTQ",
+    "sourceType": "github",
+    "description": "Easy-to-use GPTQ model quantization",
+    "subcategory": "Model Optimization",
+    "agentValue": "Quantize agent LLMs for efficient local inference"
+  },
+  {
+    "name": "awq",
+    "source": "mit-han-lab/llm-awq",
+    "sourceType": "github",
+    "description": "Activation-aware weight quantization for LLMs",
+    "subcategory": "Model Optimization",
+    "agentValue": "Hardware-efficient quantization for agent model deployment"
+  },
+  {
+    "name": "mlx",
+    "source": "ml-explore/mlx",
+    "sourceType": "github",
+    "description": "Apple's ML framework for Apple silicon",
+    "subcategory": "ML Frameworks",
+    "agentValue": "Native Apple silicon ML for macOS agent deployments"
+  },
+  {
+    "name": "mlx-lm",
+    "source": "ml-explore/mlx-examples",
+    "sourceType": "github",
+    "description": "LLM inference and fine-tuning on Apple silicon",
+    "subcategory": "ML Frameworks",
+    "agentValue": "Run and fine-tune LLMs natively on Mac for agents"
+  },
+  {
+    "name": "open-interpreter",
+    "source": "OpenInterpreter/open-interpreter",
+    "sourceType": "github",
+    "description": "Natural language interface for computer control",
+    "subcategory": "AI Agents",
+    "agentValue": "Agent that executes code from natural language instructions"
+  },
+  {
+    "name": "mem0",
+    "source": "mem0ai/mem0",
+    "sourceType": "github",
+    "description": "Memory layer for AI applications",
+    "subcategory": "AI Agents",
+    "agentValue": "Persistent memory for stateful agent conversations"
+  },
+  {
+    "name": "embedchain",
+    "source": "mem0ai/embedchain",
+    "sourceType": "github",
+    "description": "Framework for creating RAG bots over any dataset",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "Quick RAG setup for agent knowledge retrieval"
+  },
+  {
+    "name": "ragflow",
+    "source": "infiniflow/ragflow",
+    "sourceType": "github",
+    "description": "Open-source RAG engine with deep document understanding",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "Production RAG with chunking quality control for agents"
+  },
+  {
+    "name": "txtai",
+    "source": "neuml/txtai",
+    "sourceType": "github",
+    "description": "All-in-one embeddings database for semantic search",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "Semantic search and workflow engine for agent knowledge"
+  },
+  {
+    "name": "privategpt",
+    "source": "zylon-ai/private-gpt",
+    "sourceType": "github",
+    "description": "Interact with documents using local LLMs privately",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "Private document Q&A for security-sensitive agent use cases"
+  },
+  {
+    "name": "cognee",
+    "source": "topoteretes/cognee",
+    "sourceType": "github",
+    "description": "Memory management for AI agents and applications",
+    "subcategory": "AI Agents",
+    "agentValue": "Knowledge graph memory layer for agent context management"
+  },
+  {
+    "name": "letta",
+    "source": "letta-ai/letta",
+    "sourceType": "github",
+    "description": "Framework for building stateful LLM agents with memory",
+    "subcategory": "AI Agents",
+    "agentValue": "Persistent memory agents with self-editing capabilities"
+  },
+  {
+    "name": "dify",
+    "source": "langgenius/dify",
+    "sourceType": "github",
+    "description": "LLM app development platform with visual workflow builder",
+    "subcategory": "AI Agents",
+    "agentValue": "Visual platform for building and deploying agent workflows"
+  },
+  {
+    "name": "flowise",
+    "source": "FlowiseAI/Flowise",
+    "sourceType": "github",
+    "description": "Drag-and-drop UI for building LLM flows",
+    "subcategory": "AI Agents",
+    "agentValue": "Visual agent workflow builder with no-code interface"
+  },
+  {
+    "name": "langflow",
+    "source": "langflow-ai/langflow",
+    "sourceType": "github",
+    "description": "Visual framework for multi-agent and RAG applications",
+    "subcategory": "AI Agents",
+    "agentValue": "Visual builder for LangChain-based agent pipelines"
+  },
+  {
+    "name": "n8n",
+    "source": "n8n-io/n8n",
+    "sourceType": "github",
+    "description": "Workflow automation tool with AI integrations",
+    "subcategory": "AI Agents",
+    "agentValue": "Automate agent workflows with 400+ integrations"
+  },
+  {
+    "name": "composio",
+    "source": "ComposioHQ/composio",
+    "sourceType": "github",
+    "description": "Integration platform for AI agents with 250+ tools",
+    "subcategory": "AI Agents",
+    "agentValue": "Plug-and-play tool integrations for AI agents"
+  },
+  {
+    "name": "browser-use",
+    "source": "browser-use/browser-use",
+    "sourceType": "github",
+    "description": "Make LLM agents interact with web browsers",
+    "subcategory": "AI Agents",
+    "agentValue": "Browser automation for web-capable agent tasks"
+  },
+  {
+    "name": "crawl4ai",
+    "source": "unclecode/crawl4ai",
+    "sourceType": "github",
+    "description": "Open-source LLM-friendly web crawler",
+    "subcategory": "AI Agents",
+    "agentValue": "Web crawling optimized for agent knowledge extraction"
+  },
+  {
+    "name": "firecrawl",
+    "source": "mendableai/firecrawl",
+    "sourceType": "github",
+    "description": "Turn websites into LLM-ready markdown",
+    "subcategory": "AI Agents",
+    "agentValue": "Clean web-to-markdown conversion for agent data ingestion"
+  },
+  {
+    "name": "scrapegraph-ai",
+    "source": "ScrapeGraphAI/Scrapegraph-ai",
+    "sourceType": "github",
+    "description": "AI-powered web scraping framework",
+    "subcategory": "AI Agents",
+    "agentValue": "LLM-driven web scraping for agent data collection"
+  },
+  {
+    "name": "instructor-js",
+    "source": "instructor-ai/instructor-js",
+    "sourceType": "github",
+    "description": "Structured extraction from LLMs for TypeScript",
+    "subcategory": "Prompt Engineering",
+    "agentValue": "Type-safe LLM outputs for TypeScript agent pipelines"
+  },
+  {
+    "name": "zod",
+    "source": "zod",
+    "sourceType": "npm",
+    "description": "TypeScript-first schema validation",
+    "subcategory": "AI APIs",
+    "agentValue": "Schema validation for agent tool inputs and LLM outputs"
+  },
+  {
+    "name": "timber",
+    "source": "kossisoroyce/timber",
+    "sourceType": "github",
+    "description": "AOT compiler for ML models to native C99 inference code",
+    "subcategory": "Model Optimization",
+    "agentValue": "Compile sklearn/XGBoost models to native code for fast agent inference"
+  },
+  {
+    "name": "dspy-js",
+    "source": "dspy",
+    "sourceType": "npm",
+    "description": "DSPy for JavaScript - program LLMs systematically",
+    "subcategory": "Prompt Engineering",
+    "agentValue": "Systematic prompt programming for JS/TS agents"
+  },
+  {
+    "name": "auto-round",
+    "source": "intel/auto-round",
+    "sourceType": "github",
+    "description": "Advanced weight-only quantization for LLMs",
+    "subcategory": "Model Optimization",
+    "agentValue": "Quantize agent LLMs with minimal accuracy loss"
+  },
+  {
+    "name": "ollama-js",
+    "source": "ollama",
+    "sourceType": "npm",
+    "description": "Official Ollama JavaScript client",
+    "subcategory": "AI APIs",
+    "agentValue": "Connect TypeScript agents to local Ollama models"
+  },
+  {
+    "name": "mistral-ai",
+    "source": "@mistralai/mistralai",
+    "sourceType": "npm",
+    "description": "Official Mistral AI client for Node.js",
+    "subcategory": "AI APIs",
+    "agentValue": "Access Mistral models from TypeScript agent backends"
+  },
+  {
+    "name": "groq-sdk",
+    "source": "groq-sdk",
+    "sourceType": "npm",
+    "description": "Official Groq API client for Node.js",
+    "subcategory": "AI APIs",
+    "agentValue": "Ultra-fast inference from Groq for latency-sensitive agents"
+  },
+  {
+    "name": "together-ai",
+    "source": "together-ai",
+    "sourceType": "npm",
+    "description": "Together AI client for Node.js",
+    "subcategory": "AI APIs",
+    "agentValue": "Access hosted open-source models for agent workloads"
+  },
+  {
+    "name": "chromadb-js",
+    "source": "chromadb",
+    "sourceType": "npm",
+    "description": "ChromaDB client for JavaScript",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "Vector storage from TypeScript agent applications"
+  },
+  {
+    "name": "weaviate-client",
+    "source": "weaviate-ts-client",
+    "sourceType": "npm",
+    "description": "Weaviate TypeScript client",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "Vector search from TypeScript agent backends"
+  },
+  {
+    "name": "qdrant-js",
+    "source": "@qdrant/js-client-rest",
+    "sourceType": "npm",
+    "description": "Qdrant JavaScript client",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "Vector similarity search from TypeScript agents"
+  },
+  {
+    "name": "lancedb-js",
+    "source": "@lancedb/lancedb",
+    "sourceType": "npm",
+    "description": "LanceDB client for JavaScript",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "Embedded vector DB for lightweight TypeScript agents"
+  },
+  {
+    "name": "localai-ts",
+    "source": "localai-ts",
+    "sourceType": "npm",
+    "description": "TypeScript client for LocalAI",
+    "subcategory": "AI APIs",
+    "agentValue": "Local model inference from TypeScript agent code"
+  },
+  {
+    "name": "stable-diffusion-cpp-node",
+    "source": "stable-diffusion-cpp",
+    "sourceType": "npm",
+    "description": "Node.js bindings for stable-diffusion.cpp",
+    "subcategory": "Image Generation",
+    "agentValue": "Local image generation from Node.js agent backends"
+  },
+  {
+    "name": "tiktoken",
+    "source": "openai/tiktoken",
+    "sourceType": "github",
+    "description": "Fast BPE tokeniser for OpenAI models",
+    "subcategory": "NLP",
+    "agentValue": "Count tokens accurately for agent context management"
+  },
+  {
+    "name": "tiktoken-js",
+    "source": "tiktoken",
+    "sourceType": "npm",
+    "description": "JavaScript port of OpenAI's tiktoken",
+    "subcategory": "NLP",
+    "agentValue": "Token counting for TypeScript agent context windows"
+  },
+  {
+    "name": "modal",
+    "source": "modal-labs/modal-client",
+    "sourceType": "github",
+    "description": "Serverless cloud for AI and ML workloads",
+    "subcategory": "MLOps Pipelines",
+    "agentValue": "Serverless GPU compute for agent model training and inference"
+  },
+  {
+    "name": "skypilot",
+    "source": "skypilot-org/skypilot",
+    "sourceType": "github",
+    "description": "Run ML workloads on any cloud",
+    "subcategory": "MLOps Pipelines",
+    "agentValue": "Multi-cloud ML execution for cost-optimized agent training"
+  },
+  {
+    "name": "runpod",
+    "source": "runpod/runpod-python",
+    "sourceType": "github",
+    "description": "RunPod serverless GPU platform SDK",
+    "subcategory": "MLOps Pipelines",
+    "agentValue": "On-demand GPU access for agent model inference"
+  },
+  {
+    "name": "vanna",
+    "source": "vanna-ai/vanna",
+    "sourceType": "github",
+    "description": "AI-powered SQL generation from natural language",
+    "subcategory": "AI Agents",
+    "agentValue": "Natural language to SQL for agent database queries"
+  },
+  {
+    "name": "sqlcoder",
+    "source": "defog-ai/sqlcoder",
+    "sourceType": "github",
+    "description": "LLM for generating SQL from natural language",
+    "subcategory": "AI Agents",
+    "agentValue": "Specialized SQL generation model for agent data access"
+  },
+  {
+    "name": "text2sql",
+    "source": "eosphoros-ai/Awesome-Text2SQL",
+    "sourceType": "github",
+    "description": "Curated text-to-SQL resources and tools",
+    "subcategory": "AI Agents",
+    "agentValue": "Resources for building agent SQL capabilities"
+  },
+  {
+    "name": "pytorch-image-models",
+    "source": "huggingface/pytorch-image-models",
+    "sourceType": "github",
+    "description": "Collection of image classification models for PyTorch",
+    "subcategory": "Computer Vision",
+    "agentValue": "Pre-trained image models for agent visual understanding"
+  },
+  {
+    "name": "albumentations",
+    "source": "albumentations-team/albumentations",
+    "sourceType": "github",
+    "description": "Fast image augmentation library",
+    "subcategory": "Computer Vision",
+    "agentValue": "Data augmentation for training agent vision models"
+  },
+  {
+    "name": "clip",
+    "source": "openai/CLIP",
+    "sourceType": "github",
+    "description": "Contrastive Language-Image Pre-Training",
+    "subcategory": "Computer Vision",
+    "agentValue": "Vision-language understanding for agent multimodal tasks"
+  },
+  {
+    "name": "open-clip",
+    "source": "mlfoundations/open_clip",
+    "sourceType": "github",
+    "description": "Open-source implementation of CLIP",
+    "subcategory": "Computer Vision",
+    "agentValue": "Open CLIP models for agent image-text matching"
+  },
+  {
+    "name": "paddleocr",
+    "source": "PaddlePaddle/PaddleOCR",
+    "sourceType": "github",
+    "description": "Multilingual OCR toolkit",
+    "subcategory": "Document AI",
+    "agentValue": "Production OCR for agent document processing"
+  },
+  {
+    "name": "easyocr",
+    "source": "JaidedAI/EasyOCR",
+    "sourceType": "github",
+    "description": "Ready-to-use OCR with 80+ language support",
+    "subcategory": "Document AI",
+    "agentValue": "Easy OCR integration for agent text extraction from images"
+  },
+  {
+    "name": "camelot",
+    "source": "camelot-dev/camelot",
+    "sourceType": "github",
+    "description": "PDF table extraction library",
+    "subcategory": "Document AI",
+    "agentValue": "Extract tabular data from PDFs for agent analysis"
+  },
+  {
+    "name": "tabula-py",
+    "source": "chezou/tabula-py",
+    "sourceType": "github",
+    "description": "Python wrapper for tabula-java PDF table extraction",
+    "subcategory": "Document AI",
+    "agentValue": "PDF table extraction for agent data processing"
+  },
+  {
+    "name": "deepspeed",
+    "source": "microsoft/DeepSpeed",
+    "sourceType": "github",
+    "description": "Deep learning optimization library",
+    "subcategory": "ML Frameworks",
+    "agentValue": "Distributed training at scale for agent model development"
+  },
+  {
+    "name": "megatron-lm",
+    "source": "NVIDIA/Megatron-LM",
+    "sourceType": "github",
+    "description": "Large-scale transformer model training framework",
+    "subcategory": "ML Frameworks",
+    "agentValue": "Train large models for agent foundation capabilities"
+  },
+  {
+    "name": "fairscale",
+    "source": "facebookresearch/fairscale",
+    "sourceType": "github",
+    "description": "PyTorch extensions for high-performance training",
+    "subcategory": "ML Frameworks",
+    "agentValue": "Scale agent model training across GPUs efficiently"
+  },
+  {
+    "name": "lm-format-enforcer",
+    "source": "noamgat/lm-format-enforcer",
+    "sourceType": "github",
+    "description": "Enforce output format for LLMs",
+    "subcategory": "Prompt Engineering",
+    "agentValue": "Force agent LLM outputs to match required JSON schemas"
+  },
+  {
+    "name": "jsonformer",
+    "source": "1rgs/jsonformer",
+    "sourceType": "github",
+    "description": "Generate structured JSON from LLMs",
+    "subcategory": "Prompt Engineering",
+    "agentValue": "Guaranteed JSON output from agent LLM calls"
+  },
+  {
+    "name": "guardrails-js",
+    "source": "guardrails-ai/guardrails-js",
+    "sourceType": "github",
+    "description": "JavaScript guardrails for LLM outputs",
+    "subcategory": "AI Security",
+    "agentValue": "Output validation for TypeScript agent applications"
+  },
+  {
+    "name": "giskard",
+    "source": "Giskard-AI/giskard",
+    "sourceType": "github",
+    "description": "Testing framework for ML models and LLMs",
+    "subcategory": "AI Evaluation",
+    "agentValue": "Test agent models for bias, hallucination, and vulnerabilities"
+  },
+  {
+    "name": "opik",
+    "source": "comet-ml/opik",
+    "sourceType": "github",
+    "description": "Open-source LLM evaluation and tracing platform",
+    "subcategory": "AI Evaluation",
+    "agentValue": "Evaluate and trace agent LLM interactions in production"
+  },
+  {
+    "name": "weave",
+    "source": "wandb/weave",
+    "sourceType": "github",
+    "description": "Weights & Biases LLM application toolkit",
+    "subcategory": "AI Evaluation",
+    "agentValue": "Track and evaluate agent LLM app performance"
+  },
+  {
+    "name": "prompttools",
+    "source": "hegelai/prompttools",
+    "sourceType": "github",
+    "description": "Open-source tools for testing and experimenting with prompts",
+    "subcategory": "Prompt Engineering",
+    "agentValue": "A/B test agent prompts systematically"
+  },
+  {
+    "name": "elia",
+    "source": "darrenburns/elia",
+    "sourceType": "github",
+    "description": "Terminal LLM chat app with TUI",
+    "subcategory": "AI Coding",
+    "agentValue": "Beautiful terminal UI for agent LLM conversations"
+  },
+  {
+    "name": "gorilla",
+    "source": "ShishirPatil/gorilla",
+    "sourceType": "github",
+    "description": "LLM connected with APIs for tool use",
+    "subcategory": "AI Agents",
+    "agentValue": "LLM specialized in API tool calls for agent automation"
+  },
+  {
+    "name": "toolformer",
+    "source": "lucidrains/toolformer-pytorch",
+    "sourceType": "github",
+    "description": "Implementation of Toolformer for LLM tool use",
+    "subcategory": "AI Agents",
+    "agentValue": "Self-taught tool-using LLM for agent capabilities"
+  },
+  {
+    "name": "functionary",
+    "source": "MeetKai/functionary",
+    "sourceType": "github",
+    "description": "LLM that interprets and executes function calls",
+    "subcategory": "AI Agents",
+    "agentValue": "Specialized function-calling model for agent tool use"
+  },
+  {
+    "name": "e2b",
+    "source": "@e2b/code-interpreter",
+    "sourceType": "npm",
+    "description": "Secure sandboxed code execution for AI agents",
+    "subcategory": "AI Agents",
+    "agentValue": "Sandboxed runtime for safe agent code execution"
+  },
+  {
+    "name": "tavily",
+    "source": "@tavily/core",
+    "sourceType": "npm",
+    "description": "Search API built for AI agents",
+    "subcategory": "AI Agents",
+    "agentValue": "AI-optimized web search for agent knowledge retrieval"
+  },
+  {
+    "name": "serper",
+    "source": "serper/serper-node",
+    "sourceType": "github",
+    "description": "Google Search API for developers",
+    "subcategory": "AI Agents",
+    "agentValue": "Web search API for agent information gathering"
+  },
+  {
+    "name": "html-to-markdown",
+    "source": "crosstype/node-html-markdown",
+    "sourceType": "github",
+    "description": "Convert HTML to markdown for LLM consumption",
+    "subcategory": "Document AI",
+    "agentValue": "Clean HTML conversion for agent web content ingestion"
+  },
+  {
+    "name": "reader",
+    "source": "jina-ai/reader",
+    "sourceType": "github",
+    "description": "Convert URLs to LLM-friendly text",
+    "subcategory": "Document AI",
+    "agentValue": "URL-to-text conversion for agent web reading"
+  },
+  {
+    "name": "xinference",
+    "source": "xorbitsai/inference",
+    "sourceType": "github",
+    "description": "Distributed inference platform for LLMs and embeddings",
+    "subcategory": "LLM Inference",
+    "agentValue": "Serve multiple model types for agent inference needs"
+  },
+  {
+    "name": "openrouter",
+    "source": "@openrouter/ai-sdk-provider",
+    "sourceType": "npm",
+    "description": "OpenRouter provider for AI SDK",
+    "subcategory": "AI APIs",
+    "agentValue": "Route agent requests across multiple LLM providers"
+  },
+  {
+    "name": "portkey-ai",
+    "source": "portkey-ai",
+    "sourceType": "npm",
+    "description": "AI gateway with observability and fallbacks",
+    "subcategory": "AI APIs",
+    "agentValue": "Reliable LLM routing with fallbacks for agent systems"
+  },
+  {
+    "name": "helicone",
+    "source": "Helicone/helicone",
+    "sourceType": "github",
+    "description": "Open-source LLM observability platform",
+    "subcategory": "Model Monitoring",
+    "agentValue": "Monitor agent LLM costs and performance"
+  },
+  {
+    "name": "braintrust",
+    "source": "braintrustdata/braintrust-sdk",
+    "sourceType": "github",
+    "description": "AI evaluation and logging platform",
+    "subcategory": "AI Evaluation",
+    "agentValue": "Evaluate and log agent AI outputs continuously"
+  },
+  {
+    "name": "semantic-router",
+    "source": "aurelio-labs/semantic-router",
+    "sourceType": "github",
+    "description": "Superfast decision-making layer for LLMs",
+    "subcategory": "AI Agents",
+    "agentValue": "Route agent queries to specialized handlers via embeddings"
+  },
+  {
+    "name": "autotrain",
+    "source": "huggingface/autotrain-advanced",
+    "sourceType": "github",
+    "description": "No-code training for NLP and CV models",
+    "subcategory": "AutoML",
+    "agentValue": "Automated model training for agent ML components"
+  },
+  {
+    "name": "ludwig",
+    "source": "ludwig-ai/ludwig",
+    "sourceType": "github",
+    "description": "Declarative deep learning framework",
+    "subcategory": "AutoML",
+    "agentValue": "Config-driven deep learning for agent model development"
+  },
+  {
+    "name": "h2o-automl",
+    "source": "h2oai/h2o-3",
+    "sourceType": "github",
+    "description": "Open-source ML platform with AutoML",
+    "subcategory": "AutoML",
+    "agentValue": "Automated model building for agent prediction tasks"
+  },
+  {
+    "name": "evidently-ui",
+    "source": "evidentlyai/evidently",
+    "sourceType": "github",
+    "description": "ML monitoring dashboard",
+    "subcategory": "Model Monitoring",
+    "agentValue": "Visual monitoring dashboard for agent model health"
+  },
+  {
+    "name": "ruff",
+    "source": "astral-sh/ruff",
+    "sourceType": "github",
+    "description": "Extremely fast Python linter and formatter",
+    "subcategory": "Data Processing",
+    "agentValue": "Fast Python linting for agent-generated code quality"
+  },
+  {
+    "name": "uv",
+    "source": "astral-sh/uv",
+    "sourceType": "github",
+    "description": "Ultra-fast Python package manager",
+    "subcategory": "Data Processing",
+    "agentValue": "Fast dependency management for agent Python environments"
+  },
+  {
+    "name": "llmware",
+    "source": "llmware-ai/llmware",
+    "sourceType": "github",
+    "description": "Framework for building enterprise RAG pipelines",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "Enterprise RAG toolkit for agent knowledge retrieval"
+  },
+  {
+    "name": "spacy-llm",
+    "source": "explosion/spacy-llm",
+    "sourceType": "github",
+    "description": "Integrate LLMs into spaCy NLP pipelines",
+    "subcategory": "NLP",
+    "agentValue": "Combine traditional NLP with LLMs in agent pipelines"
+  },
+  {
+    "name": "presidio",
+    "source": "microsoft/presidio",
+    "sourceType": "github",
+    "description": "Data protection and de-identification SDK",
+    "subcategory": "AI Security",
+    "agentValue": "PII detection and redaction in agent data processing"
+  },
+  {
+    "name": "datadreamer",
+    "source": "datadreamer-dev/DataDreamer",
+    "sourceType": "github",
+    "description": "Prompt-driven synthetic data generation",
+    "subcategory": "Synthetic Data",
+    "agentValue": "Generate synthetic training data for agent model improvement"
+  },
+  {
+    "name": "distilabel",
+    "source": "argilla-io/distilabel",
+    "sourceType": "github",
+    "description": "Framework for synthetic data and AI feedback",
+    "subcategory": "Synthetic Data",
+    "agentValue": "Create synthetic preference data for agent RLHF training"
+  },
+  {
+    "name": "aisuite",
+    "source": "andrewyng/aisuite",
+    "sourceType": "github",
+    "description": "Simple unified interface to multiple LLM providers",
+    "subcategory": "AI APIs",
+    "agentValue": "Unified multi-provider access for agent LLM switching"
+  },
+  {
+    "name": "open-assistant",
+    "source": "LAION-AI/Open-Assistant",
+    "sourceType": "github",
+    "description": "Open-source chat assistant training data and models",
+    "subcategory": "Fine-tuning",
+    "agentValue": "Open-source assistant training data for agent fine-tuning"
+  },
+  {
+    "name": "vega",
+    "source": "vega/vega",
+    "sourceType": "github",
+    "description": "Visualization grammar for data exploration",
+    "subcategory": "Data Processing",
+    "agentValue": "Agent-generated data visualizations from specifications"
+  },
+  {
+    "name": "gradio",
+    "source": "gradio-app/gradio",
+    "sourceType": "github",
+    "description": "Build ML demos and web apps easily",
+    "subcategory": "Model Serving",
+    "agentValue": "Quick UI for agent model demos and testing"
+  },
+  {
+    "name": "streamlit",
+    "source": "streamlit/streamlit",
+    "sourceType": "github",
+    "description": "Framework for building data and ML apps",
+    "subcategory": "Model Serving",
+    "agentValue": "Rapid prototyping of agent-powered web applications"
+  },
+  {
+    "name": "chainlit",
+    "source": "Chainlit/chainlit",
+    "sourceType": "github",
+    "description": "Build production-ready LLM applications",
+    "subcategory": "Model Serving",
+    "agentValue": "Chat UI framework for deploying agent applications"
+  },
+  {
+    "name": "panel",
+    "source": "holoviz/panel",
+    "sourceType": "github",
+    "description": "Web app framework for data science",
+    "subcategory": "Model Serving",
+    "agentValue": "Build interactive dashboards for agent model outputs"
+  },
+  {
+    "name": "nomic",
+    "source": "nomic-ai/nomic",
+    "sourceType": "github",
+    "description": "Interact with large datasets using embeddings",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "Explore and visualize agent embedding spaces"
+  },
+  {
+    "name": "sentence-transformers-js",
+    "source": "@xenova/transformers",
+    "sourceType": "npm",
+    "description": "Run sentence transformers in Node.js and browser",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "Local embeddings in TypeScript for agent retrieval"
+  },
+  {
+    "name": "vectordb",
+    "source": "lancedb/vectordb",
+    "sourceType": "npm",
+    "description": "Embedded vector database for Node.js",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "Serverless vector storage for TypeScript agent apps"
+  },
+  {
+    "name": "deep-chat",
+    "source": "deep-chat",
+    "sourceType": "npm",
+    "description": "Web component for AI chat interfaces",
+    "subcategory": "AI APIs",
+    "agentValue": "Drop-in chat UI component for agent web frontends"
+  },
+  {
+    "name": "chatgpt-shell-cli",
+    "source": "0xacx/chatGPT-shell-cli",
+    "sourceType": "github",
+    "description": "Shell script for ChatGPT and DALL-E in the terminal",
+    "subcategory": "AI Coding",
+    "agentValue": "Minimal shell-only LLM interface for scripted agent use"
+  },
+  {
+    "name": "llamaparse",
+    "source": "run-llama/llama_parse",
+    "sourceType": "github",
+    "description": "LlamaParse document parsing for LLM ingestion",
+    "subcategory": "Document AI",
+    "agentValue": "Advanced document parsing for agent knowledge ingestion"
+  },
+  {
+    "name": "deeplake",
+    "source": "activeloopai/deeplake",
+    "sourceType": "github",
+    "description": "Database for AI with vector, tensor, and metadata storage",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "Multi-modal data lake for agent training and retrieval"
+  },
+  {
+    "name": "deepface",
+    "source": "serengil/deepface",
+    "sourceType": "github",
+    "description": "Face recognition and analysis framework",
+    "subcategory": "Computer Vision",
+    "agentValue": "Face analysis for agent identity verification tasks"
+  },
+  {
+    "name": "insightface",
+    "source": "deepinsight/insightface",
+    "sourceType": "github",
+    "description": "2D/3D face analysis toolkit",
+    "subcategory": "Computer Vision",
+    "agentValue": "Advanced face analysis for agent biometric tasks"
+  },
+  {
+    "name": "doctr",
+    "source": "mindee/doctr",
+    "sourceType": "github",
+    "description": "Document text recognition library",
+    "subcategory": "Document AI",
+    "agentValue": "End-to-end OCR for agent document understanding"
+  },
+  {
+    "name": "nougat",
+    "source": "facebookresearch/nougat",
+    "sourceType": "github",
+    "description": "Neural optical understanding for academic documents",
+    "subcategory": "Document AI",
+    "agentValue": "Scientific paper parsing for agent research capabilities"
+  },
+  {
+    "name": "rerankers",
+    "source": "AnswerDotAI/rerankers",
+    "sourceType": "github",
+    "description": "Unified interface for reranking models",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "Improve agent retrieval quality with cross-encoder reranking"
+  },
+  {
+    "name": "colbert",
+    "source": "stanford-futuredata/ColBERT",
+    "sourceType": "github",
+    "description": "Efficient neural retrieval via late interaction",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "High-quality passage retrieval for agent knowledge access"
+  },
+  {
+    "name": "speaches",
+    "source": "speaches-ai/speaches",
+    "sourceType": "github",
+    "description": "OpenAI-compatible speech API server",
+    "subcategory": "Audio/Speech",
+    "agentValue": "Local speech API for agent voice processing"
+  },
+  {
+    "name": "fuyu",
+    "source": "adept/fuyu-8b",
+    "sourceType": "github",
+    "description": "Multimodal model for document understanding",
+    "subcategory": "Document AI",
+    "agentValue": "Visual document understanding for agent multimodal tasks"
+  },
+  {
+    "name": "instructor-go",
+    "source": "instructor-ai/instructor-go",
+    "sourceType": "github",
+    "description": "Structured extraction from LLMs for Go",
+    "subcategory": "Prompt Engineering",
+    "agentValue": "Type-safe LLM outputs for Go agent implementations"
+  },
+  {
+    "name": "spring-ai",
+    "source": "spring-projects/spring-ai",
+    "sourceType": "github",
+    "description": "Spring framework for AI applications",
+    "subcategory": "AI APIs",
+    "agentValue": "Enterprise Java agent development with Spring ecosystem"
+  },
+  {
+    "name": "bisheng",
+    "source": "dataelement/bisheng",
+    "sourceType": "github",
+    "description": "Open LLM DevOps platform",
+    "subcategory": "MLOps Pipelines",
+    "agentValue": "LLM application development and deployment platform"
+  },
+  {
+    "name": "griptape",
+    "source": "griptape-ai/griptape",
+    "sourceType": "github",
+    "description": "Modular Python framework for AI agents",
+    "subcategory": "AI Agents",
+    "agentValue": "Enterprise agent framework with off-prompt data storage"
+  },
+  {
+    "name": "swarm",
+    "source": "openai/swarm",
+    "sourceType": "github",
+    "description": "Educational multi-agent orchestration framework",
+    "subcategory": "AI Agents",
+    "agentValue": "Lightweight multi-agent handoff patterns for agent design"
+  },
+  {
+    "name": "controlflow",
+    "source": "PrefectHQ/ControlFlow",
+    "sourceType": "github",
+    "description": "Python framework for AI workflows",
+    "subcategory": "AI Agents",
+    "agentValue": "Structured AI workflows with Prefect orchestration"
+  },
+  {
+    "name": "marvin",
+    "source": "prefecthq/marvin",
+    "sourceType": "github",
+    "description": "AI engineering toolkit for building natural language interfaces",
+    "subcategory": "AI Agents",
+    "agentValue": "Build NL interfaces and AI functions for agent tools"
+  },
+  {
+    "name": "rivet",
+    "source": "Ironclad/rivet",
+    "sourceType": "github",
+    "description": "Visual AI programming environment",
+    "subcategory": "AI Agents",
+    "agentValue": "Visual IDE for designing and debugging agent workflows"
+  },
+  {
+    "name": "bee-agent",
+    "source": "i-am-bee/bee-agent-framework",
+    "sourceType": "github",
+    "description": "IBM's open-source agent framework",
+    "subcategory": "AI Agents",
+    "agentValue": "Enterprise agent framework with tool use and memory"
+  },
+  {
+    "name": "qwen-agent",
+    "source": "QwenLM/Qwen-Agent",
+    "sourceType": "github",
+    "description": "Agent framework for Qwen LLM models",
+    "subcategory": "AI Agents",
+    "agentValue": "Qwen-optimized agent framework with code interpreter"
+  },
+  {
+    "name": "google-adk",
+    "source": "google/adk-python",
+    "sourceType": "github",
+    "description": "Google Agent Development Kit",
+    "subcategory": "AI Agents",
+    "agentValue": "Google's agent SDK for building production AI agents"
+  },
+  {
+    "name": "cobra-cli",
+    "source": "spf13/cobra",
+    "sourceType": "github",
+    "description": "CLI framework used by many ML tools",
+    "subcategory": "MLOps Pipelines",
+    "agentValue": "Build CLI interfaces for agent management tools"
+  },
+  {
+    "name": "typer",
+    "source": "fastapi/typer",
+    "sourceType": "github",
+    "description": "Build CLIs with Python type hints",
+    "subcategory": "MLOps Pipelines",
+    "agentValue": "Create agent CLI tools with auto-generated help"
+  },
+  {
+    "name": "click",
+    "source": "pallets/click",
+    "sourceType": "github",
+    "description": "Python composable CLI creation kit",
+    "subcategory": "MLOps Pipelines",
+    "agentValue": "Build composable agent management CLI tools"
+  },
+  {
+    "name": "whisperkit",
+    "source": "argmaxinc/WhisperKit",
+    "sourceType": "github",
+    "description": "On-device speech recognition for Apple platforms",
+    "subcategory": "Audio/Speech",
+    "agentValue": "Native Apple speech recognition for iOS/macOS agents"
+  },
+  {
+    "name": "fish-speech",
+    "source": "fishaudio/fish-speech",
+    "sourceType": "github",
+    "description": "Multi-lingual text-to-speech model",
+    "subcategory": "Audio/Speech",
+    "agentValue": "Multilingual TTS for agent voice output in many languages"
+  },
+  {
+    "name": "parler-tts",
+    "source": "huggingface/parler-tts",
+    "sourceType": "github",
+    "description": "High-quality TTS with natural speech patterns",
+    "subcategory": "Audio/Speech",
+    "agentValue": "Natural-sounding agent voice output with style control"
+  },
+  {
+    "name": "llava",
+    "source": "haotian-liu/LLaVA",
+    "sourceType": "github",
+    "description": "Large Language and Vision Assistant",
+    "subcategory": "Computer Vision",
+    "agentValue": "Multimodal vision-language model for agent visual QA"
+  },
+  {
+    "name": "flux",
+    "source": "black-forest-labs/flux",
+    "sourceType": "github",
+    "description": "Text-to-image model by Black Forest Labs",
+    "subcategory": "Image Generation",
+    "agentValue": "State-of-the-art image generation for agent visual tasks"
+  },
+  {
+    "name": "ip-adapter",
+    "source": "tencent-ailab/IP-Adapter",
+    "sourceType": "github",
+    "description": "Image prompt adapter for diffusion models",
+    "subcategory": "Image Generation",
+    "agentValue": "Control image generation style for agent creative tasks"
+  },
+  {
+    "name": "replicate-python",
+    "source": "replicate/replicate-python",
+    "sourceType": "github",
+    "description": "Python client for Replicate API",
+    "subcategory": "AI APIs",
+    "agentValue": "Run cloud ML models from Python agent code"
+  },
+  {
+    "name": "lunary",
+    "source": "lunary-ai/lunary",
+    "sourceType": "github",
+    "description": "LLM observability and analytics platform",
+    "subcategory": "Model Monitoring",
+    "agentValue": "Track agent LLM usage, costs, and quality metrics"
+  },
+  {
+    "name": "cvat",
+    "source": "cvat-ai/cvat",
+    "sourceType": "github",
+    "description": "Computer vision annotation tool",
+    "subcategory": "Data Labeling",
+    "agentValue": "Annotate images and video for agent vision model training"
+  },
+  {
+    "name": "labelme",
+    "source": "labelmeai/labelme",
+    "sourceType": "github",
+    "description": "Image polygonal annotation tool",
+    "subcategory": "Data Labeling",
+    "agentValue": "Create segmentation annotations for agent vision models"
+  },
+  {
+    "name": "diffgram",
+    "source": "diffgram/diffgram",
+    "sourceType": "github",
+    "description": "Training data platform for ML",
+    "subcategory": "Data Labeling",
+    "agentValue": "Manage annotation workflows for agent model datasets"
+  },
+  {
+    "name": "featureform",
+    "source": "featureform/featureform",
+    "sourceType": "github",
+    "description": "Virtual feature store for ML",
+    "subcategory": "Feature Stores",
+    "agentValue": "Declarative feature management for agent ML models"
+  },
+  {
+    "name": "butterfree",
+    "source": "quintoandar/butterfree",
+    "sourceType": "github",
+    "description": "Feature store toolbox built on Spark",
+    "subcategory": "Feature Stores",
+    "agentValue": "Spark-based feature engineering for agent data pipelines"
+  },
+  {
+    "name": "pyg",
+    "source": "pyg-team/pytorch_geometric",
+    "sourceType": "github",
+    "description": "Graph neural network library for PyTorch",
+    "subcategory": "Knowledge Graphs",
+    "agentValue": "Graph learning for agent knowledge representation"
+  },
+  {
+    "name": "dgl",
+    "source": "dmlc/dgl",
+    "sourceType": "github",
+    "description": "Deep Graph Library for graph neural networks",
+    "subcategory": "Knowledge Graphs",
+    "agentValue": "GNN training for agent graph-based reasoning"
+  },
+  {
+    "name": "stellargraph",
+    "source": "stellargraph/stellargraph",
+    "sourceType": "github",
+    "description": "Graph ML library for graph-structured data",
+    "subcategory": "Knowledge Graphs",
+    "agentValue": "Graph ML algorithms for agent network analysis"
+  },
+  {
+    "name": "ollama-models",
+    "source": "ollama/ollama",
+    "sourceType": "github",
+    "description": "Ollama model registry and management",
+    "subcategory": "Model Hub",
+    "agentValue": "Browse and pull models for local agent inference"
+  },
+  {
+    "name": "civitai",
+    "source": "civitai/civitai",
+    "sourceType": "github",
+    "description": "Platform for sharing AI art models",
+    "subcategory": "Model Hub",
+    "agentValue": "Access community image generation models for agent creativity"
+  },
+  {
+    "name": "py3nvml",
+    "source": "fbcotter/py3nvml",
+    "sourceType": "github",
+    "description": "Python bindings for NVIDIA Management Library",
+    "subcategory": "GPU Tools",
+    "agentValue": "Programmatic GPU monitoring for agent resource management"
+  },
+  {
+    "name": "gpu-burn",
+    "source": "wilicc/gpu-burn",
+    "sourceType": "github",
+    "description": "Multi-GPU CUDA stress test",
+    "subcategory": "GPU Tools",
+    "agentValue": "Validate GPU health before agent model training"
+  },
+  {
+    "name": "meilisearch",
+    "source": "meilisearch/meilisearch",
+    "sourceType": "github",
+    "description": "Lightning-fast search engine with AI features",
+    "subcategory": "Vector Search",
+    "agentValue": "Hybrid text and vector search for agent queries"
+  },
+  {
+    "name": "opensearch",
+    "source": "opensearch-project/OpenSearch",
+    "sourceType": "github",
+    "description": "Open-source search engine with vector capabilities",
+    "subcategory": "Vector Search",
+    "agentValue": "Enterprise search with KNN for agent knowledge retrieval"
+  },
+  {
+    "name": "elastic-vector",
+    "source": "elastic/elasticsearch",
+    "sourceType": "github",
+    "description": "Search engine with dense vector support",
+    "subcategory": "Vector Search",
+    "agentValue": "Add vector search to existing Elasticsearch agent stacks"
+  },
+  {
+    "name": "augly",
+    "source": "facebookresearch/AugLy",
+    "sourceType": "github",
+    "description": "Data augmentation library for multimodal data",
+    "subcategory": "Synthetic Data",
+    "agentValue": "Augment agent training data across text, image, audio, video"
+  },
+  {
+    "name": "nlpaug",
+    "source": "makcedward/nlpaug",
+    "sourceType": "github",
+    "description": "Text augmentation library for NLP",
+    "subcategory": "Synthetic Data",
+    "agentValue": "Augment text training data for agent NLP models"
+  },
+  {
+    "name": "deepchecks",
+    "source": "deepchecks/deepchecks",
+    "sourceType": "github",
+    "description": "Testing suite for ML models and data",
+    "subcategory": "Model Monitoring",
+    "agentValue": "Validate agent model and data quality with automated checks"
+  },
+  {
+    "name": "fiddler",
+    "source": "fiddler-labs/fiddler-auditor",
+    "sourceType": "github",
+    "description": "ML model monitoring and explainability",
+    "subcategory": "Model Monitoring",
+    "agentValue": "Monitor agent model fairness and explain predictions"
+  },
+  {
+    "name": "pyrit",
+    "source": "Azure/PyRIT",
+    "sourceType": "github",
+    "description": "Python Risk Identification Tool for AI",
+    "subcategory": "AI Security",
+    "agentValue": "Red-team agent AI systems for risk identification"
+  },
+  {
+    "name": "ai-exploits",
+    "source": "protectai/ai-exploits",
+    "sourceType": "github",
+    "description": "Collection of AI/ML vulnerability exploits",
+    "subcategory": "AI Security",
+    "agentValue": "Test agent systems against known AI vulnerabilities"
+  },
+  {
+    "name": "counterfit",
+    "source": "Azure/counterfit",
+    "sourceType": "github",
+    "description": "CLI for assessing ML model security",
+    "subcategory": "AI Security",
+    "agentValue": "Automated adversarial testing for agent ML models"
+  },
+  {
+    "name": "lakera-guard",
+    "source": "lakeraai/lakera-guard-examples",
+    "sourceType": "github",
+    "description": "AI security for prompt injection defense",
+    "subcategory": "AI Security",
+    "agentValue": "Protect agent inputs from prompt injection attacks"
+  },
+  {
+    "name": "uptrain",
+    "source": "uptrain-ai/uptrain",
+    "sourceType": "github",
+    "description": "Open-source LLM evaluation tool",
+    "subcategory": "AI Evaluation",
+    "agentValue": "Evaluate agent LLM responses with 20+ preconfigured checks"
+  },
+  {
+    "name": "athina-ai",
+    "source": "athina-ai/athina-sdk",
+    "sourceType": "github",
+    "description": "Production monitoring for LLM applications",
+    "subcategory": "AI Evaluation",
+    "agentValue": "Monitor agent LLM output quality in production"
+  },
+  {
+    "name": "guardrails-genie",
+    "source": "wandb/guardrails-genie",
+    "sourceType": "github",
+    "description": "W&B guardrails evaluation toolkit",
+    "subcategory": "AI Evaluation",
+    "agentValue": "Evaluate agent guardrail effectiveness"
+  },
+  {
+    "name": "delta-rs",
+    "source": "delta-io/delta-rs",
+    "sourceType": "github",
+    "description": "Native Rust Delta Lake implementation",
+    "subcategory": "Data Processing",
+    "agentValue": "Efficient Delta Lake access for agent data pipelines"
+  },
+  {
+    "name": "datafusion",
+    "source": "apache/datafusion",
+    "sourceType": "github",
+    "description": "Extensible query engine in Rust",
+    "subcategory": "Data Processing",
+    "agentValue": "Fast SQL queries over agent training data"
+  },
+  {
+    "name": "ibis",
+    "source": "ibis-project/ibis",
+    "sourceType": "github",
+    "description": "Portable Python dataframe API",
+    "subcategory": "Data Processing",
+    "agentValue": "Backend-agnostic data processing for agent pipelines"
+  },
+  {
+    "name": "soda",
+    "source": "sodadata/soda-core",
+    "sourceType": "github",
+    "description": "Data quality testing framework",
+    "subcategory": "Data Processing",
+    "agentValue": "Test agent data quality with declarative checks"
+  },
+  {
+    "name": "bentoctl",
+    "source": "bentoml/bentoctl",
+    "sourceType": "github",
+    "description": "Deploy BentoML services to cloud platforms",
+    "subcategory": "MLOps Pipelines",
+    "agentValue": "Deploy agent models to any cloud with one command"
+  },
+  {
+    "name": "seldon-deploy",
+    "source": "SeldonIO/seldon-deploy-sdk",
+    "sourceType": "github",
+    "description": "Seldon deployment management SDK",
+    "subcategory": "MLOps Pipelines",
+    "agentValue": "Manage agent model deployments on Kubernetes"
+  },
+  {
+    "name": "bodywork",
+    "source": "bodywork-ml/bodywork-core",
+    "sourceType": "github",
+    "description": "Deploy ML pipelines to Kubernetes",
+    "subcategory": "MLOps Pipelines",
+    "agentValue": "Containerized ML pipeline deployment for agent workflows"
+  },
+  {
+    "name": "langdetect",
+    "source": "Mimino666/langdetect",
+    "sourceType": "github",
+    "description": "Language detection library",
+    "subcategory": "NLP",
+    "agentValue": "Detect input language for multilingual agent routing"
+  },
+  {
+    "name": "polyglot",
+    "source": "aboSamoor/polyglot",
+    "sourceType": "github",
+    "description": "Multilingual NLP toolkit",
+    "subcategory": "NLP",
+    "agentValue": "Multilingual text analysis for global agent deployments"
+  },
+  {
+    "name": "fasttext",
+    "source": "facebookresearch/fastText",
+    "sourceType": "github",
+    "description": "Library for efficient text classification and embeddings",
+    "subcategory": "NLP",
+    "agentValue": "Fast text classification for agent content routing"
+  },
+  {
+    "name": "alignment-handbook",
+    "source": "huggingface/alignment-handbook",
+    "sourceType": "github",
+    "description": "Recipes for aligning language models",
+    "subcategory": "Fine-tuning",
+    "agentValue": "Alignment training recipes for agent model behavior"
+  },
+  {
+    "name": "openrlhf",
+    "source": "OpenRLHF/OpenRLHF",
+    "sourceType": "github",
+    "description": "Easy-to-use RLHF framework",
+    "subcategory": "Fine-tuning",
+    "agentValue": "Reinforcement learning from human feedback for agent training"
+  },
+  {
+    "name": "mediapipe",
+    "source": "google-ai-edge/mediapipe",
+    "sourceType": "github",
+    "description": "Cross-platform ML solutions for live media",
+    "subcategory": "Computer Vision",
+    "agentValue": "Real-time pose and gesture detection for agent interaction"
+  },
+  {
+    "name": "kornia",
+    "source": "kornia/kornia",
+    "sourceType": "github",
+    "description": "Differentiable CV library for PyTorch",
+    "subcategory": "Computer Vision",
+    "agentValue": "Differentiable image transforms for agent vision training"
+  },
+  {
+    "name": "a1111-sd-webui-tagcomplete",
+    "source": "DominikDoom/a1111-sd-webui-tagcomplete",
+    "sourceType": "github",
+    "description": "Tag autocomplete for Stable Diffusion WebUI",
+    "subcategory": "Image Generation",
+    "agentValue": "Better prompt crafting for agent image generation"
+  },
+  {
+    "name": "controlnet",
+    "source": "lllyasviel/ControlNet",
+    "sourceType": "github",
+    "description": "Neural network for controlling diffusion models",
+    "subcategory": "Image Generation",
+    "agentValue": "Precise image generation control for agent creative tasks"
+  },
+  {
+    "name": "pyannote-audio",
+    "source": "pyannote/pyannote-audio",
+    "sourceType": "github",
+    "description": "Speaker diarization toolkit",
+    "subcategory": "Audio/Speech",
+    "agentValue": "Identify speakers in audio for agent meeting analysis"
+  },
+  {
+    "name": "espnet",
+    "source": "espnet/espnet",
+    "sourceType": "github",
+    "description": "End-to-end speech processing toolkit",
+    "subcategory": "Audio/Speech",
+    "agentValue": "Full speech pipeline for agent voice applications"
+  },
+  {
+    "name": "vosk",
+    "source": "alphacep/vosk-api",
+    "sourceType": "github",
+    "description": "Offline speech recognition API",
+    "subcategory": "Audio/Speech",
+    "agentValue": "Offline speech recognition for private agent voice input"
+  },
+  {
+    "name": "sherpa-onnx",
+    "source": "k2-fsa/sherpa-onnx",
+    "sourceType": "github",
+    "description": "Speech recognition and TTS using ONNX",
+    "subcategory": "Audio/Speech",
+    "agentValue": "Cross-platform speech for agent voice on any device"
+  },
+  {
+    "name": "cortex",
+    "source": "janhq/cortex.cpp",
+    "sourceType": "github",
+    "description": "Local AI API platform",
+    "subcategory": "Model Serving",
+    "agentValue": "Local model serving with OpenAI-compatible API for agents"
+  },
+  {
+    "name": "mosec",
+    "source": "mosecorg/mosec",
+    "sourceType": "github",
+    "description": "High-performance ML model serving framework",
+    "subcategory": "Model Serving",
+    "agentValue": "Low-latency model serving for agent inference endpoints"
+  },
+  {
+    "name": "mlem",
+    "source": "iterative/mlem",
+    "sourceType": "github",
+    "description": "Package and deploy ML models",
+    "subcategory": "ML Experiment Tracking",
+    "agentValue": "Package agent models for reproducible deployment"
+  },
+  {
+    "name": "dvclive",
+    "source": "iterative/dvclive",
+    "sourceType": "github",
+    "description": "Lightweight experiment tracking with DVC",
+    "subcategory": "ML Experiment Tracking",
+    "agentValue": "Log agent training metrics with Git-based tracking"
+  },
+  {
+    "name": "pycaret",
+    "source": "pycaret/pycaret",
+    "sourceType": "github",
+    "description": "Low-code ML library for rapid prototyping",
+    "subcategory": "AutoML",
+    "agentValue": "Quick ML model building for agent prediction needs"
+  },
+  {
+    "name": "evalml",
+    "source": "alteryx/evalml",
+    "sourceType": "github",
+    "description": "AutoML library for building ML pipelines",
+    "subcategory": "AutoML",
+    "agentValue": "Automated ML pipeline construction for agent models"
+  },
+  {
+    "name": "tpot",
+    "source": "EpistasisLab/tpot",
+    "sourceType": "github",
+    "description": "Tree-based pipeline optimization for AutoML",
+    "subcategory": "AutoML",
+    "agentValue": "Genetic programming AutoML for agent model selection"
+  },
+  {
+    "name": "quanto",
+    "source": "huggingface/optimum-quanto",
+    "sourceType": "github",
+    "description": "PyTorch quantization backend",
+    "subcategory": "Model Optimization",
+    "agentValue": "Quantize PyTorch agent models with minimal code"
+  },
+  {
+    "name": "squeezellm",
+    "source": "SqueezeAILab/SqueezeLLM",
+    "sourceType": "github",
+    "description": "Dense-and-sparse quantization for LLMs",
+    "subcategory": "Model Optimization",
+    "agentValue": "Compress agent LLMs with minimal quality loss"
+  },
+  {
+    "name": "quarto",
+    "source": "quarto-dev/quarto-cli",
+    "sourceType": "github",
+    "description": "Scientific and technical publishing system",
+    "subcategory": "Notebooks",
+    "agentValue": "Publish agent experiment reports from notebooks"
+  },
+  {
+    "name": "ploomber",
+    "source": "ploomber/ploomber",
+    "sourceType": "github",
+    "description": "Build data pipelines from Jupyter notebooks",
+    "subcategory": "Notebooks",
+    "agentValue": "Convert agent experiment notebooks into pipelines"
+  },
+  {
+    "name": "adalflow",
+    "source": "SylphAI-Inc/AdalFlow",
+    "sourceType": "github",
+    "description": "Auto-optimize LLM task pipelines",
+    "subcategory": "Prompt Engineering",
+    "agentValue": "Automatic prompt optimization for agent task quality"
+  },
+  {
+    "name": "ell",
+    "source": "MadcowD/ell",
+    "sourceType": "github",
+    "description": "Prompt engineering library with versioning",
+    "subcategory": "Prompt Engineering",
+    "agentValue": "Version and track agent prompts like code"
+  },
+  {
+    "name": "aphrodite",
+    "source": "PygmalionAI/aphrodite-engine",
+    "sourceType": "github",
+    "description": "LLM inference engine for PygmalionAI",
+    "subcategory": "LLM Inference",
+    "agentValue": "vLLM-based inference for roleplay and chat agents"
+  },
+  {
+    "name": "llm-rs",
+    "source": "rustformers/llm",
+    "sourceType": "github",
+    "description": "Run LLMs locally in Rust",
+    "subcategory": "LLM Inference",
+    "agentValue": "Rust-native LLM inference for high-performance agents"
+  },
+  {
+    "name": "copilot-cli",
+    "source": "github/gh-copilot",
+    "sourceType": "github",
+    "description": "GitHub Copilot in the CLI",
+    "subcategory": "AI Coding",
+    "agentValue": "AI-assisted command line with GitHub integration"
+  },
+  {
+    "name": "claude-dev",
+    "source": "saoudrizwan/claude-dev",
+    "sourceType": "github",
+    "description": "Autonomous coding agent VS Code extension",
+    "subcategory": "AI Coding",
+    "agentValue": "Autonomous coding in VS Code with file and terminal access"
+  },
+  {
+    "name": "aicursor",
+    "source": "AICursor/ai-cursor",
+    "sourceType": "github",
+    "description": "AI code editor tools",
+    "subcategory": "AI Coding",
+    "agentValue": "AI-powered code editing tools for developer agents"
+  },
+  {
+    "name": "pdfplumber",
+    "source": "jsvine/pdfplumber",
+    "sourceType": "github",
+    "description": "Extract text and tables from PDF files",
+    "subcategory": "Document AI",
+    "agentValue": "Precise PDF data extraction for agent document processing"
+  },
+  {
+    "name": "pymupdf",
+    "source": "pymupdf/PyMuPDF",
+    "sourceType": "github",
+    "description": "High-performance Python bindings for MuPDF",
+    "subcategory": "Document AI",
+    "agentValue": "Fast PDF rendering and text extraction for agents"
+  },
+  {
+    "name": "textract",
+    "source": "deanmalmgren/textract",
+    "sourceType": "github",
+    "description": "Extract text from any document format",
+    "subcategory": "Document AI",
+    "agentValue": "Universal document text extraction for agent ingestion"
+  },
+  {
+    "name": "ragatouille",
+    "source": "AnswerDotAI/RAGatouille",
+    "sourceType": "github",
+    "description": "ColBERT-based RAG made easy",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "Easy late-interaction retrieval for agent RAG pipelines"
+  },
+  {
+    "name": "llm-sherpa",
+    "source": "nlmatics/llmsherpa",
+    "sourceType": "github",
+    "description": "Strategic document chunking for LLMs",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "Smart document chunking for agent RAG quality"
+  },
+  {
+    "name": "langchain-chatchat",
+    "source": "chatchat-space/Langchain-Chatchat",
+    "sourceType": "github",
+    "description": "Local knowledge base QA with LangChain",
+    "subcategory": "RAG & Embeddings",
+    "agentValue": "Full local RAG system for private agent knowledge bases"
+  },
+  {
+    "name": "chatdev",
+    "source": "OpenBMB/ChatDev",
+    "sourceType": "github",
+    "description": "Multi-agent software development company",
+    "subcategory": "AI Agents",
+    "agentValue": "Simulated software company with multi-agent collaboration"
+  },
+  {
+    "name": "metagpt",
+    "source": "geekan/MetaGPT",
+    "sourceType": "github",
+    "description": "Multi-agent framework that models a software company",
+    "subcategory": "AI Agents",
+    "agentValue": "Multi-agent software engineering with role specialization"
+  },
+  {
+    "name": "devon",
+    "source": "entropy-research/Devon",
+    "sourceType": "github",
+    "description": "Open-source AI software engineer",
+    "subcategory": "AI Agents",
+    "agentValue": "Autonomous coding agent for software development tasks"
+  },
+  {
+    "name": "ragapp",
+    "source": "ragapp/ragapp",
+    "sourceType": "github",
+    "description": "Easiest way to use Agentic RAG in any enterprise",
+    "subcategory": "AI Agents",
+    "agentValue": "Deploy enterprise RAG agents with minimal configuration"
+  },
+  {
+    "name": "julep",
+    "source": "julep-ai/julep",
+    "sourceType": "github",
+    "description": "API for building multi-step AI workflows",
+    "subcategory": "AI Agents",
+    "agentValue": "Stateful multi-step workflows for production agents"
+  },
+  {
+    "name": "dust",
+    "source": "dust-tt/dust",
+    "sourceType": "github",
+    "description": "Platform for building large language model apps",
+    "subcategory": "AI Agents",
+    "agentValue": "Design and deploy agent pipelines with visual blocks"
+  },
+  {
+    "name": "autoarena",
+    "source": "kolenaIO/autoarena",
+    "sourceType": "github",
+    "description": "Automated LLM evaluation arena",
+    "subcategory": "AI Evaluation",
+    "agentValue": "Automated head-to-head agent model comparison"
+  },
+  {
+    "name": "vecs",
+    "source": "supabase/vecs",
+    "sourceType": "github",
+    "description": "Python client for Supabase Vector",
+    "subcategory": "Vector Search",
+    "agentValue": "Vector search with Supabase for agent knowledge stores"
+  },
+  {
+    "name": "@langchain/core",
+    "source": "@langchain/core",
+    "sourceType": "npm",
+    "description": "Core abstractions for LangChain.js",
+    "subcategory": "AI Agents",
+    "agentValue": "Foundation for building TypeScript agent chains"
+  },
+  {
+    "name": "@langchain/community",
+    "source": "@langchain/community",
+    "sourceType": "npm",
+    "description": "Community integrations for LangChain.js",
+    "subcategory": "AI Agents",
+    "agentValue": "Community tools and integrations for TypeScript agents"
+  },
+  {
+    "name": "@langchain/langgraph",
+    "source": "@langchain/langgraph",
+    "sourceType": "npm",
+    "description": "LangGraph for JavaScript agent workflows",
+    "subcategory": "AI Agents",
+    "agentValue": "Build stateful TypeScript agent graphs"
+  },
+  {
+    "name": "mcp",
+    "source": "mcp",
+    "sourceType": "npm",
+    "description": "Model Context Protocol utilities",
+    "subcategory": "AI APIs",
+    "agentValue": "MCP utilities for agent tool server development"
+  },
+  {
+    "name": "inngest",
+    "source": "inngest",
+    "sourceType": "npm",
+    "description": "Durable workflow engine for TypeScript",
+    "subcategory": "MLOps Pipelines",
+    "agentValue": "Durable execution for long-running agent workflows"
+  },
+  {
+    "name": "trigger.dev",
+    "source": "triggerdotdev/trigger.dev",
+    "sourceType": "github",
+    "description": "Background jobs framework for TypeScript",
+    "subcategory": "MLOps Pipelines",
+    "agentValue": "Run agent background tasks with retries and observability"
+  },
+  {
+    "name": "hono",
+    "source": "hono",
+    "sourceType": "npm",
+    "description": "Ultrafast web framework for edge and serverless",
+    "subcategory": "Model Serving",
+    "agentValue": "Lightweight API server for agent model endpoints"
+  },
+  {
+    "name": "elysia",
+    "source": "elysiajs",
+    "sourceType": "npm",
+    "description": "TypeScript web framework for Bun",
+    "subcategory": "Model Serving",
+    "agentValue": "Fast API server for agent backend services"
+  },
+  {
+    "name": "pdf-parse",
+    "source": "pdf-parse",
+    "sourceType": "npm",
+    "description": "Parse PDF files in Node.js",
+    "subcategory": "Document AI",
+    "agentValue": "PDF text extraction for TypeScript agent pipelines"
+  },
+  {
+    "name": "mammoth",
+    "source": "mammoth",
+    "sourceType": "npm",
+    "description": "Convert DOCX to HTML/Markdown",
+    "subcategory": "Document AI",
+    "agentValue": "Word document conversion for agent document processing"
+  },
+  {
+    "name": "turndown",
+    "source": "turndown",
+    "sourceType": "npm",
+    "description": "HTML to Markdown converter",
+    "subcategory": "Document AI",
+    "agentValue": "Convert web content to markdown for agent ingestion"
+  },
+  {
+    "name": "cheerio",
+    "source": "cheerio",
+    "sourceType": "npm",
+    "description": "Fast HTML parsing and manipulation",
+    "subcategory": "Data Processing",
+    "agentValue": "Parse web pages for agent web scraping pipelines"
+  },
+  {
+    "name": "sharp",
+    "source": "sharp",
+    "sourceType": "npm",
+    "description": "High-performance image processing",
+    "subcategory": "Computer Vision",
+    "agentValue": "Image preprocessing for agent vision pipelines in Node.js"
+  },
+  {
+    "name": "tesseract.js",
+    "source": "tesseract.js",
+    "sourceType": "npm",
+    "description": "OCR engine for JavaScript",
+    "subcategory": "Document AI",
+    "agentValue": "Browser and Node.js OCR for agent text extraction"
+  },
+  {
+    "name": "natural",
+    "source": "natural",
+    "sourceType": "npm",
+    "description": "NLP library for Node.js",
+    "subcategory": "NLP",
+    "agentValue": "Text processing utilities for TypeScript agent NLP"
+  },
+  {
+    "name": "compromise",
+    "source": "compromise",
+    "sourceType": "npm",
+    "description": "Modest NLP library for JavaScript",
+    "subcategory": "NLP",
+    "agentValue": "Lightweight NLP for agent text understanding in JS"
+  },
+  {
+    "name": "ml-matrix",
+    "source": "ml-matrix",
+    "sourceType": "npm",
+    "description": "Matrix operations library for JavaScript",
+    "subcategory": "ML Frameworks",
+    "agentValue": "Matrix operations for agent ML computations in JS"
+  },
+  {
+    "name": "brain.js",
+    "source": "brain.js",
+    "sourceType": "npm",
+    "description": "Neural network library for JavaScript",
+    "subcategory": "ML Frameworks",
+    "agentValue": "Train neural networks in JS for lightweight agent models"
+  },
+  {
+    "name": "onnxruntime-node",
+    "source": "onnxruntime-node",
+    "sourceType": "npm",
+    "description": "ONNX Runtime for Node.js",
+    "subcategory": "Model Optimization",
+    "agentValue": "Run optimized ONNX models in TypeScript agent backends"
+  }
+]

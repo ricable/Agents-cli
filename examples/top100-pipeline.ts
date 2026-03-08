@@ -2,15 +2,20 @@
 /**
  * top100-pipeline.ts
  *
- * Install and analyze the 100 most useful CLI tools for AI agents.
+ * Install and analyze CLI tools for AI agents — 91 general + 502 AI/ML tools.
  * Sources: GitHub repos + npm packages.
  *
  * Usage:
- *   npx tsx examples/top100-pipeline.ts [--dry-run] [--limit N] [--category CAT] [--skip-installed]
- *   npx tsx examples/top100-pipeline.ts --dry-run                 # preview all tools
- *   npx tsx examples/top100-pipeline.ts --category security       # only security tools
- *   npx tsx examples/top100-pipeline.ts --limit 10                # first 10 tools
- *   npx tsx examples/top100-pipeline.ts --skip-installed          # skip already installed
+ *   npx tsx examples/top100-pipeline.ts [--dry-run] [--limit N] [--category CAT] [--skip-installed] [--list-categories]
+ *
+ * Examples:
+ *   npx tsx examples/top100-pipeline.ts --dry-run                       # preview all 593 tools
+ *   npx tsx examples/top100-pipeline.ts --category ai-ml --dry-run      # all 502 AI/ML tools
+ *   npx tsx examples/top100-pipeline.ts --category ai-ml/llm-inference  # just LLM inference tools
+ *   npx tsx examples/top100-pipeline.ts --category ai-ml/ai-agents      # just AI agent frameworks
+ *   npx tsx examples/top100-pipeline.ts --category security             # security tools
+ *   npx tsx examples/top100-pipeline.ts --limit 10 --skip-installed     # first 10, skip existing
+ *   npx tsx examples/top100-pipeline.ts --list-categories               # show all categories
  */
 
 import { createResolver } from "../lib/resolver.js";
@@ -21,8 +26,9 @@ import { generateRichSkillMd, installTool } from "../lib/skills.js";
 import { readPkgVersion } from "../lib/pkg-utils.js";
 import type { Tool, ToolCapabilities } from "../lib/types.js";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
-import { mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { join, resolve, dirname } from "node:path";
+import { mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 // ── Config ───────────────────────────────────────────────────────────────────
 const DATA_DIR = join(homedir(), ".agents-cli");
@@ -40,16 +46,10 @@ interface CliTool {
 }
 
 /**
- * The 100+ most useful CLI tools for AI agents.
- *
- * Selection criteria:
- *  - Has structured/JSON output (critical for agents)
- *  - Widely used (>1000 GitHub stars or >10k npm weekly downloads)
- *  - Actively maintained
- *  - Clear CLI interface with non-interactive modes
- *  - Can be automated (non-interactive or has --yes/--no-input flags)
+ * 91 general-purpose CLI tools (code-search, data-processing, http-api, git,
+ * javascript, python, cloud, package-managers, testing, security, etc.)
  */
-const CLI_TOOLS: CliTool[] = [
+const GENERAL_TOOLS: CliTool[] = [
   // ── Code Search & Navigation ─────────────────────────────────────
   { name: "rg", source: "BurntSushi/ripgrep", sourceType: "github", description: "Recursively search directories for a regex pattern with structured output", category: "code-search", agentValue: "Fastest code search with --json output, essential for codebase understanding" },
   { name: "fd", source: "sharkdp/fd", sourceType: "github", description: "Simple, fast alternative to find with colorized output", category: "code-search", agentValue: "Fast file discovery with regex/glob, simpler syntax than find" },
@@ -178,14 +178,58 @@ const CLI_TOOLS: CliTool[] = [
   { name: "oha", source: "hatoo/oha", sourceType: "github", description: "HTTP load generator with TUI", category: "network", agentValue: "JSON output (--json), detailed latency histograms" },
 ];
 
+// ── AI/ML Tools (loaded from ai-ml-tools.json) ──────────────────────────────
+
+interface AiMlToolEntry {
+  name: string;
+  source: string;
+  sourceType: "github" | "npm";
+  description: string;
+  subcategory: string;
+  agentValue: string;
+}
+
+function loadAiMlTools(): CliTool[] {
+  const scriptDir = dirname(fileURLToPath(import.meta.url));
+  const jsonPath = join(scriptDir, "..", "ai-ml-tools.json");
+  if (!existsSync(jsonPath)) {
+    console.log("  ⚠ ai-ml-tools.json not found, skipping AI/ML tools");
+    return [];
+  }
+  const raw = JSON.parse(readFileSync(jsonPath, "utf-8")) as AiMlToolEntry[];
+  return raw.map(t => ({
+    name: t.name,
+    source: t.source,
+    sourceType: t.sourceType,
+    description: t.description,
+    category: `ai-ml/${t.subcategory.toLowerCase().replace(/ & /g, "-and-").replace(/ /g, "-")}`,
+    agentValue: t.agentValue,
+  }));
+}
+
+/** Merge general + AI/ML tools, deduplicating by name */
+function loadAllTools(): CliTool[] {
+  const aiMlTools = loadAiMlTools();
+  const seen = new Set(GENERAL_TOOLS.map(t => t.name));
+  const merged = [...GENERAL_TOOLS];
+  for (const t of aiMlTools) {
+    if (!seen.has(t.name)) {
+      merged.push(t);
+      seen.add(t.name);
+    }
+  }
+  return merged;
+}
+
 // ── CLI Args ─────────────────────────────────────────────────────────────────
 function parseCliArgs() {
   const args = process.argv.slice(2);
-  let limit = CLI_TOOLS.length;
+  let limit = 0; // 0 = no limit
   let dryRun = false;
   let category = "";
   let skipInstalled = false;
   let verbose = false;
+  let listCategories = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!;
@@ -194,8 +238,9 @@ function parseCliArgs() {
     else if (arg === "--category" && args[i + 1]) { category = args[++i]!.toLowerCase(); }
     else if (arg === "--skip-installed") { skipInstalled = true; }
     else if (arg === "--verbose" || arg === "-v") { verbose = true; }
+    else if (arg === "--list-categories") { listCategories = true; }
   }
-  return { limit, dryRun, category, skipInstalled, verbose };
+  return { limit, dryRun, category, skipInstalled, verbose, listCategories };
 }
 
 // ── Pipeline ─────────────────────────────────────────────────────────────────
@@ -284,14 +329,34 @@ function writeSkillForTool(installed: Tool, meta: CliTool): string {
 async function main() {
   const opts = parseCliArgs();
 
-  // Filter by category if specified
-  let tools = CLI_TOOLS;
+  // Load all tools (91 general + 502 AI/ML)
+  const allTools = loadAllTools();
+
+  // --list-categories: show available categories and exit
+  if (opts.listCategories) {
+    const cats = new Map<string, number>();
+    for (const t of allTools) {
+      cats.set(t.category, (cats.get(t.category) ?? 0) + 1);
+    }
+    console.log(`\n  ${allTools.length} tools across ${cats.size} categories:\n`);
+    const sorted = [...cats.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    for (const [cat, count] of sorted) {
+      console.log(`    ${cat.padEnd(35)} ${count} tools`);
+    }
+    console.log(`\n  Filter with: --category <name>  (matches partial, e.g. "ai-ml" or "ai-ml/llm")\n`);
+    return;
+  }
+
+  // Filter by category if specified (supports partial match: "ai-ml" matches all ai-ml/* subcategories)
+  let tools = allTools;
   if (opts.category) {
     tools = tools.filter(t => t.category.toLowerCase().includes(opts.category));
   }
 
-  // Apply limit
-  tools = tools.slice(0, opts.limit);
+  // Apply limit (0 = no limit)
+  if (opts.limit > 0) {
+    tools = tools.slice(0, opts.limit);
+  }
 
   // Group by category for display
   const categories = new Map<string, CliTool[]>();
@@ -301,10 +366,12 @@ async function main() {
   }
 
   console.log("╔══════════════════════════════════════════════════════════╗");
-  console.log("║    agents-cli: Top 100 CLIs for AI Agents Pipeline      ║");
+  console.log("║   agents-cli: CLI Tools for AI Agents Pipeline          ║");
+  console.log("║   91 general + 502 AI/ML tools from GitHub & npm        ║");
   console.log("╚══════════════════════════════════════════════════════════╝");
-  console.log(`  Total tools:  ${tools.length}`);
+  console.log(`  Total tools:  ${tools.length} / ${allTools.length}`);
   console.log(`  Categories:   ${categories.size}`);
+  if (opts.category) console.log(`  Filter:       "${opts.category}"`);
   console.log(`  Dry run:      ${opts.dryRun}`);
   console.log(`  Output:       ${OUTPUT_DIR}`);
   console.log("");
@@ -400,7 +467,7 @@ async function main() {
 
   // Write INDEX.md
   const indexLines = [
-    "# Top 100 CLI Tools for AI Agents",
+    `# CLI Tools for AI Agents (${results.length} generated)`,
     "",
     `Generated on ${new Date().toISOString()}`,
     "",
