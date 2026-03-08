@@ -14,12 +14,14 @@ Built on the "Rewrite Your CLI for AI Agents" philosophy — every command outpu
 - **No default exports** — use named exports only.
 - **Types in `lib/types.ts`** — all shared interfaces and types live there. Don't scatter type definitions.
 - **Security**: The codebase has SSRF protection, path traversal guards, size limits, and input validation. Do NOT bypass these. Do NOT remove `assertWithinDir`, `isPrivateUrl`, `validateToolId`, guard functions, or size checks.
+- **Shell safety**: When interpolating tool names or URIs into generated shell scripts, always call `validateToolName()` first and shell-quote all values. Never pass unsanitized user input into shell commands.
+- **Path containment**: When writing files based on user/tool-provided paths, always verify the resolved path stays within the intended output directory: `resolve(fullPath).startsWith(resolve(baseDir) + "/")`.
 - **No interactive prompts** — the CLI must work non-interactively (CI/agent-friendly).
 - **Tests**: Run `npm test` (vitest). Tests are in `tests/`. Write tests for new functionality.
 - **Atomic writes**: Store uses temp-file + rename for crash safety. Maintain this pattern.
-- **Structured output everywhere**: Every command must support `--json` flag and `OUTPUT_FORMAT=json` env var via the `CliOutput<T>` envelope from `lib/output.ts`.
-- **Dry-run on mutating commands**: All commands that modify state must support `--dry-run`.
-- **Input hardening**: All user/agent inputs must pass through guards in `lib/guards.ts` before use.
+- **Structured output everywhere**: Every command must support `--json` flag and `OUTPUT_FORMAT=json` env var via the `CliOutput<T>` envelope from `lib/output.ts`. Error paths must also use `emit(failure(...))` when `--json` is active — never fall back to bare `console.error`.
+- **Dry-run on mutating commands**: All commands that modify state must support `--dry-run`. This includes file writes, index generation, and lockfile creation — not just the primary operation.
+- **Input hardening**: All user/agent inputs must pass through guards in `lib/guards.ts` before use. Key guards: `validateSource()` for tool URIs, `validateToolName()` for tool names used in paths/scripts, `rejectPathTraversal()` for file paths.
 
 ## Key commands
 
@@ -173,45 +175,68 @@ These 7 principles from "Rewrite Your CLI for AI Agents" are integrated througho
 
 ```
 bin/
-  agents-cli.ts    — main CLI entry point (commander), all 14+ commands
-  agent-run.ts     — tool execution engine
+  agents-cli.ts        — main CLI entry point (commander), all 14+ commands
+  agent-run.ts         — tool execution engine
 lib/
-  types.ts         — all shared types (CliOutput, ToolSubcommand, ToolSchema, etc.)
-  index.ts         — public SDK entry point (re-exports)
-  output.ts        — structured output layer (success/failure/emit)
-  guards.ts        — input hardening against agent hallucinations
-  resolver.ts      — source format detection + metadata fetching (github/npm/pypi/crates/local)
-  installer.ts     — download, extract, build, install deps
-  analyzer.ts      — deep recursive --help probing, command/flag parsing
-  store.ts         — flat-file JSON tool store + CONTEXT.md generation
-  registry.ts      — 4-layer registry cascade (local, community, github, npm)
-  skills.ts        — SKILL.md parsing, skill install/remove, lockfile, rich generation
-  skill-content.ts — structural skill generation (commands.md, flags.md, scripts)
-  skill-tester.ts  — quality gate scoring (trigger score, structural quality)
-  skill-factory.ts — skill creation and templating
-  mcp.ts           — MCP bridge for exposing tools to AI agents
-  chunker.ts       — AST-aware semantic chunking of source files
-  extractor.ts     — README excerpts, code blocks, export groups
-  indexes.ts       — domain grouping + master/domain index generation
-  domains.ts       — domain trigger phrases for skill descriptions
-  pkg-utils.ts     — package.json reading, monorepo walking
-  schemas.ts       — zod schemas
-  classifier/      — multi-registry auto-discovery
-    npm.ts         — npm registry search (query or keyword groups)
-    github.ts      — GitHub repo search (query or topic groups)
-    crates.ts      — crates.io search (query or keyword groups)
-    pypi.ts        — PyPI package discovery (curated AI/ML/CLI list)
-  pipeline/        — NL prompt → intent classification → entity extraction
-    intent.ts      — classify user intent from natural language
-    entity-extractor.ts — extract named entities from prompts
-    prompt-parser.ts    — parse capabilities and direct terms
+  types.ts             — all shared types (CliOutput, Tool, ManifestEntry, etc.)
+  index.ts             — public SDK entry point (re-exports everything)
+  output.ts            — structured output layer: success(), failure(), emit()
+  guards.ts            — input hardening: validateSource, validateToolName, rejectPathTraversal
+  resolver.ts          — source format detection + metadata fetching
+  installer.ts         — download, extract, build, install deps
+  analyzer.ts          — deep recursive --help probing, command/flag parsing
+  store.ts             — flat-file JSON tool store + CONTEXT.md generation
+  registry.ts          — 4-layer registry cascade (local, community, github, npm)
+  skills.ts            — SKILL.md parsing, skill install/remove, lockfile, rich generation
+  skill-content.ts     — structural skill generation (scripts, patterns, api docs)
+  skill-tester.ts      — quality gate: trigger scoring + structural quality
+  skill-factory.ts     — 3-layer skill creation (structural → AI-enhanced)
+  mcp.ts               — MCP bridge for exposing tools to AI agents
+  mcp-skill.ts         — opensrc MCP skill bridge (callOpensrc, opensrc)
+  chunker.ts           — AST-aware semantic chunking of source files
+  extractor.ts         — README excerpts, code blocks, export groups, repo analysis
+  cache.ts             — SkillCache, file hashing, incremental generation
+  search.ts            — hybrid FTS + vector search (lazy better-sqlite3)
+  indexer.ts           — source indexing pipeline (files → chunks → SQLite)
+  indexes.ts           — domain grouping + master/domain index generation
+  domains.ts           — domain trigger phrases (19 domains) for skill descriptions
+  pkg-utils.ts         — package.json reading, monorepo walking
+  schemas.ts           — zod schemas
+  classifier/          — multi-registry auto-discovery
+    npm.ts             — npm registry search
+    github.ts          — GitHub repo/trending search
+    crates.ts          — crates.io search
+    pypi.ts            — PyPI package discovery
+  pipeline/            — NL prompt intelligence
+    intent.ts          — classify user intent from natural language
+    entity-extractor.ts — extract named entities (APIs, services, libraries)
+    prompt-parser.ts   — parse capabilities and direct terms
+    capability-map.ts  — capability → search query mapping
+    workflow-gen.ts    — generate skills from workflow templates
+    templates/         — workflow skill templates
+  plugin/              — plugin system
+    builder.ts         — build plugin.json from installed tools
+    publisher.ts       — publish plugins to registry
+    ai-generator.ts    — generate agent definitions
+    marketplace.ts     — marketplace generation
+  db/                  — database layer (lazy better-sqlite3)
+    domain-db.ts       — per-domain SQLite databases
+    aggregated-db.ts   — aggregated cross-domain database
+    sqlite.ts          — SQLite utilities, WAL pragmas, chunk upsert
 examples/
-  skill-forge.ts   — unified skill generation pipeline (all 8 stages)
-  trending-pipeline.ts — batch pipeline: GitHub trending -> skills
-  generated-skills/ — 350+ auto-generated SKILL.md files
+  skill-forge.ts           — unified 8-stage skill generation pipeline
+  trending-pipeline.ts     — batch: GitHub trending → skills
+  pipeline-discover.ts     — NL prompt → multi-registry discovery
+  regenerate-skills.ts     — batch regeneration of existing skills
+  skill-quality-audit.ts   — quality audit across skill directories
+  workflow-builder.ts      — workflow → skill generation
+  chunker-demo.ts          — AST chunking demonstration
+  top100-pipeline.ts       — top-100 trending repos pipeline
+  generated-skills/        — 350+ auto-generated skill directories
 tests/
-  skills.test.ts   — skill tests
-  resolver.test.ts, guards.test.ts, etc. — 152 tests total
+  skills.test.ts, resolver.test.ts, guards.test.ts, analyzer.test.ts,
+  store.test.ts, registry.test.ts, schemas.test.ts, mcp.test.ts,
+  pipeline.test.ts, pypi.test.ts, crates.test.ts, agent-run.test.ts
 ```
 
 ## Data directory: ~/.agents-cli/
@@ -264,13 +289,72 @@ export async function discoverXPackages(query?: string, limit?: number): Promise
 - When `query` is omitted, search across hardcoded keyword groups
 - Always return `ExtendedManifestEntry[]` (extends `ManifestEntry`)
 
+## Skill spec compliance (Anthropic)
+
+Generated skills must comply with the Anthropic skill specification:
+
+- **name**: kebab-case, max 64 chars, no reserved words ("claude", "anthropic")
+- **description**: max 1024 chars, must include trigger phrase ("Use when..."), no XML tags, third person
+- **tags**: array of relevant keywords for discovery
+- **SKILL.md body**: max 500 lines, progressive disclosure (Quick Start → details → references)
+- **references/**: one level deep from SKILL.md (no nested subdirectories)
+- **No README.md** inside skill folders — use SKILL.md as the entry point
+- **File must be exactly `SKILL.md`** (case-sensitive, not `SKILL.MD` or `skill.md`)
+- **scripts/**: executable helpers (bash `.sh`, python `.py` with uv inline metadata)
+
+Quality gate thresholds (from `testSkillSync`):
+- Trigger score ≥ 0.80 (fraction of trigger queries that match the description)
+- Quality score ≥ 6/10 (structural quality check)
+
+## Key function signatures
+
+```typescript
+// Output (lib/output.ts) — always use these, never bare console.log for commands
+success<T>(command: string, data: T, startTime: number): CliOutput<T>
+failure(command: string, code: string, message: string, startTime: number): CliOutput<never>
+emit<T>(result: CliOutput<T>, json: boolean): void
+
+// Guards (lib/guards.ts) — call before using user input
+validateSource(source: string): void      // validates tool URI format
+validateToolName(name: string): void      // validates name for paths/scripts
+rejectPathTraversal(path: string): void   // blocks ../ in paths
+
+// Deep probing (lib/analyzer.ts)
+deepProbe(binPath: string, opts: { maxDepth: number }): { tree: ToolCommand[], totalCommands: number }
+
+// Skills (lib/skills.ts)
+installTool(source: string, dataDir: string, opts): Promise<Tool>
+generateRichSkillMd(tool: Tool): string
+generateSkillDirectory(tool: Tool): { skillMd: string, files: Record<string, string> }
+writeLockfile(lockPath: string, tools: Tool[]): void
+
+// Quality (lib/skill-tester.ts)
+testSkillSync(skillPath: string, preloadedContent?: string): SkillTestResult
+testAllSkillsSync(dir: string): SkillTestResult[]
+
+// Classifiers (lib/classifier/*.ts) — all follow same pattern
+discoverNpmPackages(query?: string, limit?: number): Promise<ExtendedManifestEntry[]>
+discoverGitHubRepos(query?: string, limit?: number): Promise<ExtendedManifestEntry[]>
+discoverCratesPackages(query?: string, limit?: number): Promise<ExtendedManifestEntry[]>
+discoverPyPIPackages(query?: string, limit?: number): Promise<ExtendedManifestEntry[]>
+
+// Indexes (lib/indexes.ts)
+generateDomainIndex(domain: string, entries: ManifestEntry[], triggers: DomainTriggers): string
+generateMasterIndex(manifest: Manifest, triggers: DomainTriggers): string
+```
+
 ## Do NOT
 
 - Add heavy dependencies — the CLI should stay lean
-- Use `yaml` or `js-yaml` — we have a custom frontmatter parser
+- Use `yaml` or `js-yaml` — we have a custom frontmatter parser (`parseFrontmatter` in skills.ts)
 - Skip the build step — TypeScript source is not directly runnable via node (only via tsx)
 - Remove security guards (SSRF, path traversal, size limits, input validation)
 - Use `process.exit()` — set `process.exitCode` instead
 - Add interactive prompts or TTY-dependent features
 - Bypass the `CliOutput<T>` envelope — all commands must use `success()`/`failure()`/`emit()`
 - Remove input hardening guards from `lib/guards.ts`
+- Interpolate unsanitized tool names/URIs into shell scripts — always validate + quote
+- Write files outside the intended output directory — always verify path containment
+- Use `require()` in ESM modules — use `import` (the codebase is pure ESM)
+- Hardcode `dryRun: false` — always thread the dry-run flag through the full pipeline
+- Return bare `console.error` when `--json` is active — use `emit(failure(...))`
