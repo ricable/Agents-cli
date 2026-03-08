@@ -13,7 +13,7 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { randomBytes } from "node:crypto";
 import { unlinkSync } from "node:fs";
-import { isPrivateUrl, parseGithubOwnerRepo, parsePypiPackage } from "./resolver.js";
+import { isPrivateUrl, parseGithubOwnerRepo, parsePypiPackage, parseCratesPackage } from "./resolver.js";
 import { readPkgJson, walkPackageDirs } from "./pkg-utils.js";
 import type { PkgInfo } from "./pkg-utils.js";
 
@@ -240,7 +240,7 @@ async function installFromNpm(
   dest: string,
 ): Promise<InstallResult> {
   const start = Date.now();
-  const pkg = source.uri;
+  const pkg = source.uri.startsWith("npm:") ? source.uri.slice(4) : source.uri;
 
   mkdirSync(dest, { recursive: true });
 
@@ -342,7 +342,7 @@ async function installFromPypi(
 
   // Create isolated venv
   const venvDir = join(dest, ".venv");
-  execFileSync("uv", ["venv", venvDir], { stdio: "pipe", timeout: 30000 });
+  execFileSync("uv", ["venv", "--clear", venvDir], { stdio: "pipe", timeout: 30000 });
 
   // Install the package
   const installArgs = version ? [`${pkg}==${version}`] : [pkg];
@@ -375,11 +375,72 @@ async function installFromPypi(
   };
 }
 
+/** Files created by cargo install that are not binaries */
+const CARGO_META_FILES = new Set([".crates.toml", ".crates2.json"]);
+
+/** Check if a command exists on PATH */
+function commandExists(cmd: string): boolean {
+  try {
+    execFileSync("which", [cmd], { stdio: "pipe" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Install from crates.io via cargo */
+async function installFromCrates(
+  source: ToolSource,
+  dest: string,
+): Promise<InstallResult> {
+  const start = Date.now();
+  const pkg = parseCratesPackage(source.uri);
+  const version = source.ref;
+  const spec = version ? `${pkg}@${version}` : pkg;
+
+  mkdirSync(dest, { recursive: true });
+
+  if (commandExists("cargo-binstall")) {
+    execFileSync("cargo-binstall", [spec, "--root", dest, "--no-confirm"], {
+      stdio: "pipe",
+      timeout: 300000,
+    });
+  } else {
+    execFileSync("cargo", ["install", spec, "--root", dest], {
+      stdio: "pipe",
+      timeout: 600000,
+    });
+  }
+
+  // Discover binaries in {dest}/bin/, excluding cargo metadata files
+  const binDir = join(dest, "bin");
+  const binaries: string[] = [];
+  if (existsSync(binDir)) {
+    for (const entry of readdirSync(binDir)) {
+      if (CARGO_META_FILES.has(entry)) continue;
+      const full = join(binDir, entry);
+      try {
+        const st = statSync(full);
+        if (st.isFile()) {
+          chmodSync(full, 0o755);
+          binaries.push(full);
+        }
+      } catch { /* skip */ }
+    }
+  }
+
+  return {
+    installPath: dest,
+    binaries,
+    duration: Date.now() - start,
+  };
+}
+
 /** Create an installer instance */
 export function createInstaller(): ToolInstaller {
   return {
     supports(format: SourceFormat): boolean {
-      return ["github", "npm", "pypi", "local"].includes(format);
+      return ["github", "npm", "pypi", "crates", "local"].includes(format);
     },
 
     async install(
@@ -396,6 +457,8 @@ export function createInstaller(): ToolInstaller {
           return installFromLocal(source, dest);
         case "pypi":
           return installFromPypi(source, dest);
+        case "crates":
+          return installFromCrates(source, dest);
         default:
           throw new Error(`Unsupported install format: ${source.format}`);
       }
