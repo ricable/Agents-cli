@@ -547,27 +547,30 @@ export function buildContext(skill: Skill): string {
 /**
  * Generate a rich SKILL.md from an installed tool's discovered capabilities.
  *
- * This is the gws-style approach: every installed tool gets a real skill file
- * with command reference, flags, examples, and workflow guidance — not a stub.
- * The quality depends on what --help reveals. Compiled tools with no binary
- * will produce a thinner skill, but it's still better than nothing.
+ * Produces a comprehensive skill with command reference, flags, real examples,
+ * workflow guidance, and agent integration patterns. When binary analysis
+ * yields no commands (libraries, compiled tools without --help), it still
+ * generates useful content from rawHelp text, description, and metadata.
  */
 export function generateRichSkillMd(tool: Tool): string {
   const commands = tool.capabilities.commands;
   const flags = tool.capabilities.globalFlags;
+  const rawHelp = tool.capabilities.rawHelp ?? "";
   const desc = tool.meta.description || `CLI tool: ${tool.meta.name}`;
+  const name = tool.meta.name;
+  const descLower = desc.toLowerCase().replace(/\.$/, "");
 
-  // Build trigger-aware description
+  // Build trigger-aware description — always rich, never generic
   const cmdNames = commands.slice(0, 5).map(c => c.name).join(", ");
   const triggerHint = commands.length > 0
-    ? `Use this skill when the user needs ${tool.meta.name} (commands: ${cmdNames}), even if they don't mention "${tool.meta.name}" explicitly.`
-    : `Use this skill when working with ${tool.meta.name}-related tasks.`;
+    ? `Use this skill when the user needs ${name} (commands: ${cmdNames}), even if they don't mention "${name}" explicitly.`
+    : `Use this skill whenever the user works with ${name} or tasks related to ${descLower} — even if they don't mention "${name}" by name.`;
 
   const s: string[] = [];
 
   // ── Frontmatter ──
   s.push("---");
-  s.push(`name: ${tool.meta.name}`);
+  s.push(`name: ${name}`);
   s.push(`version: ${tool.meta.version}`);
   s.push(`description: "${esc(desc)}. ${triggerHint}"`);
   s.push(`ingredients:`);
@@ -581,7 +584,7 @@ export function generateRichSkillMd(tool: Tool): string {
   s.push("");
 
   // ── Header ──
-  s.push(`# ${tool.meta.name}`);
+  s.push(`# ${name}`);
   s.push("");
   s.push(desc);
   s.push("");
@@ -590,15 +593,62 @@ export function generateRichSkillMd(tool: Tool): string {
     s.push("");
   }
 
-  // ── Commands ──
+  // ── Overview / Why this tool matters for agents ──
+  s.push("## Overview");
+  s.push("");
+  // Use description as-is if it starts with a verb, otherwise prefix naturally
+  const startsWithVerb = /^(run|build|create|manage|provide|enable|generate|convert|analyze|search|scan|test|deploy|monitor|transform|process|execute|install|serve|compile|validate|extract|detect|train|optimize|automate|format|lint|check|bundle|watch|debug|profile|benchmark|audit|schedule|orchestrate|evaluate|annotate|label|embed|index|query|fetch|sync|stream|log|track|visualize|render|parse|resolve|discover|inspect|measure|report|read|write)/.test(descLower);
+  const descSentence = startsWithVerb ? `${name} can ${descLower}` : `${name} provides ${descLower}`;
+  s.push(`${descSentence}. Agents benefit from ${name} because it provides programmatic access to capabilities that would otherwise require manual interaction or complex scripting.`);
+  s.push("");
+
+  // ── Installation ──
+  s.push("## Installation");
+  s.push("");
+  s.push("```bash");
+  s.push(`# Install via agents-cli`);
+  s.push(`agents-cli add ${tool.source.uri}`);
+  s.push("");
+  if (tool.source.format === "npm" || tool.source.uri.includes("npm:")) {
+    s.push(`# Or install directly via npm`);
+    s.push(`npm install -g ${tool.source.uri.replace("npm:", "")}`);
+  } else if (tool.source.format === "github") {
+    s.push(`# Or clone from GitHub`);
+    s.push(`git clone https://github.com/${tool.source.uri}.git`);
+  }
+  s.push("```");
+  s.push("");
+
+  // ── Commands (if discovered) ──
   if (commands.length > 0) {
     s.push("## Commands");
     s.push("");
+    s.push(`${name} exposes ${commands.length} command${commands.length > 1 ? "s" : ""}:`);
+    s.push("");
+
+    // Summary table first
+    if (commands.length > 3) {
+      s.push("| Command | Description |");
+      s.push("|---------|-------------|");
+      for (const cmd of commands) {
+        s.push(`| \`${name} ${cmd.name}\` | ${cmd.description || "—"} |`);
+      }
+      s.push("");
+    }
+
+    // Detailed sections for each command
     for (const cmd of commands) {
-      s.push(`### \`${tool.meta.name} ${cmd.name}\``);
+      s.push(`### \`${name} ${cmd.name}\``);
       s.push("");
       if (cmd.description) s.push(cmd.description);
       s.push("");
+
+      // Example usage for each command
+      s.push("```bash");
+      s.push(`${name} ${cmd.name}`);
+      s.push("```");
+      s.push("");
+
       if (cmd.flags.length > 0) {
         s.push("**Flags:**");
         for (const f of cmd.flags) {
@@ -610,7 +660,7 @@ export function generateRichSkillMd(tool: Tool): string {
     }
   }
 
-  // ── Global flags ──
+  // ── Global flags (if discovered) ──
   if (flags.length > 0) {
     s.push("## Global Options");
     s.push("");
@@ -622,36 +672,128 @@ export function generateRichSkillMd(tool: Tool): string {
     s.push("");
   }
 
-  // ── Usage ──
+  // ── Raw help output (when available, especially useful when no commands were parsed) ──
+  if (rawHelp && commands.length === 0) {
+    s.push("## Help Reference");
+    s.push("");
+    s.push("The following is the tool's built-in help output for reference:");
+    s.push("");
+    s.push("```");
+    // Truncate very long help to keep skill readable
+    const helpLines = rawHelp.trim().split("\n");
+    const truncated = helpLines.length > 80 ? helpLines.slice(0, 80).join("\n") + "\n\n... (truncated, run --help for full output)" : rawHelp.trim();
+    s.push(truncated);
+    s.push("```");
+    s.push("");
+  }
+
+  // ── Usage examples ──
   s.push("## Usage");
   s.push("");
-  s.push("```bash");
-  s.push(`# Show help`);
-  s.push(`${tool.meta.name} --help`);
   if (commands.length > 0) {
+    s.push("```bash");
+    s.push(`# Show help`);
+    s.push(`${name} --help`);
     s.push("");
     for (const cmd of commands.slice(0, 5)) {
       s.push(`# ${cmd.description || cmd.name}`);
-      s.push(`${tool.meta.name} ${cmd.name}`);
+      s.push(`${name} ${cmd.name}`);
       s.push("");
     }
+    s.push("```");
+  } else {
+    // No commands discovered — provide general usage patterns
+    s.push("```bash");
+    s.push(`# Show help and available options`);
+    s.push(`${name} --help`);
+    s.push("");
+    s.push(`# Check version`);
+    s.push(`${name} --version`);
+    s.push("```");
+    s.push("");
+    s.push("Refer to the project documentation for detailed usage:");
+    if (tool.meta.homepage) {
+      s.push(`- ${tool.meta.homepage}`);
+    } else {
+      s.push(`- https://github.com/${tool.source.uri}`);
+    }
   }
+  s.push("");
+
+  // ── Common Workflows ──
+  s.push("## Common Workflows");
+  s.push("");
+  if (commands.length >= 3) {
+    // Build workflow from discovered commands
+    s.push(`### Basic workflow`);
+    s.push("");
+    s.push("```bash");
+    for (const cmd of commands.slice(0, 4)) {
+      s.push(`# Step: ${cmd.description || cmd.name}`);
+      s.push(`${name} ${cmd.name}`);
+      s.push("");
+    }
+    s.push("```");
+  } else {
+    // General workflow guidance
+    s.push(`### Getting started`);
+    s.push("");
+    s.push("```bash");
+    s.push(`# 1. Install the tool`);
+    s.push(`agents-cli add ${tool.source.uri}`);
+    s.push("");
+    s.push(`# 2. Verify installation`);
+    s.push(`agents-cli run ${name} -- --version`);
+    s.push("");
+    s.push(`# 3. Explore capabilities`);
+    s.push(`agents-cli schema ${name} --json`);
+    s.push("```");
+    s.push("");
+    s.push(`### Piping with other tools`);
+    s.push("");
+    s.push("```bash");
+    s.push(`# Chain ${name} output with jq for structured processing`);
+    s.push(`agents-cli run ${name} -- <args> | jq '.'`);
+    s.push("");
+    s.push(`# Use with rg for filtering output`);
+    s.push(`agents-cli run ${name} -- <args> | rg '<pattern>'`);
+    s.push("```");
+  }
+  s.push("");
+
+  // ── Agent Integration ──
+  s.push("## Agent Integration");
+  s.push("");
+  s.push("Agents should use `agents-cli` to run this tool for structured output and safety:");
+  s.push("");
+  s.push("```bash");
+  s.push(`# Run via agents-cli (structured JSON envelope)`);
+  s.push(`agents-cli run ${name} -- --help --json`);
+  s.push("");
+  s.push(`# Introspect full command schema`);
+  s.push(`agents-cli schema ${name} --json`);
+  s.push("");
+  s.push(`# Dry-run before executing (safe exploration)`);
+  s.push(`agents-cli run ${name} -- <args> --dry-run`);
+  s.push("");
+  s.push(`# Generate detailed context for agent consumption`);
+  s.push(`agents-cli describe ${name} --json`);
   s.push("```");
   s.push("");
 
-  // ── Agent notes ──
-  s.push("## Agent Integration");
+  // ── When to use / When not to use ──
+  s.push("## When to Use This Tool");
   s.push("");
-  s.push("```bash");
-  s.push(`# Run via agents-cli (structured JSON output)`);
-  s.push(`agents-cli run ${tool.meta.name} -- --help --json`);
+  s.push(`Use \`${name}\` when:`);
+  s.push(`- Your task involves ${descLower}`);
+  s.push(`- A task requires ${name}-specific functionality`);
+  if (commands.length > 0) {
+    s.push(`- You need any of: ${commands.slice(0, 5).map(c => c.name).join(", ")}`);
+  }
   s.push("");
-  s.push(`# Introspect command schema`);
-  s.push(`agents-cli schema ${tool.meta.name} --json`);
-  s.push("");
-  s.push(`# Dry-run before executing`);
-  s.push(`agents-cli run ${tool.meta.name} -- <args> --dry-run`);
-  s.push("```");
+  s.push(`Consider alternatives when:`);
+  s.push(`- The task can be accomplished with simpler built-in tools`);
+  s.push(`- You need a different specialization than what ${name} provides`);
   s.push("");
 
   return s.join("\n");
