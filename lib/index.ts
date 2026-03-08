@@ -33,7 +33,9 @@ export type {
   RegistrySearchOptions,
   ToolRegistry,
   // Skills
+  SkillCompatibility,
   SkillFrontmatter,
+  SkillResources,
   Skill,
   LockEntry,
   Lockfile,
@@ -45,22 +47,52 @@ export type {
   CliConfig,
   LlmConfig,
   GuardConfig,
+  // Agent-first (gws-style)
+  CliOutput,
+  ToolSubcommand,
+  ToolSchema,
+  DryRunResult,
+  SkillTier,
+  SkillGenerationOptions,
 } from "./types.js";
 
+export { readPkgJson, readPkgVersion, walkPackageDirs } from "./pkg-utils.js";
+export type { PkgInfo } from "./pkg-utils.js";
 export { createResolver, detectFormat, fetchJson, parseGithubOwnerRepo, isPrivateUrl } from "./resolver.js";
 export { createInstaller } from "./installer.js";
-export { createAnalyzer, findMainBinary } from "./analyzer.js";
+export { createAnalyzer, findMainBinary, deepProbe } from "./analyzer.js";
 export { createStore, generateContextMd, getToolInstallDir } from "./store.js";
 export { createRegistry } from "./registry.js";
 export {
   parseFrontmatter,
   buildContext,
   generateSkillMd,
+  generateRichSkillMd,
+  discoverResources,
+  installTool,
+  installSkill,
+  listSkills,
+  removeSkill,
   parseLockfile,
   generateLockfile,
   writeLockfile,
   readLockfile,
-  installSkill,
 } from "./skills.js";
+export type { InstalledSkillMeta } from "./skills.js";
 export { McpBridge, createMcpConfig } from "./mcp.js";
 export type { McpToolDescription } from "./mcp.js";
+
+// Agent-first output layer
+export { success, failure, emit } from "./output.js";
+
+// Input hardening guards
+export {
+  rejectControlChars,
+  rejectPathTraversal,
+  rejectEmbeddedParams,
+  rejectPercentEncoding,
+  validateSource,
+  validateToolName,
+  validateRunArgs,
+  InputValidationError,
+} from "./guards.js";

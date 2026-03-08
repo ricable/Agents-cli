@@ -173,11 +173,73 @@ export interface ToolInstaller {
 export interface AnalyzeOptions {
   readonly useLlm?: boolean;
   readonly timeout?: number;
+  /** Recursively probe subcommands (default: false) */
+  readonly recursive?: boolean;
+  /** Max depth for recursive probing (default: 3) */
+  readonly maxDepth?: number;
 }
 
 /** Interface for analyzing installed tool capabilities */
 export interface ToolAnalyzer {
   analyze(binPath: string, options?: AnalyzeOptions): Promise<ToolCapabilities>;
+}
+
+// =============================================================================
+// Agent-first output (gws-style structured JSON on every command)
+// =============================================================================
+
+/** Universal JSON envelope for all CLI output — agents parse this, humans get pretty text */
+export interface CliOutput<T = unknown> {
+  readonly ok: boolean;
+  readonly command: string;
+  readonly data?: T;
+  readonly error?: { code: string; message: string; details?: Record<string, unknown> };
+  readonly meta: {
+    readonly version: string;
+    readonly duration: number;
+    readonly timestamp: string;
+  };
+}
+
+/** A subcommand with recursively-discovered children */
+export interface ToolSubcommand {
+  readonly name: string;
+  readonly description: string;
+  readonly flags: readonly ToolFlag[];
+  readonly subcommands: readonly ToolSubcommand[];
+  readonly examples: readonly string[];
+  readonly rawHelp?: string;
+}
+
+/** Full schema for a tool's command surface — returned by `agents-cli schema` */
+export interface ToolSchema {
+  readonly name: string;
+  readonly version: string;
+  readonly description: string;
+  readonly binary: string;
+  readonly globalFlags: readonly ToolFlag[];
+  readonly commands: readonly ToolSubcommand[];
+  readonly totalCommands: number;
+  readonly maxDepthProbed: number;
+}
+
+/** Dry-run result — shows what would happen without doing it */
+export interface DryRunResult {
+  readonly action: string;
+  readonly resolvedSource?: ToolSource;
+  readonly resolvedBinary?: string;
+  readonly installPath?: string;
+  readonly args?: readonly string[];
+}
+
+/** Quality tier for auto-generated skills */
+export type SkillTier = "stub" | "basic" | "rich";
+
+/** Options for skill generation */
+export interface SkillGenerationOptions {
+  readonly tier: SkillTier;
+  readonly includeExamples?: boolean;
+  readonly includeWorkflows?: boolean;
 }
 
 // =============================================================================
@@ -212,6 +274,13 @@ export interface ToolRegistry {
 // Skills interfaces
 // =============================================================================
 
+/** Compatibility requirements for a skill */
+export interface SkillCompatibility {
+  readonly node?: string;
+  readonly python?: string;
+  readonly tools?: readonly string[];
+}
+
 /** Frontmatter parsed from a SKILL.md file */
 export interface SkillFrontmatter {
   readonly name: string;
@@ -219,6 +288,14 @@ export interface SkillFrontmatter {
   readonly description: string;
   readonly ingredients: readonly string[];
   readonly tags: readonly string[];
+  readonly compatibility?: SkillCompatibility;
+}
+
+/** Bundled resource paths discovered in a skill directory */
+export interface SkillResources {
+  readonly scripts: readonly string[];
+  readonly references: readonly string[];
+  readonly assets: readonly string[];
 }
 
 /** A resolved skill with its ingredients */
@@ -227,6 +304,7 @@ export interface Skill {
   readonly body: string;
   readonly ingredients: readonly Tool[];
   readonly contextPath: string;
+  readonly resources?: SkillResources;
 }
 
 /** Lock entry in agentcli.lock */

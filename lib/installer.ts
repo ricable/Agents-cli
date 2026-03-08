@@ -14,6 +14,8 @@ import { tmpdir } from "node:os";
 import { randomBytes } from "node:crypto";
 import { unlinkSync } from "node:fs";
 import { isPrivateUrl, parseGithubOwnerRepo } from "./resolver.js";
+import { readPkgJson, walkPackageDirs } from "./pkg-utils.js";
+import type { PkgInfo } from "./pkg-utils.js";
 
 const MAX_REDIRECTS = 10;
 const MAX_DOWNLOAD_SIZE = 500 * 1024 * 1024; // 500MB for tarballs
@@ -108,6 +110,63 @@ function makeExecutable(paths: string[]): void {
   }
 }
 
+/** Output directories that indicate a build already completed */
+const BUILD_OUTPUT_DIRS = ["dist", "build", "out"];
+
+/** Try to build a package directory if it has a build script and no output yet */
+function tryBuildPkg(pkg: PkgInfo, timeout = 120000): boolean {
+  if (!pkg.scripts?.build) return false;
+
+  // Check if build output already exists
+  const hasOutput = BUILD_OUTPUT_DIRS.some((d) => {
+    const p = join(pkg.dir, d);
+    try { return readdirSync(p).length > 0; } catch { return false; }
+  });
+  if (hasOutput) return false;
+
+  // Install all deps (including devDependencies) for the build
+  try {
+    execFileSync("npm", ["install", "--ignore-scripts"], {
+      cwd: pkg.dir,
+      stdio: "pipe",
+      timeout,
+    });
+  } catch {
+    return false;
+  }
+
+  // Run the build script
+  try {
+    execFileSync("npm", ["run", "build"], {
+      cwd: pkg.dir,
+      stdio: "pipe",
+      timeout,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Check if a project needs a build step and run it — supports monorepos */
+function detectAndBuild(dest: string, timeout = 120000): boolean {
+  // Try the root package first
+  const rootPkg = readPkgJson(dest);
+  if (rootPkg && tryBuildPkg(rootPkg, timeout)) return true;
+
+  // Only scan nested packages if root didn't build (monorepo case)
+  let built = false;
+  walkPackageDirs(dest, (pkg) => {
+    if (pkg.bin || pkg.scripts?.build) {
+      if (tryBuildPkg(pkg, timeout)) {
+        built = true;
+      }
+    }
+  });
+
+  return built;
+}
+
 /** Install from GitHub tarball */
 async function installFromGithub(
   source: ToolSource,
@@ -140,16 +199,20 @@ async function installFromGithub(
   const binaries = findBinaries(dest);
   makeExecutable(binaries);
 
-  // Check for package.json and install deps
+  // Check for package.json — detect if build is needed, otherwise just install production deps
   const pkgJson = join(dest, "package.json");
   if (existsSync(pkgJson)) {
-    try {
-      execFileSync("npm", ["install", "--production", "--ignore-scripts"], {
-        cwd: dest,
-        stdio: "pipe",
-        timeout: 60000,
-      });
-    } catch { /* best effort */ }
+    const didBuild = detectAndBuild(dest);
+    if (!didBuild) {
+      // No build needed or build failed — just install production deps
+      try {
+        execFileSync("npm", ["install", "--production", "--ignore-scripts"], {
+          cwd: dest,
+          stdio: "pipe",
+          timeout: 60000,
+        });
+      } catch { /* best effort */ }
+    }
   }
 
   // Check for requirements.txt and install deps
@@ -209,16 +272,19 @@ async function installFromNpm(
     try { rmSync(packDir, { recursive: true, force: true }); } catch { /* ignore */ }
   }
 
-  // Install production deps
+  // Install deps — detect if build is needed, otherwise just production deps
   const pkgJson = join(dest, "package.json");
   if (existsSync(pkgJson)) {
-    try {
-      execFileSync("npm", ["install", "--production", "--ignore-scripts"], {
-        cwd: dest,
-        stdio: "pipe",
-        timeout: 60000,
-      });
-    } catch { /* best effort */ }
+    const didBuild = detectAndBuild(dest);
+    if (!didBuild) {
+      try {
+        execFileSync("npm", ["install", "--production", "--ignore-scripts"], {
+          cwd: dest,
+          stdio: "pipe",
+          timeout: 60000,
+        });
+      } catch { /* best effort */ }
+    }
   }
 
   const binaries = findBinaries(dest);

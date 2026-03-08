@@ -113,19 +113,23 @@ description: Missing name
 `;
     expect(parseFrontmatter(noName)).toBeNull();
 
-    const noVersion = `---
-name: no-version
-description: Missing version
----
-`;
-    expect(parseFrontmatter(noVersion)).toBeNull();
-
     const noDesc = `---
 name: no-desc
 version: 1.0.0
 ---
 `;
     expect(parseFrontmatter(noDesc)).toBeNull();
+  });
+
+  it("defaults version to 0.0.0 when omitted", () => {
+    const content = `---
+name: no-version
+description: Missing version
+---
+`;
+    const result = parseFrontmatter(content);
+    expect(result).not.toBeNull();
+    expect(result!.version).toBe("0.0.0");
   });
 
   it("returns null when no frontmatter delimiters", () => {
@@ -200,16 +204,18 @@ describe("generateSkillMd", () => {
     expect(parsed).not.toBeNull();
     expect(parsed!.name).toBe("roundtrip-test");
     expect(parsed!.version).toBe("0.1.0");
-    expect(parsed!.description).toBe("Testing roundtrip");
-    expect(parsed!.ingredients.length).toBeGreaterThan(0);
+    // Description is now trigger-aware
+    expect(parsed!.description).toContain("Testing roundtrip");
+    expect(parsed!.ingredients).toEqual([]);
     expect(parsed!.tags.length).toBeGreaterThan(0);
   });
 
-  it("includes example ingredients and tags", () => {
+  it("generates trigger-aware description and skill-named tag", () => {
     const md = generateSkillMd("test-skill", "A test");
-    expect(md).toContain("ruvnet/example-tool");
-    expect(md).toContain("@scope/another-tool");
-    expect(md).toContain("example");
+    expect(md).toContain("ingredients: []");
+    expect(md).toContain("test-skill");
+    // Description includes trigger hint
+    expect(md).toContain("Use this skill whenever");
   });
 
   it("includes usage section", () => {
@@ -422,13 +428,12 @@ describe("buildContext", () => {
     // Should include body
     expect(context).toContain("This is the body of the skill.");
     expect(context).toContain("It has multiple paragraphs.");
-    // Should include tool context sections
-    expect(context).toContain("# bar");
+    // Should include tool sections in progressive format
+    expect(context).toContain("## Installed Tools");
+    expect(context).toContain("### bar@1.0.0");
     expect(context).toContain("A bar tool");
-    expect(context).toContain("# baz");
+    expect(context).toContain("### baz@1.0.0");
     expect(context).toContain("A baz tool");
-    // Should have separators between tools
-    expect(context).toContain("---");
   });
 
   it("handles skill with no body", () => {
@@ -486,10 +491,8 @@ describe("buildContext", () => {
     };
 
     const context = buildContext(skill);
-    expect(context).toContain("## Commands");
-    expect(context).toContain("`run`");
-    expect(context).toContain("## Global Options");
-    expect(context).toContain("--verbose");
+    expect(context).toContain("**Commands**: `run`");
+    expect(context).toContain("**Flags**: `--verbose`");
   });
 });
 

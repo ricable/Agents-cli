@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
 import { createStore } from "../lib/store.js";
+import { findMainBinary } from "../lib/analyzer.js";
 import { homedir } from "node:os";
 import type { AgentRunResult } from "../lib/types.js";
 
@@ -79,25 +80,14 @@ export async function runTool(
     };
   }
 
-  // Find executable - look for common binary locations
-  let binPath: string | null = null;
-  const candidates = [
-    join(installDir, "bin", toolName),
-    join(installDir, toolName),
-    join(installDir, "index.js"),
-    join(installDir, "main.py"),
-  ];
-
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) {
-      binPath = candidate;
-      break;
-    }
-  }
-
-  // If no specific binary found, use the installDir itself as a script dir
+  // Find executable using the shared analyzer logic (supports monorepos)
+  const binPath = findMainBinary(installDir);
   if (!binPath) {
-    binPath = installDir;
+    return {
+      success: false,
+      error: { code: "NO_BINARY", message: `No executable found in: ${installDir}` },
+      duration: 0,
+    };
   }
 
   const start = Date.now();
@@ -110,19 +100,20 @@ export async function runTool(
 
     const child = spawn(binPath!, [...args], {
       env,
-      cwd: installDir,
+      cwd: process.cwd(),
       stdio: ["ignore", "pipe", "pipe"],
     });
 
+    const MAX_OUTPUT = 10 * 1024 * 1024; // 10MB cap
     let stdout = "";
     let stderr = "";
 
     child.stdout.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString();
+      if (stdout.length < MAX_OUTPUT) stdout += chunk.toString();
     });
 
     child.stderr.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString();
+      if (stderr.length < MAX_OUTPUT) stderr += chunk.toString();
     });
 
     const timer = setTimeout(() => {

@@ -1,7 +1,11 @@
-import type { ToolAnalyzer, ToolCapabilities, ToolCommand, ToolFlag, AnalyzeOptions } from "./types.js";
+import type { ToolAnalyzer, ToolCapabilities, ToolCommand, ToolFlag, ToolSubcommand, AnalyzeOptions } from "./types.js";
 import { execFileSync } from "node:child_process";
-import { readdirSync, statSync, readFileSync, existsSync, realpathSync } from "node:fs";
+import { existsSync, readdirSync, statSync, realpathSync } from "node:fs";
 import { join, resolve as resolvePath } from "node:path";
+import { readPkgJson, walkPackageDirs } from "./pkg-utils.js";
+
+/** Max subcommands before we stop recursing (prevents runaway on tools like gcloud) */
+const MAX_TOTAL_COMMANDS = 500;
 
 /** Validate that a resolved path stays within the given base directory */
 function assertWithinDir(resolved: string, baseDir: string): void {
@@ -12,11 +16,11 @@ function assertWithinDir(resolved: string, baseDir: string): void {
   }
 }
 
-/** Try running a binary with --help or -h and capture output */
-function probeHelp(binPath: string, timeout: number): string | null {
+/** Try running a binary with args and capture output */
+function probeWithArgs(binPath: string, args: string[], timeout: number): string | null {
   for (const flag of ["--help", "-h", "help"]) {
     try {
-      const output = execFileSync(binPath, [flag], {
+      const output = execFileSync(binPath, [...args, flag], {
         timeout,
         stdio: ["pipe", "pipe", "pipe"],
         encoding: "utf-8",
@@ -34,6 +38,11 @@ function probeHelp(binPath: string, timeout: number): string | null {
     }
   }
   return null;
+}
+
+/** Try running a binary with --help or -h and capture output */
+function probeHelp(binPath: string, timeout: number): string | null {
+  return probeWithArgs(binPath, [], timeout);
 }
 
 /** Parse flags from a line like "  -o, --output <file>   Output file path" */
@@ -115,47 +124,164 @@ function parseFlags(helpText: string): ToolFlag[] {
   return flags;
 }
 
+/** Extract example commands from help text (lines starting with $ or indented commands) */
+function parseExamples(helpText: string): string[] {
+  const examples: string[] = [];
+  const lines = helpText.split("\n");
+  let inExampleSection = false;
+
+  for (const line of lines) {
+    if (/^(examples?|usage examples?)/i.test(line.trim()) || /^\s*(EXAMPLES?|Usage):?\s*$/i.test(line)) {
+      inExampleSection = true;
+      continue;
+    }
+    if (inExampleSection) {
+      // Lines starting with $ are command examples
+      const dollarMatch = /^\s*\$\s+(.+)/.exec(line);
+      if (dollarMatch?.[1]) {
+        examples.push(dollarMatch[1].trim());
+        continue;
+      }
+      // Indented lines that look like commands (start with the tool name or common patterns)
+      const cmdLine = /^\s{2,}(\w[\w-]*\s+.+)/.exec(line);
+      if (cmdLine?.[1] && !cmdLine[1].startsWith("--") && !cmdLine[1].startsWith("-")) {
+        examples.push(cmdLine[1].trim());
+        continue;
+      }
+      // Empty line after examples ends the section
+      if (line.trim() === "" && examples.length > 0) {
+        inExampleSection = false;
+      }
+    }
+  }
+  return examples;
+}
+
+/**
+ * Recursively probe a binary's subcommands.
+ * This is the heart of deep command discovery — like gws reading Discovery Service,
+ * but we read --help at each level of the command tree.
+ */
+function probeSubcommands(
+  binPath: string,
+  parentArgs: string[],
+  maxDepth: number,
+  currentDepth: number,
+  timeout: number,
+  totalCount: { value: number },
+): ToolSubcommand[] {
+  if (currentDepth >= maxDepth || totalCount.value >= MAX_TOTAL_COMMANDS) {
+    return [];
+  }
+
+  const helpText = probeWithArgs(binPath, parentArgs, timeout);
+  if (!helpText) return [];
+
+  const rawCommands = parseCommands(helpText);
+  const results: ToolSubcommand[] = [];
+
+  for (const cmd of rawCommands) {
+    if (totalCount.value >= MAX_TOTAL_COMMANDS) break;
+    totalCount.value++;
+
+    // Probe this subcommand's own help to get its flags, examples, and children
+    const subArgs = [...parentArgs, cmd.name];
+    const subHelp = probeWithArgs(binPath, subArgs, Math.min(timeout, 3000));
+    const subFlags = subHelp ? parseFlags(subHelp) : [];
+    const subExamples = subHelp ? parseExamples(subHelp) : [];
+
+    // Recurse into children
+    const children = probeSubcommands(
+      binPath,
+      subArgs,
+      maxDepth,
+      currentDepth + 1,
+      timeout,
+      totalCount,
+    );
+
+    results.push({
+      name: cmd.name,
+      description: cmd.description,
+      flags: subFlags.length > 0 ? subFlags : cmd.flags,
+      subcommands: children,
+      examples: subExamples,
+      rawHelp: subHelp ?? undefined,
+    });
+  }
+
+  return results;
+}
+
+/** Flatten a subcommand tree into a flat ToolCommand[] for backward compatibility */
+function flattenSubcommands(subs: readonly ToolSubcommand[], prefix: string = ""): ToolCommand[] {
+  const result: ToolCommand[] = [];
+  for (const sub of subs) {
+    const fullName = prefix ? `${prefix} ${sub.name}` : sub.name;
+    result.push({
+      name: fullName,
+      description: sub.description,
+      flags: [...sub.flags],
+    });
+    result.push(...flattenSubcommands(sub.subcommands, fullName));
+  }
+  return result;
+}
+
+/** Count total commands in a subcommand tree */
+function countSubcommands(subs: readonly ToolSubcommand[]): number {
+  let count = subs.length;
+  for (const sub of subs) {
+    count += countSubcommands(sub.subcommands);
+  }
+  return count;
+}
+
+// ── Binary resolution (unchanged) ────────────────────────────────────────────
+
+/** Resolve the first bin/main entry from a parsed PkgInfo, validated against toolDir */
+function resolveBinFromPkg(dir: string, bin: Record<string, string> | string | undefined, main: string | undefined, toolDir: string): string | null {
+  if (typeof bin === "string") {
+    const resolved = join(dir, bin);
+    try { assertWithinDir(resolved, toolDir); } catch { return null; }
+    if (existsSync(resolved)) return resolved;
+  } else if (typeof bin === "object" && bin !== null) {
+    const first = Object.values(bin)[0];
+    if (first) {
+      const resolved = join(dir, first);
+      try { assertWithinDir(resolved, toolDir); } catch { return null; }
+      if (existsSync(resolved)) return resolved;
+    }
+  }
+  if (typeof main === "string") {
+    const resolved = join(dir, main);
+    try { assertWithinDir(resolved, toolDir); } catch { return null; }
+    if (existsSync(resolved)) return resolved;
+  }
+  return null;
+}
+
 /** Try to find the main binary in a tool directory */
 export function findMainBinary(toolDir: string): string | null {
-  // Check package.json bin field
-  const pkgPath = join(toolDir, "package.json");
-  if (existsSync(pkgPath)) {
-    try {
-      const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as Record<string, unknown>;
-      const bin = pkg.bin;
-      if (typeof bin === "string") {
-        const resolved = join(toolDir, bin);
-        try { assertWithinDir(resolved, toolDir); } catch { return null; }
-        if (existsSync(resolved)) return resolved;
-      } else if (typeof bin === "object" && bin !== null) {
-        const entries = Object.values(bin as Record<string, string>);
-        if (entries[0]) {
-          const resolved = join(toolDir, entries[0]);
-          try { assertWithinDir(resolved, toolDir); } catch { return null; }
-          if (existsSync(resolved)) return resolved;
-        }
-      }
-      // Check main field as fallback
-      const main = pkg.main;
-      if (typeof main === "string") {
-        const resolved = join(toolDir, main);
-        try { assertWithinDir(resolved, toolDir); } catch { return null; }
-        if (existsSync(resolved)) return resolved;
-      }
-    } catch { /* ignore parse errors */ }
+  // Check root package.json bin/main fields
+  const rootPkg = readPkgJson(toolDir);
+  if (rootPkg) {
+    const found = resolveBinFromPkg(toolDir, rootPkg.bin, rootPkg.main, toolDir);
+    if (found) return found;
   }
 
   // Check bin/ directory
   const binDir = join(toolDir, "bin");
   if (existsSync(binDir)) {
-    const entries = readdirSync(binDir);
-    for (const entry of entries) {
-      const full = join(binDir, entry);
-      try {
-        const st = statSync(full);
-        if (st.isFile() && (st.mode & 0o111)) return full;
-      } catch { /* skip */ }
-    }
+    try {
+      for (const entry of readdirSync(binDir)) {
+        const full = join(binDir, entry);
+        try {
+          const st = statSync(full);
+          if (st.isFile() && (st.mode & 0o111)) return full;
+        } catch { /* skip */ }
+      }
+    } catch { /* skip */ }
   }
 
   // Check for common patterns
@@ -164,7 +290,35 @@ export function findMainBinary(toolDir: string): string | null {
     if (existsSync(candidate)) return candidate;
   }
 
-  return null;
+  // Search nested packages (monorepo support)
+  let nestedBin: string | null = null;
+  walkPackageDirs(toolDir, (pkg): boolean => {
+    if (!pkg.bin) return false;
+    const found = resolveBinFromPkg(pkg.dir, pkg.bin, pkg.main, toolDir);
+    if (found) {
+      nestedBin = found;
+      return true; // stop walking
+    }
+    return false;
+  });
+
+  return nestedBin;
+}
+
+// ── Public API ───────────────────────────────────────────────────────────────
+
+/** Deeply probe a tool's command tree. Exported for `schema` command and rich skill generation. */
+export function deepProbe(
+  binPath: string,
+  options: { maxDepth?: number; timeout?: number } = {},
+): { tree: ToolSubcommand[]; totalCommands: number } {
+  const maxDepth = options.maxDepth ?? 3;
+  const timeout = options.timeout ?? 10000;
+  const totalCount = { value: 0 };
+
+  const tree = probeSubcommands(binPath, [], maxDepth, 0, timeout, totalCount);
+
+  return { tree, totalCommands: totalCount.value };
 }
 
 /** Create an analyzer instance */
@@ -175,18 +329,48 @@ export function createAnalyzer(): ToolAnalyzer {
       options?: AnalyzeOptions,
     ): Promise<ToolCapabilities> {
       const timeout = options?.timeout ?? 10000;
+      const recursive = options?.recursive ?? false;
+      const maxDepth = options?.maxDepth ?? 3;
 
       // Try --help probe
       const helpText = probeHelp(binPath, timeout);
 
       if (helpText) {
-        const commands = parseCommands(helpText);
         const globalFlags = parseFlags(helpText);
 
+        if (recursive) {
+          // Deep probe: recursively discover subcommands with their own flags/examples
+          const { tree } = deepProbe(binPath, { maxDepth, timeout });
+          // Flatten for backward-compatible commands array
+          const flatCommands = flattenSubcommands(tree);
+
+          return {
+            commands: flatCommands,
+            globalFlags,
+            analysisMethod: flatCommands.length > 0 || globalFlags.length > 0 ? "flag-parse" : "help-probe",
+            rawHelp: helpText,
+          };
+        }
+
+        // Shallow probe: parse top-level commands only (original behavior)
+        const commands = parseCommands(helpText);
+
+        // NEW: also parse per-command flags by probing each command's --help
+        const enrichedCommands: ToolCommand[] = [];
+        for (const cmd of commands) {
+          const cmdHelp = probeWithArgs(binPath, [cmd.name], Math.min(timeout, 3000));
+          const cmdFlags = cmdHelp ? parseFlags(cmdHelp) : [];
+          enrichedCommands.push({
+            name: cmd.name,
+            description: cmd.description,
+            flags: cmdFlags.length > 0 ? cmdFlags : cmd.flags,
+          });
+        }
+
         return {
-          commands,
+          commands: enrichedCommands,
           globalFlags,
-          analysisMethod: commands.length > 0 || globalFlags.length > 0 ? "flag-parse" : "help-probe",
+          analysisMethod: enrichedCommands.length > 0 || globalFlags.length > 0 ? "flag-parse" : "help-probe",
           rawHelp: helpText,
         };
       }
@@ -200,3 +384,5 @@ export function createAnalyzer(): ToolAnalyzer {
     },
   };
 }
+
+export { parseExamples, parseFlags, parseCommands, countSubcommands, flattenSubcommands };
