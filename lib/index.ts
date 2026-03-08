@@ -57,4 +57,10 @@ export {
   buildContext,
   generateSkillMd,
   parseLockfile,
+  generateLockfile,
+  writeLockfile,
+  readLockfile,
+  installSkill,
 } from "./skills.js";
+export { McpBridge, createMcpConfig } from "./mcp.js";
+export type { McpToolDescription } from "./mcp.js";

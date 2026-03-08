@@ -219,7 +219,7 @@ async function installFromLocal(
 export function createInstaller(): ToolInstaller {
   return {
     supports(format: SourceFormat): boolean {
-      return ["github", "npm", "tarball", "local"].includes(format);
+      return ["github", "npm", "local"].includes(format);
     },
 
     async install(
