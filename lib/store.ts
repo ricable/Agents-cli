@@ -1,6 +1,7 @@
 import type { ToolStore, Tool, StoreQuery, StoreQueryResult } from "./types.js";
-import { mkdirSync, existsSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, existsSync, readFileSync, writeFileSync, rmSync, renameSync } from "node:fs";
 import { join } from "node:path";
+import { randomBytes } from "node:crypto";
 
 const TOOLS_DIR = "tools";
 const STORE_FILE = "tools.json";
@@ -12,12 +13,19 @@ function validateToolId(id: string): void {
   }
 }
 
+/** Escape markdown link/injection patterns in untrusted text (preserves readability) */
+function escapeMarkdown(text: string): string {
+  return text
+    .replace(/\[([^\]]*)\]\(([^)]*)\)/g, "$1 ($2)")  // neutralize markdown links
+    .replace(/\n/g, " ");
+}
+
 /** Generate CONTEXT.md content for a tool */
 export function generateContextMd(tool: Tool): string {
   const lines: string[] = [
     `# ${tool.meta.name}`,
     "",
-    tool.meta.description,
+    escapeMarkdown(tool.meta.description),
     "",
     `- **Version**: ${tool.meta.version}`,
     `- **Source**: ${tool.source.format}:${tool.source.uri}`,
@@ -26,7 +34,7 @@ export function generateContextMd(tool: Tool): string {
   ];
 
   if (tool.meta.homepage) {
-    lines.push(`- **Homepage**: ${tool.meta.homepage}`);
+    lines.push(`- **Homepage**: ${escapeMarkdown(tool.meta.homepage)}`);
   }
   if (tool.meta.license) {
     lines.push(`- **License**: ${tool.meta.license}`);
@@ -74,6 +82,9 @@ export function createStore(dataDir: string): ToolStore {
   mkdirSync(dataDir, { recursive: true });
   mkdirSync(toolsDir, { recursive: true });
 
+  // In-process write serialization to prevent concurrent save() data loss
+  let writeQueue: Promise<void> = Promise.resolve();
+
   /** Load all tools from disk */
   function loadTools(): Map<string, Tool> {
     const map = new Map<string, Tool>();
@@ -89,10 +100,12 @@ export function createStore(dataDir: string): ToolStore {
     return map;
   }
 
-  /** Persist tools to disk */
+  /** Persist tools to disk atomically (write to temp file, then rename) */
   function saveTools(tools: Map<string, Tool>): void {
     const data = Array.from(tools.values());
-    writeFileSync(storeFile, JSON.stringify(data, null, 2), "utf-8");
+    const tmpFile = `${storeFile}.${randomBytes(6).toString("hex")}.tmp`;
+    writeFileSync(tmpFile, JSON.stringify(data, null, 2), "utf-8");
+    renameSync(tmpFile, storeFile);
   }
 
   return {
@@ -133,28 +146,34 @@ export function createStore(dataDir: string): ToolStore {
 
     async save(tool: Tool): Promise<void> {
       validateToolId(tool.id);
-      const tools = loadTools();
-      tools.set(tool.id, tool);
-      saveTools(tools);
+      writeQueue = writeQueue.then(() => {
+        const tools = loadTools();
+        tools.set(tool.id, tool);
+        saveTools(tools);
 
-      // Write CONTEXT.md alongside the tool
-      const contextDir = join(toolsDir, tool.id);
-      mkdirSync(contextDir, { recursive: true });
-      writeFileSync(join(contextDir, "CONTEXT.md"), generateContextMd(tool), "utf-8");
+        // Write CONTEXT.md alongside the tool
+        const contextDir = join(toolsDir, tool.id);
+        mkdirSync(contextDir, { recursive: true });
+        writeFileSync(join(contextDir, "CONTEXT.md"), generateContextMd(tool), "utf-8");
+      });
+      return writeQueue;
     },
 
     async remove(id: string): Promise<boolean> {
       validateToolId(id);
-      const tools = loadTools();
-      const existed = tools.delete(id);
-      if (existed) {
-        saveTools(tools);
-        // Remove tool directory
-        const toolDir = join(toolsDir, id);
-        if (existsSync(toolDir)) {
-          rmSync(toolDir, { recursive: true, force: true });
+      let existed = false;
+      writeQueue = writeQueue.then(() => {
+        const tools = loadTools();
+        existed = tools.delete(id);
+        if (existed) {
+          saveTools(tools);
+          const toolDir = join(toolsDir, id);
+          if (existsSync(toolDir)) {
+            rmSync(toolDir, { recursive: true, force: true });
+          }
         }
-      }
+      });
+      await writeQueue;
       return existed;
     },
 

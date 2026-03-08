@@ -455,14 +455,41 @@ program
       // Re-add with force
       const resolver = createResolver();
       const installer = createInstaller();
+      const analyzer = createAnalyzer();
       const resolved = await resolver.resolve(tool.source.uri);
       const installDir = getToolInstallDir(DATA_DIR, name);
       await installer.install(resolved.source, installDir, { force: true });
+
+      // Re-analyze after update
+      let capabilities = tool.capabilities;
+      const mainBin = findMainBinary(installDir);
+      if (mainBin) {
+        try {
+          capabilities = await analyzer.analyze(mainBin);
+        } catch { /* keep existing capabilities */ }
+      }
+
+      // Update version from package.json if available
+      let version = resolved.meta.version ?? tool.meta.version;
+      const pkgJsonPath = join(installDir, "package.json");
+      if (existsSync(pkgJsonPath)) {
+        try {
+          const pkg = JSON.parse(readFileSync(pkgJsonPath, "utf-8")) as Record<string, unknown>;
+          if (typeof pkg.version === "string") version = pkg.version;
+        } catch { /* ignore */ }
+      }
+
       const now = new Date().toISOString();
-      await store.save({ ...tool, updatedAt: now });
+      await store.save({
+        ...tool,
+        capabilities,
+        meta: { ...tool.meta, version },
+        updatedAt: now,
+      });
       console.log(`Updated ${name}`);
     } else {
       const result = await store.list();
+      const analyzer = createAnalyzer();
       console.log(`Updating all ${result.total} tools...`);
       for (const tool of result.tools) {
         try {
@@ -473,8 +500,24 @@ program
             const resolved = await resolver.resolve(tool.source.uri);
             const installDir = getToolInstallDir(DATA_DIR, tool.id);
             await installer.install(resolved.source, installDir, { force: true });
+
+            let capabilities = tool.capabilities;
+            const mainBin = findMainBinary(installDir);
+            if (mainBin) {
+              try { capabilities = await analyzer.analyze(mainBin); } catch { /* keep existing */ }
+            }
+
+            let version = resolved.meta.version ?? tool.meta.version;
+            const pkgJsonPath = join(installDir, "package.json");
+            if (existsSync(pkgJsonPath)) {
+              try {
+                const pkg = JSON.parse(readFileSync(pkgJsonPath, "utf-8")) as Record<string, unknown>;
+                if (typeof pkg.version === "string") version = pkg.version;
+              } catch { /* ignore */ }
+            }
+
             const now = new Date().toISOString();
-            await store.save({ ...tool, updatedAt: now });
+            await store.save({ ...tool, capabilities, meta: { ...tool.meta, version }, updatedAt: now });
             console.log(`    Done`);
           } else {
             console.log(`    Skipped (unsupported format)`);

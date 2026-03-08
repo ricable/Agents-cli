@@ -10,17 +10,13 @@ describe("detectFormat", () => {
     expect(detectFormat("https://github.com/owner/repo")).toBe("github");
   });
 
-  it("detects tarball URL", () => {
-    expect(detectFormat("https://example.com/tool.tar.gz")).toBe("tarball");
-    expect(detectFormat("https://example.com/tool.tgz")).toBe("tarball");
+  it("returns null for non-GitHub URLs", () => {
+    expect(detectFormat("https://example.com/tool.tar.gz")).toBeNull();
+    expect(detectFormat("https://example.com/tool")).toBeNull();
   });
 
-  it("detects generic URL", () => {
-    expect(detectFormat("https://example.com/tool")).toBe("url");
-  });
-
-  it("detects git+https", () => {
-    expect(detectFormat("git+https://github.com/owner/repo.git")).toBe("git");
+  it("returns null for git+https", () => {
+    expect(detectFormat("git+https://github.com/owner/repo.git")).toBeNull();
   });
 
   it("detects local paths", () => {
@@ -55,11 +51,6 @@ describe("createResolver", () => {
     const result = await resolver.resolve("./my-tool");
     expect(result.source.format).toBe("local");
     expect(result.source.uri).toBe("./my-tool");
-  });
-
-  it("resolves a tarball source (no network)", async () => {
-    const result = await resolver.resolve("https://example.com/tool.tar.gz");
-    expect(result.source.format).toBe("tarball");
   });
 
   it("throws on unrecognized input", async () => {

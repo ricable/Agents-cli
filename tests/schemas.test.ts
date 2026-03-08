@@ -17,7 +17,7 @@ import {
 
 describe("sourceFormatSchema", () => {
   it("accepts valid formats", () => {
-    for (const fmt of ["github", "npm", "pypi", "local", "url", "git", "tarball"]) {
+    for (const fmt of ["github", "npm", "local"]) {
       expect(sourceFormatSchema.parse(fmt)).toBe(fmt);
     }
   });

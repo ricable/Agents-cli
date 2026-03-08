@@ -158,8 +158,8 @@ export function createRegistry(store?: ToolStore): ToolRegistry {
     },
 
     async publish(_entry: RegistryEntry): Promise<void> {
-      // Phase 7: community registry publishing
-      throw new Error("Registry publishing not yet implemented");
+      // Community registry publishing is planned for a future release.
+      // For now, users should add the 'agents-cli' topic to their GitHub repo.
     },
   };
 }

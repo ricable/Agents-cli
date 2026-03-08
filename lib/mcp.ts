@@ -1,6 +1,10 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { McpServerConfig, AgentRunResult } from "./types.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 /** JSON-RPC 2.0 request */
 interface JsonRpcRequest {
@@ -92,12 +96,22 @@ export class McpBridge {
     this._started = true;
   }
 
+  private static readonly KILL_TIMEOUT = 5_000; // 5 seconds before SIGKILL
+
   /**
    * Stop the MCP server process.
    */
   stopServer(): void {
     if (this.process) {
-      this.process.kill("SIGTERM");
+      const proc = this.process;
+      proc.kill("SIGTERM");
+
+      // SIGKILL fallback if process doesn't exit within timeout
+      const killTimer = setTimeout(() => {
+        try { proc.kill("SIGKILL"); } catch { /* already dead */ }
+      }, McpBridge.KILL_TIMEOUT);
+      killTimer.unref(); // Don't block Node.js exit
+
       this.process = null;
       this._started = false;
       this.buffer = "";
@@ -160,6 +174,8 @@ export class McpBridge {
     }
   }
 
+  private static readonly REQUEST_TIMEOUT = 30_000; // 30 seconds
+
   /**
    * Send a JSON-RPC request and wait for the response.
    */
@@ -177,10 +193,20 @@ export class McpBridge {
     };
 
     return new Promise<JsonRpcResponse>((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`MCP request timed out after ${McpBridge.REQUEST_TIMEOUT}ms: ${method}`));
+      }, McpBridge.REQUEST_TIMEOUT);
+
+      this.pending.set(id, {
+        resolve: (value) => { clearTimeout(timer); resolve(value); },
+        reject: (reason) => { clearTimeout(timer); reject(reason); },
+      });
+
       const data = JSON.stringify(request) + "\n";
       this.process!.stdin!.write(data, (err) => {
         if (err) {
+          clearTimeout(timer);
           this.pending.delete(id);
           reject(err);
         }
