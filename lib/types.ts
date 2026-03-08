@@ -7,6 +7,7 @@ export type SourceFormat =
   | "github"
   | "npm"
   | "pypi"
+  | "crates"
   | "local";
 
 /** Tool installation status */
@@ -36,7 +37,8 @@ export type RegistryLayer =
   | "community"
   | "github"
   | "npm"
-  | "pypi";
+  | "pypi"
+  | "crates";
 
 // =============================================================================
 // Tool interfaces
@@ -244,6 +246,14 @@ export interface SkillGenerationOptions {
   readonly includeWorkflows?: boolean;
 }
 
+/** Multi-file skill directory output from generateSkillDirectory() */
+export interface SkillDirectory {
+  /** The main SKILL.md content */
+  readonly skillMd: string;
+  /** Map of relative paths to file contents (e.g. "references/commands.md" -> content) */
+  readonly files: Readonly<Record<string, string>>;
+}
+
 // =============================================================================
 // Registry interfaces
 // =============================================================================
@@ -291,6 +301,7 @@ export interface SkillFrontmatter {
   readonly ingredients: readonly string[];
   readonly tags: readonly string[];
   readonly compatibility?: SkillCompatibility;
+  readonly domain?: string;
 }
 
 /** Bundled resource paths discovered in a skill directory */
@@ -352,6 +363,60 @@ export interface McpServerConfig {
 }
 
 // =============================================================================
+// Manifest & repo analysis interfaces (from core pipeline)
+// =============================================================================
+
+/** A manifest entry describing a repo/package to process */
+export interface ManifestEntry {
+  domain: string;
+  name: string;
+  repo: string;
+  description: string;
+  /** Optional: scope indexing + analysis to a subdirectory of the repo (e.g. "packages/cli") */
+  subdir?: string;
+  /** Optional: sub-classification within the domain (e.g. "swarm" for agent/swarm) */
+  subdomain?: string;
+}
+
+/** A collection of manifest entries */
+export interface Manifest {
+  repos: ManifestEntry[];
+}
+
+/** Extended manifest entry with auto-discovery fields */
+export interface ExtendedManifestEntry extends ManifestEntry {
+  quality_score?: number | null;
+  auto_discovered?: boolean;
+  classifier_source?: "manual" | "rules" | "llm";
+}
+
+/** Skill directory is always flat: src-{name}/ — never domain/name/ nesting. */
+export function skillDirName(entry: ManifestEntry): string {
+  return entry.name.startsWith("src-") ? entry.name : `src-${entry.name}`;
+}
+
+/** A group of exported symbols from a module */
+export interface ExportGroup {
+  module: string;
+  symbols: string[];
+}
+
+/** Analysis result for a repository/package */
+export interface PackageAnalysis {
+  pkgName: string;
+  version: string;
+  description: string;
+  mainFiles: string[];
+  exports: string[];
+  keywords: string[];
+  hasTypes: boolean;
+  repoUrl: string;
+  readmeExcerpt: string;
+  codeExamples: string[];
+  exportGroups: ExportGroup[];
+}
+
+// =============================================================================
 // Config interfaces
 // =============================================================================
 
@@ -375,4 +440,135 @@ export interface GuardConfig {
   readonly type: GuardType;
   readonly enabled: boolean;
   readonly options?: Readonly<Record<string, unknown>>;
+}
+
+// =============================================================================
+// Pipeline types for prompt-based discovery
+// =============================================================================
+
+/** Capability identifier for pipeline discovery */
+export type Capability =
+  | "image-generation"
+  | "video-generation"
+  | "audio-generation"
+  | "social-facebook"
+  | "social-tiktok"
+  | "social-instagram"
+  | "social-linkedin"
+  | "social-twitter"
+  | "social-youtube"
+  | "payments-stripe"
+  | "payments-paypal"
+  | "llm-openai"
+  | "llm-anthropic"
+  | "llm-google"
+  | "llm-local"
+  | "llm-aws-bedrock"
+  | "vector-storage"
+  | "embedding"
+  | "rag"
+  | "mcp"
+  | "agent"
+  | "browser-automation"
+  | "email"
+  | "database"
+  | "storage"
+  | "websocket"
+  | "api-gateway"
+  | "authentication";
+
+/** Project type for pipeline classification */
+export type ProjectType =
+  | "agent-workflow"
+  | "website"
+  | "merch-store"
+  | "ai-assistant"
+  | "repo-indexer"
+  | "api-service"
+  | "chatbot";
+
+/** Parsed prompt result from natural language */
+export interface ParsedPrompt {
+  projectType: ProjectType | null;
+  capabilities: Capability[];
+  directTerms: string[];
+  techStack: {
+    language: string | null;
+    framework: string | null;
+  };
+}
+
+/** Source for discovered packages */
+export type PackageSource = "github" | "npm" | "crates";
+
+/** A package discovered during pipeline search */
+export interface DiscoveredPackage {
+  name: string;
+  repo: string;
+  domain: string;
+  source: PackageSource;
+  quality_score: number;
+  description: string;
+}
+
+/** Pipeline configuration */
+export interface PipelineConfig {
+  sources: PackageSource[];
+  execute: boolean;
+  dryRun: boolean;
+  minQuality: number;
+}
+
+/** Workflow intent classification */
+export type WorkflowIntent =
+  | "council"
+  | "publishing"
+  | "ecommerce"
+  | "assistant"
+  | "api-service"
+  | "custom";
+
+/** An entity extracted from a prompt */
+export interface ExtractedEntity {
+  name: string;
+  type: "api" | "service" | "library" | "platform";
+  source: PackageSource;
+  packageName?: string;
+  repoSlug?: string;
+  domain: string;
+  confidence: number;
+}
+
+/** Full prompt analysis result */
+export interface PromptAnalysis {
+  intent: WorkflowIntent;
+  domains: string[];
+  entities: ExtractedEntity[];
+  capabilities: Capability[];
+  complexity: "simple" | "medium" | "complex";
+  suggestedPackages: string[];
+  suggestedTemplate: string;
+  techStack: {
+    language: string | null;
+    framework: string | null;
+  };
+}
+
+/** Workflow configuration for generation */
+export interface WorkflowConfig {
+  name: string;
+  intent: WorkflowIntent;
+  packages: DiscoveredPackage[];
+  entities: ExtractedEntity[];
+  outputPath: string;
+}
+
+/** A generated workflow with all files */
+export interface GeneratedWorkflow {
+  workflowName: string;
+  intent: WorkflowIntent;
+  packages: DiscoveredPackage[];
+  config: WorkflowConfig;
+  files: Record<string, string>;
+  envVars: string[];
 }

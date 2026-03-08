@@ -773,7 +773,7 @@ async function curatedMode(args: CliArgs, startTime: number): Promise<void> {
   const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
   const allTools = loadAllTools(projectRoot);
 
-  if (allTools.length < 100) {
+  if (!existsSync(join(projectRoot, "ai-ml-tools.json"))) {
     log("  Warning: ai-ml-tools.json not found — only general tools loaded.");
   }
 
@@ -1054,12 +1054,10 @@ async function runAudit(opts: AuditOpts, startTime: number): Promise<void> {
       const content = readFileSync(r.skillPath, "utf-8");
       const fm = parseFrontmatter(content);
       if (fm) {
-        // domain is not in SkillFrontmatter type — extract from raw frontmatter
-        const domainMatch = content.match(/^domain:\s*(\S+)/m);
         entries.push({
           name: fm.name,
           repo: "",
-          domain: domainMatch?.[1] ?? "uncategorized",
+          domain: fm.domain ?? "uncategorized",
           description: fm.description ?? "",
         });
       }

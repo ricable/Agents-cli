@@ -1,10 +1,12 @@
 import type {
   Skill,
+  SkillDirectory,
   SkillFrontmatter,
   SkillCompatibility,
   SkillResources,
   Tool,
   ToolCapabilities,
+  ToolCommand,
   Lockfile,
   LockEntry,
   ToolStore,
@@ -17,6 +19,7 @@ import { createInstaller } from "./installer.js";
 import { createAnalyzer, findMainBinary } from "./analyzer.js";
 import { createStore, getToolInstallDir } from "./store.js";
 import { readPkgVersion } from "./pkg-utils.js";
+import { validateToolName } from "./guards.js";
 
 // =============================================================================
 // YAML Frontmatter Parsing
@@ -126,7 +129,9 @@ export function parseFrontmatter(content: string): SkillFrontmatter | null {
     compatibility = { node: nodeReq, python: pythonReq, tools: toolsReq };
   }
 
-  return { name, version, description, ingredients, tags, compatibility };
+  const domain = typeof data.domain === "string" ? data.domain : undefined;
+
+  return { name, version, description, ingredients, tags, compatibility, domain };
 }
 
 // =============================================================================
@@ -454,7 +459,7 @@ export function readLockfile(lockPath: string): Lockfile | null {
 // Context Building
 // =============================================================================
 
-/** Build context with progressive disclosure — metadata summary first, details on demand */
+/** Build context with progressive disclosure — metadata summary first, references on demand */
 export function buildContext(skill: Skill): string {
   const sections: string[] = [];
 
@@ -479,20 +484,20 @@ export function buildContext(skill: Skill): string {
     }
   }
 
-  // Bundled resources summary if any
+  // Bundled resources — progressive disclosure guidance
   const resources = skill.resources ?? { scripts: [], references: [], assets: [] };
   if (resources.scripts.length > 0 || resources.references.length > 0) {
     sections.push("## Bundled Resources");
     sections.push("");
     if (resources.scripts.length > 0) {
-      sections.push("**Scripts** (run directly, no need to load into context):");
-      for (const s of resources.scripts) {
-        sections.push(`- \`${s}\``);
+      sections.push("**Scripts** (run directly):");
+      for (const sc of resources.scripts) {
+        sections.push(`- \`${sc}\``);
       }
       sections.push("");
     }
     if (resources.references.length > 0) {
-      sections.push("**References** (read when needed for domain-specific guidance):");
+      sections.push("**References** (read only when you need detailed info on a specific topic):");
       for (const r of resources.references) {
         sections.push(`- \`${r}\``);
       }
@@ -506,7 +511,7 @@ export function buildContext(skill: Skill): string {
     sections.push("");
   }
 
-  // Level 3: Tool details — command/flag summary, not full raw help
+  // Level 3: Tool details — compact command/flag summary
   if (skill.ingredients.length > 0) {
     sections.push("## Installed Tools");
     sections.push("");
@@ -519,7 +524,7 @@ export function buildContext(skill: Skill): string {
         sections.push("");
       }
 
-      // Compact command summary instead of full CONTEXT.md dump
+      // Compact command summary
       if (tool.capabilities.commands.length > 0) {
         sections.push("**Commands**: " + tool.capabilities.commands.map((c) => `\`${c.name}\``).join(", "));
         sections.push("");
@@ -529,9 +534,9 @@ export function buildContext(skill: Skill): string {
         sections.push("");
       }
 
-      // Point to full help instead of inlining it
+      // Point to references instead of inlining
       if (tool.capabilities.rawHelp) {
-        sections.push(`_Run \`agents-cli describe ${tool.id}\` for full help output._`);
+        sections.push(`_Full help: run \`${tool.meta.name} --help\` or see references/help-output.md if bundled._`);
         sections.push("");
       }
     }
@@ -547,275 +552,1210 @@ export function buildContext(skill: Skill): string {
 /**
  * Generate a rich SKILL.md from an installed tool's discovered capabilities.
  *
- * Produces a comprehensive skill with command reference, flags, real examples,
- * workflow guidance, and agent integration patterns. When binary analysis
- * yields no commands (libraries, compiled tools without --help), it still
- * generates useful content from rawHelp text, description, and metadata.
+ * Produces detailed, compliant skills following the official guidelines:
+ * - Description: [What it does]. Use when [trigger phrases].
+ * - Body under 300 lines with concrete examples (no placeholders)
+ * - Detailed content split into references/ for progressive disclosure
+ * - No boilerplate sections (overview, installation, agent integration)
+ *
+ * When capability data is missing (no commands/flags/help discovered),
+ * the generator infers usage patterns from the tool's description, tags,
+ * homepage, and source to produce rich, domain-specific content.
  */
-// Verbs that commonly start CLI tool descriptions — used to build natural sentences.
-// "run large language models" → "X can run large language models"
-// "lightweight JSON processor" → "X provides lightweight JSON processor"
-const DESC_ACTION_VERBS = /^(run|build|create|manage|provide|enable|generate|convert|analyze|search|scan|test|deploy|monitor|transform|process|execute|install|serve|compile|validate|extract|detect|train|optimize|automate|format|lint|check|bundle|watch|debug|profile|benchmark|audit|schedule|orchestrate|evaluate|annotate|label|embed|index|query|fetch|sync|stream|log|track|visualize|render|parse|resolve|discover|inspect|measure|report|read|write)/;
 
-const MAX_TRIGGER_COMMANDS = 5;
-const MAX_USAGE_EXAMPLES = 5;
-const MAX_WORKFLOW_STEPS = 4;
-const MAX_HELP_LINES = 80;
+const MAX_QUICK_START_EXAMPLES = 3;
+const MAX_PATTERN_EXAMPLES = 5;
+const MAX_HELP_LINES = 60;
+
+/** Escape a string for use in YAML frontmatter double quotes */
+function esc(s: string): string {
+  return s.replace(/"/g, '\\"').replace(/\n/g, " ");
+}
+
+/** Normalize description: strip trailing period, strip "CLI tool:" prefix, provide fallback */
+function normalizeDesc(tool: Tool): string {
+  const raw = (tool.meta.description || tool.meta.name).replace(/\.$/, "");
+  // Strip generic "CLI tool:" prefix — always lead with actual description
+  return raw.replace(/^CLI tool:\s*/i, "").trim() || tool.meta.name;
+}
+
+/**
+ * Build a compliant description: "[What it does]. Use when [trigger phrases]."
+ * Third person, under 1024 chars, no XML tags. Uses action verbs from commands
+ * or domain-inferred trigger phrases — never "the task involves".
+ */
+function buildDescription(tool: Tool): string {
+  const desc = normalizeDesc(tool);
+  const name = tool.meta.name;
+  const commands = tool.capabilities.commands;
+
+  const triggers: string[] = [];
+  if (commands.length > 0) {
+    // Extract action verbs from command descriptions
+    const actionPhrases = commands
+      .slice(0, 5)
+      .map(c => c.description?.toLowerCase())
+      .filter((d): d is string => !!d && d.length > 3);
+    if (actionPhrases.length > 0) {
+      // Convert to gerund form: "check files" → "checking files"
+      const gerunds = actionPhrases.map(p => {
+        const first = p.split(/\s+/)[0] ?? "";
+        if (first.endsWith("e") && !first.endsWith("ee")) {
+          return first.slice(0, -1) + "ing" + p.slice(first.length);
+        }
+        // Double final consonant for CVC words (format→formatting, run→running)
+        if (/[bcdfghlmnprstvz]$/.test(first) && /[aeiou][bcdfghlmnprstvz]$/.test(first)) {
+          return first + first.slice(-1) + "ing" + p.slice(first.length);
+        }
+        return first + "ing" + p.slice(first.length);
+      });
+      triggers.push(...gerunds.slice(0, 3));
+    } else {
+      triggers.push(`using ${name} commands`);
+    }
+  } else {
+    // Use domain-inferred triggers instead of generic "the task involves"
+    const domain = inferDomain(tool);
+    const domainTriggers: Record<string, string[]> = {
+      llm: ["running LLM inference", "chatting with language models", "generating text"],
+      linter: ["linting files for issues", "auto-fixing code style", "formatting source code"],
+      testing: ["running tests", "checking test coverage", "debugging test failures"],
+      security: ["scanning for vulnerabilities", "auditing dependencies", "detecting secrets"],
+      containers: ["managing containers", "deploying applications", "orchestrating services"],
+      ml: ["training models", "running inference", "fine-tuning pretrained models"],
+      search: ["searching files and code", "finding patterns in text", "indexing content"],
+      data: ["processing structured data", "converting between formats", "transforming datasets"],
+      http: ["making HTTP requests", "interacting with APIs", "downloading resources"],
+      git: ["managing version control", "creating pull requests", "reviewing changes"],
+      agents: ["building AI agents", "orchestrating agent workflows", "running autonomous tasks"],
+      rag: ["building retrieval pipelines", "indexing documents", "querying knowledge bases"],
+      monitoring: ["monitoring performance", "collecting metrics", "viewing logs"],
+      "package-manager": ["managing dependencies", "installing packages", "running project scripts"],
+      documentation: ["generating documentation", "building API docs", "validating doc structure"],
+    };
+    const categoryTriggers = domainTriggers[domain.category];
+    if (categoryTriggers && categoryTriggers.length > 0) {
+      triggers.push(...categoryTriggers);
+    } else {
+      triggers.push(`working with ${name}`);
+    }
+  }
+
+  const triggerPhrase = triggers.join(", ");
+  const full = `${desc}. Use when ${triggerPhrase}.`;
+  return full.length > 1024 ? full.slice(0, 1021) + "..." : full;
+}
+
+/**
+ * Generate concrete example arguments based on command flags and purpose.
+ * Never uses <args> or <pattern> placeholders.
+ */
+function concreteArgs(cmd: ToolCommand, toolName: string): string {
+  const parts = [toolName, cmd.name];
+  for (const f of cmd.flags.slice(0, 2)) {
+    if (f.type === "boolean") {
+      parts.push(f.alias || f.name);
+    } else if (f.type === "string") {
+      const val = f.defaultValue ? String(f.defaultValue) : guessValue(f.name, f.description);
+      parts.push(`${f.alias || f.name} ${val}`);
+    }
+  }
+  return parts.join(" ");
+}
+
+/** Guess a realistic value for a flag based on its name/description */
+function guessValue(flagName: string, description: string): string {
+  const lower = (flagName + " " + description).toLowerCase();
+  if (lower.includes("file") || lower.includes("path") || lower.includes("input")) return "src/main.py";
+  if (lower.includes("output") || lower.includes("out")) return "output/";
+  if (lower.includes("format")) return "json";
+  if (lower.includes("port")) return "8080";
+  if (lower.includes("host")) return "localhost";
+  if (lower.includes("dir") || lower.includes("directory")) return "./src";
+  if (lower.includes("pattern") || lower.includes("glob")) return "'**/*.py'";
+  if (lower.includes("config")) return "config.toml";
+  if (lower.includes("name")) return "my-project";
+  if (lower.includes("url")) return "https://example.com";
+  if (lower.includes("count") || lower.includes("num") || lower.includes("limit")) return "10";
+  return ".";
+}
+
+// ── Domain inference for tools without discovered capabilities ──────────────
+
+/** Domain category inferred from tags and description */
+interface InferredDomain {
+  readonly category: string;
+  readonly quickStart: readonly string[];
+  readonly patterns: readonly string[];
+  readonly troubleshooting: readonly string[];
+}
+
+/** Tag/keyword patterns mapped to domain-specific usage examples */
+const DOMAIN_PATTERNS: ReadonlyArray<{
+  match: RegExp;
+  category: string;
+  quickStart: (name: string) => string[];
+  patterns: (name: string) => string[];
+  troubleshooting: (name: string) => string[];
+}> = [
+  {
+    match: /\b(llm|language.model|gpt|chat|prompt|inference|ollama|llama|gemini|openai|anthropic|claude|mistral)\b/i,
+    category: "llm",
+    quickStart: (n) => [
+      `# Start a chat session`,
+      `${n} chat "Explain how transformers work"`,
+      ``,
+      `# Run inference on a prompt`,
+      `${n} run --model gpt-4 --prompt "Summarize this text"`,
+      ``,
+      `# List available models`,
+      `${n} models list`,
+    ],
+    patterns: (n) => [
+      `# Interactive chat with a specific model`,
+      `${n} chat --model llama3 --temperature 0.7`,
+      ``,
+      `# Generate text from a prompt file`,
+      `${n} run --input prompt.txt --output result.txt`,
+      ``,
+      `# Stream responses in real-time`,
+      `${n} chat --stream "Write a Python function to sort a list"`,
+      ``,
+      `# Use with JSON output for pipeline integration`,
+      `${n} run --format json --prompt "Extract entities from: ..."`,
+      ``,
+      `# Compare outputs across models`,
+      `${n} run --model gpt-4 --prompt "Hello" && ${n} run --model claude --prompt "Hello"`,
+    ],
+    troubleshooting: (n) => [
+      `**API key not set**: Export your API key: \`export OPENAI_API_KEY=sk-...\` or check \`${n} config\``,
+      `**Model not found**: Run \`${n} models list\` to see available models`,
+      `**Rate limiting**: Add \`--retry 3\` or reduce \`--max-tokens\``,
+    ],
+  },
+  {
+    match: /\b(lint|format|style|prettier|eslint|ruff|biome|check|static.analysis)\b/i,
+    category: "linter",
+    quickStart: (n) => [
+      `# Check files for issues`,
+      `${n} check .`,
+      ``,
+      `# Auto-fix issues`,
+      `${n} check --fix .`,
+      ``,
+      `# Format files`,
+      `${n} format src/`,
+    ],
+    patterns: (n) => [
+      `# Check specific file types`,
+      `${n} check --include "*.py" src/`,
+      ``,
+      `# Check and output as JSON for CI integration`,
+      `${n} check --format json . > lint-report.json`,
+      ``,
+      `# Auto-fix with preview (dry-run)`,
+      `${n} check --fix --diff .`,
+      ``,
+      `# Check only specific rules`,
+      `${n} check --select E501,W503 src/`,
+      ``,
+      `# Ignore specific paths`,
+      `${n} check --exclude tests/ --exclude .venv/ .`,
+    ],
+    troubleshooting: (n) => [
+      `**Config not found**: Create a config file in the project root, or run \`${n} init\``,
+      `**Too many errors**: Use \`--fix\` to auto-fix, or \`--select\` to focus on specific rules`,
+      `**Conflicting with other tools**: Check for overlapping rules in your config`,
+    ],
+  },
+  {
+    match: /\b(test|testing|spec|playwright|jest|vitest|pytest|cypress|e2e)\b/i,
+    category: "testing",
+    quickStart: (n) => [
+      `# Run all tests`,
+      `${n} run`,
+      ``,
+      `# Run specific test file`,
+      `${n} run tests/unit/test_main.py`,
+      ``,
+      `# Run tests matching a pattern`,
+      `${n} run --grep "should handle"`,
+    ],
+    patterns: (n) => [
+      `# Run tests with coverage report`,
+      `${n} run --coverage`,
+      ``,
+      `# Run tests in watch mode`,
+      `${n} run --watch`,
+      ``,
+      `# Run only failed tests`,
+      `${n} run --failed`,
+      ``,
+      `# Generate JSON test report`,
+      `${n} run --reporter json --output test-results.json`,
+      ``,
+      `# Run tests in parallel`,
+      `${n} run --parallel --workers 4`,
+    ],
+    troubleshooting: (n) => [
+      `**Tests not found**: Check your test file naming convention and \`${n}\` config paths`,
+      `**Timeout errors**: Increase timeout with \`${n} run --timeout 30000\` or check for async leaks`,
+      `**Import errors**: Verify your test environment setup and \`${n}\` module resolution`,
+    ],
+  },
+  {
+    match: /\b(security|vulnerab|scan|cve|secret|exploit|pentest|audit|sast|dast|trivy|grype|snyk|semgrep|trufflehog|osv.scanner|gitleaks)\b/i,
+    category: "security",
+    quickStart: (n) => [
+      `# Scan current project for vulnerabilities`,
+      `${n} scan .`,
+      ``,
+      `# Scan a container image`,
+      `${n} scan --image myapp:latest`,
+      ``,
+      `# Output results as JSON`,
+      `${n} scan --format json . > security-report.json`,
+    ],
+    patterns: (n) => [
+      `# Scan with severity filter`,
+      `${n} scan --severity HIGH,CRITICAL .`,
+      ``,
+      `# Scan a specific file or directory`,
+      `${n} scan --target src/`,
+      ``,
+      `# Scan and fail on findings (for CI)`,
+      `${n} scan --exit-code 1 .`,
+      ``,
+      `# Scan dependencies / lockfiles`,
+      `${n} scan --type dependencies package-lock.json`,
+      ``,
+      `# Generate SARIF report for GitHub integration`,
+      `${n} scan --format sarif . > results.sarif`,
+    ],
+    troubleshooting: (n) => [
+      `**False positives**: Use \`--ignore\` rules or a \`.${n}ignore\` config file`,
+      `**Slow scans**: Exclude large vendor dirs with \`--exclude vendor/,node_modules/\``,
+      `**Database update**: Run \`${n} update-db\` to get the latest vulnerability data`,
+    ],
+  },
+  {
+    match: /\b(docker|container|kubernetes|k8s|kubectl|helm|pod|deploy|orchestrat)\b/i,
+    category: "containers",
+    quickStart: (n) => [
+      `# List running resources`,
+      `${n} list`,
+      ``,
+      `# Deploy an application`,
+      `${n} deploy --name myapp --image myapp:latest`,
+      ``,
+      `# Check status`,
+      `${n} status myapp`,
+    ],
+    patterns: (n) => [
+      `# Get detailed status in JSON`,
+      `${n} status --output json myapp`,
+      ``,
+      `# Scale a deployment`,
+      `${n} scale --replicas 3 myapp`,
+      ``,
+      `# View logs`,
+      `${n} logs myapp --tail 100`,
+      ``,
+      `# Apply configuration`,
+      `${n} apply -f config.yaml`,
+      ``,
+      `# Port-forward for local access`,
+      `${n} port-forward myapp 8080:80`,
+    ],
+    troubleshooting: (n) => [
+      `**Connection refused**: Check that the cluster/daemon is running; try \`${n} status\``,
+      `**Permission denied**: Verify your credentials with \`${n} auth status\``,
+      `**Image pull errors**: Check image name, tag, and registry authentication`,
+    ],
+  },
+  {
+    match: /\b(ml|machine.learn|train|model|neural|deep.learn|tensor|pytorch|jax|scikit|hugging\s*face|transform|finetun|embed)\b/i,
+    category: "ml",
+    quickStart: (n) => [
+      `# Train a model`,
+      `${n} train --config config.yaml --data data/train.jsonl`,
+      ``,
+      `# Run inference`,
+      `${n} predict --model ./checkpoints/best --input sample.txt`,
+      ``,
+      `# Evaluate model performance`,
+      `${n} eval --model ./checkpoints/best --data data/test.jsonl`,
+    ],
+    patterns: (n) => [
+      `# Train with custom hyperparameters`,
+      `${n} train --learning-rate 1e-4 --epochs 10 --batch-size 32`,
+      ``,
+      `# Export model for deployment`,
+      `${n} export --model ./checkpoints/best --format onnx --output model.onnx`,
+      ``,
+      `# Fine-tune from a pretrained model`,
+      `${n} train --base-model bert-base --data custom-data.jsonl --output ./finetuned`,
+      ``,
+      `# Track experiment metrics`,
+      `${n} train --tracker wandb --project my-experiment`,
+      ``,
+      `# Run distributed training`,
+      `${n} train --distributed --gpus 4 --config config.yaml`,
+    ],
+    troubleshooting: (n) => [
+      `**CUDA out of memory**: Reduce \`--batch-size\` or enable \`--gradient-checkpointing\``,
+      `**Model not found**: Check model path or download with \`${n} download <model-name>\``,
+      `**Slow training**: Enable mixed precision with \`--fp16\` or \`--bf16\``,
+    ],
+  },
+  {
+    match: /\b(search|grep|find|ripgrep|fd|code.search|index|query)\b/i,
+    category: "search",
+    quickStart: (n) => [
+      `# Search for a pattern in current directory`,
+      `${n} "TODO" .`,
+      ``,
+      `# Search with file type filter`,
+      `${n} --type py "def main" src/`,
+      ``,
+      `# Search with context lines`,
+      `${n} -C 3 "error" logs/`,
+    ],
+    patterns: (n) => [
+      `# Case-insensitive search`,
+      `${n} -i "pattern" .`,
+      ``,
+      `# Search and output JSON`,
+      `${n} --json "pattern" . | jq '.data.submatches'`,
+      ``,
+      `# Search for regex patterns`,
+      `${n} "fn\\s+\\w+\\(" --type rust src/`,
+      ``,
+      `# List matching files only`,
+      `${n} -l "import" src/`,
+      ``,
+      `# Exclude directories`,
+      `${n} --glob '!node_modules' "require" .`,
+    ],
+    troubleshooting: (n) => [
+      `**No results**: Check glob patterns and file type filters; use \`${n} -u\` to search hidden files`,
+      `**Too many results**: Add \`${n} --type\` or \`--glob\` filters to narrow scope`,
+      `**Binary file matches**: Add \`${n} --binary\` or exclude binary patterns`,
+    ],
+  },
+  {
+    match: /\b(data|json|csv|yaml|parse|transform|etl|process|pipeline|convert)\b/i,
+    category: "data",
+    quickStart: (n) => [
+      `# Process JSON input`,
+      `${n} '.key' input.json`,
+      ``,
+      `# Convert between formats`,
+      `${n} convert input.csv --to json --output result.json`,
+      ``,
+      `# Filter and transform data`,
+      `${n} 'select(.status == "active")' data.json`,
+    ],
+    patterns: (n) => [
+      `# Read from stdin in a pipeline`,
+      `curl -s https://api.example.com/data | ${n} '.results[]'`,
+      ``,
+      `# Extract specific fields`,
+      `${n} '{name: .name, email: .email}' users.json`,
+      ``,
+      `# Aggregate values`,
+      `${n} '[.[] | .price] | add' products.json`,
+      ``,
+      `# Process CSV data`,
+      `${n} --input-format csv --output-format json data.csv`,
+      ``,
+      `# Pretty-print with formatting`,
+      `${n} --indent 2 --color data.json`,
+    ],
+    troubleshooting: (n) => [
+      `**Parse error**: Validate input format; use \`${n} --raw-input\` for plain text`,
+      `**Encoding issues**: Specify \`${n} --encoding utf-8\``,
+      `**Large files**: Use \`${n} --slurp\` for streaming or line-by-line processing`,
+    ],
+  },
+  {
+    match: /\b(http|api|rest|graphql|grpc|curl|request|fetch|client|server|web)\b/i,
+    category: "http",
+    quickStart: (n) => [
+      `# Make a GET request`,
+      `${n} GET https://api.example.com/users`,
+      ``,
+      `# POST with JSON body`,
+      `${n} POST https://api.example.com/users name=John email=john@example.com`,
+      ``,
+      `# Download a file`,
+      `${n} --download https://example.com/file.zip`,
+    ],
+    patterns: (n) => [
+      `# Request with custom headers`,
+      `${n} GET https://api.example.com/data Authorization:"Bearer token123"`,
+      ``,
+      `# Submit form data`,
+      `${n} POST https://api.example.com/upload --form file@document.pdf`,
+      ``,
+      `# Follow redirects and show response headers`,
+      `${n} --follow --headers GET https://example.com`,
+      ``,
+      `# Timeout and retry configuration`,
+      `${n} --timeout 30 --retry 3 GET https://api.example.com/data`,
+      ``,
+      `# Output response body only (for piping)`,
+      `${n} --body GET https://api.example.com/data | jq '.'`,
+    ],
+    troubleshooting: (n) => [
+      `**SSL errors**: Use \`${n} --verify no\` for self-signed certs (dev only) or update CA bundle`,
+      `**Timeout**: Increase with \`${n} --timeout 30\`; check network connectivity`,
+      `**401 Unauthorized**: Verify API key or token; check \`${n} auth\` configuration`,
+    ],
+  },
+  {
+    match: /\b(git|version.control|commit|branch|merge|pr|pull.request|github|gitlab)\b/i,
+    category: "git",
+    quickStart: (n) => [
+      `# Show status overview`,
+      `${n} status`,
+      ``,
+      `# Create and switch to a new branch`,
+      `${n} branch create feature/my-feature`,
+      ``,
+      `# View recent history`,
+      `${n} log --oneline -10`,
+    ],
+    patterns: (n) => [
+      `# Create a pull request`,
+      `${n} pr create --title "Add feature" --body "Description here"`,
+      ``,
+      `# List open issues`,
+      `${n} issue list --state open --json number,title`,
+      ``,
+      `# View CI/CD status`,
+      `${n} run list --limit 5`,
+      ``,
+      `# Search across repos`,
+      `${n} search repos --query "language:python stars:>100"`,
+      ``,
+      `# Generate changelog`,
+      `${n} changelog generate --from v1.0.0 --to HEAD`,
+    ],
+    troubleshooting: (n) => [
+      `**Authentication failed**: Run \`${n} auth login\` or check your token`,
+      `**Merge conflicts**: Use \`${n} merge --abort\` to reset, then resolve manually`,
+      `**Permission denied**: Verify repository access and organization membership`,
+    ],
+  },
+  {
+    match: /\b(agent|autonomous|swarm|multi.agent|crew|autogen|langchain|langraph|agentic|orchestrat|workflow)\b/i,
+    category: "agents",
+    quickStart: (n) => [
+      `# Initialize a new agent project`,
+      `${n} init --name my-agent`,
+      ``,
+      `# Run an agent with a task`,
+      `${n} run --task "Research and summarize the latest AI papers"`,
+      ``,
+      `# List available agents / tools`,
+      `${n} list`,
+    ],
+    patterns: (n) => [
+      `# Run with a specific model`,
+      `${n} run --model gpt-4 --task "Analyze this codebase"`,
+      ``,
+      `# Run in verbose mode for debugging`,
+      `${n} run --verbose --task "Debug the failing test"`,
+      ``,
+      `# Configure agent tools`,
+      `${n} config --tools web-search,code-exec,file-read`,
+      ``,
+      `# Run in non-interactive mode (for CI)`,
+      `${n} run --non-interactive --input task.txt --output result.json`,
+      ``,
+      `# Spawn multiple agents`,
+      `${n} swarm --agents 3 --task "Process these documents"`,
+    ],
+    troubleshooting: (n) => [
+      `**Agent stuck in loop**: Set \`--max-iterations 10\` to limit execution steps`,
+      `**Tool errors**: Verify tool configuration with \`${n} config show\``,
+      `**Context too long**: Use \`--max-tokens\` to limit context window usage`,
+    ],
+  },
+  {
+    match: /\b(rag|retriev|vector|embed|knowledge.base|semantic|index|chromadb|pinecone|qdrant|weaviate|faiss)\b/i,
+    category: "rag",
+    quickStart: (n) => [
+      `# Index documents for retrieval`,
+      `${n} index --input docs/ --collection my-docs`,
+      ``,
+      `# Query the knowledge base`,
+      `${n} query "How do I configure authentication?"`,
+      ``,
+      `# List indexed collections`,
+      `${n} collections list`,
+    ],
+    patterns: (n) => [
+      `# Index with custom embedding model`,
+      `${n} index --model text-embedding-3-small --input docs/ --collection project-docs`,
+      ``,
+      `# Query with metadata filters`,
+      `${n} query --filter 'type:api-docs' "rate limiting"`,
+      ``,
+      `# Export embeddings`,
+      `${n} export --collection my-docs --format json --output embeddings.json`,
+      ``,
+      `# Re-index updated documents`,
+      `${n} index --update --input docs/ --collection my-docs`,
+      ``,
+      `# Query with top-k and threshold`,
+      `${n} query --top-k 5 --threshold 0.8 "deployment instructions"`,
+    ],
+    troubleshooting: (n) => [
+      `**Empty results**: Check that documents are indexed; run \`${n} collections info my-docs\``,
+      `**Slow queries**: Reduce collection size or add metadata filters`,
+      `**Embedding errors**: Verify API key for the embedding model provider`,
+    ],
+  },
+  {
+    match: /\b(monitor|metric|observ|log|trace|dashboard|alert|profil|benchmark|perf)\b/i,
+    category: "monitoring",
+    quickStart: (n) => [
+      `# Check system status`,
+      `${n} status --json`,
+      ``,
+      `# View recent logs`,
+      `${n} logs --tail 50`,
+      ``,
+      `# Run a benchmark`,
+      `${n} bench --runs 10 -- command-to-benchmark`,
+    ],
+    patterns: (n) => [
+      `# Export metrics as JSON`,
+      `${n} metrics export --format json > metrics.json`,
+      ``,
+      `# Monitor a process`,
+      `${n} watch --pid 1234 --interval 5s`,
+      ``,
+      `# Compare benchmark results`,
+      `${n} bench --runs 10 --export results.json -- command-a && ${n} bench --runs 10 --compare results.json -- command-b`,
+      ``,
+      `# Filter logs by level`,
+      `${n} logs --level error --since "1h ago"`,
+    ],
+    troubleshooting: (n) => [
+      `**No data collected**: Check that the target process is running; try \`${n} status\``,
+      `**Permission errors**: Some \`${n}\` metrics require elevated privileges (sudo)`,
+      `**High overhead**: Reduce sampling frequency with \`${n} --interval 10s\``,
+    ],
+  },
+  {
+    match: /\b(package|install|dependency|npm|pip|cargo|build|bundl|compil|runtime)\b/i,
+    category: "package-manager",
+    quickStart: (n) => [
+      `# Install dependencies`,
+      `${n} install`,
+      ``,
+      `# Add a new package`,
+      `${n} add express`,
+      ``,
+      `# List installed packages`,
+      `${n} list`,
+    ],
+    patterns: (n) => [
+      `# Install from lockfile (reproducible)`,
+      `${n} install --frozen-lockfile`,
+      ``,
+      `# Update all dependencies`,
+      `${n} update`,
+      ``,
+      `# Check for outdated packages`,
+      `${n} outdated`,
+      ``,
+      `# Remove unused dependencies`,
+      `${n} prune`,
+      ``,
+      `# Run a script`,
+      `${n} run build`,
+    ],
+    troubleshooting: (n) => [
+      `**Dependency conflict**: Check version constraints; try \`${n} install --force\``,
+      `**Network timeout**: Set \`--registry\` to a mirror, or check proxy settings`,
+      `**Permission denied**: Avoid \`sudo\`; use a user-local installation directory`,
+    ],
+  },
+  {
+    match: /\b(document|doc|pdf|markdown|generat|api.doc|openapi|swagger|typedoc)\b/i,
+    category: "documentation",
+    quickStart: (n) => [
+      `# Generate documentation`,
+      `${n} generate --input src/ --output docs/`,
+      ``,
+      `# Serve docs locally`,
+      `${n} serve docs/ --port 3000`,
+      ``,
+      `# Validate documentation`,
+      `${n} validate docs/`,
+    ],
+    patterns: (n) => [
+      `# Generate API docs from source code`,
+      `${n} generate --format html --input src/ --output site/`,
+      ``,
+      `# Generate in multiple formats`,
+      `${n} generate --format json --input src/ --output api.json`,
+      ``,
+      `# Watch for changes and rebuild`,
+      `${n} generate --watch --input src/ --output docs/`,
+      ``,
+      `# Validate OpenAPI spec`,
+      `${n} validate openapi.yaml --strict`,
+    ],
+    troubleshooting: (n) => [
+      `**Missing entries**: Ensure exports are public and documented with JSDoc/docstrings`,
+      `**Build errors**: Check config file syntax and path references`,
+      `**Broken links**: Run \`${n} validate --check-links\``,
+    ],
+  },
+];
+
+/** Default domain when nothing matches */
+const DEFAULT_DOMAIN: InferredDomain = {
+  category: "general",
+  quickStart: [],
+  patterns: [],
+  troubleshooting: [],
+};
+
+/** Infer domain-specific usage from tool metadata */
+function inferDomain(tool: Tool): InferredDomain {
+  const searchText = [
+    tool.meta.name,
+    tool.meta.description || "",
+    ...(tool.meta.tags as string[]),
+    tool.source.uri || "",
+    tool.meta.homepage || "",
+  ].join(" ");
+
+  for (const pattern of DOMAIN_PATTERNS) {
+    if (pattern.match.test(searchText)) {
+      return {
+        category: pattern.category,
+        quickStart: pattern.quickStart(tool.meta.name),
+        patterns: pattern.patterns(tool.meta.name),
+        troubleshooting: pattern.troubleshooting(tool.meta.name),
+      };
+    }
+  }
+
+  return DEFAULT_DOMAIN;
+}
 
 export function generateRichSkillMd(tool: Tool): string {
   const commands = tool.capabilities.commands;
   const flags = tool.capabilities.globalFlags;
   const rawHelp = tool.capabilities.rawHelp ?? "";
-  const desc = tool.meta.description || `CLI tool: ${tool.meta.name}`;
+  const desc = normalizeDesc(tool);
   const name = tool.meta.name;
-  const descLower = desc.toLowerCase().replace(/\.$/, "");
+  const description = buildDescription(tool);
+  const hasCapabilities = commands.length > 0 || flags.length > 0;
+  const domain = hasCapabilities ? null : inferDomain(tool);
+  const helpLines = rawHelp.trim() ? rawHelp.trim().split("\n") : [];
 
-  // Build trigger-aware description — always rich, never generic
-  const cmdNames = commands.slice(0, MAX_TRIGGER_COMMANDS).map(c => c.name).join(", ");
-  const triggerHint = commands.length > 0
-    ? `Use this skill when the user needs ${name} (commands: ${cmdNames}), even if they don't mention "${name}" explicitly.`
-    : `Use this skill whenever the user works with ${name} or tasks related to ${descLower} — even if they don't mention "${name}" by name.`;
+  // Normalize name to strict kebab-case
+  const kebabName = name
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .replace(/claude|anthropic/gi, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 64) || "unnamed-tool";
+
+  // Infer compatibility from source format
+  const compatMap: Record<string, string> = {
+    npm: "Node.js v18+",
+    pypi: "Python 3.10+",
+    crates: "Rust toolchain",
+    github: "See project README",
+    local: "Local installation",
+  };
+  const compatibility = compatMap[tool.source.format] ?? "See project README";
+  const license = tool.meta.license ?? "MIT";
 
   const s: string[] = [];
 
   // ── Frontmatter ──
   s.push("---");
-  s.push(`name: ${name}`);
+  s.push(`name: ${kebabName}`);
   s.push(`version: ${tool.meta.version}`);
-  s.push(`description: "${esc(desc)}. ${triggerHint}"`);
+  s.push(`description: "${esc(description)}"`);
+  s.push(`license: ${license}`);
+  s.push(`compatibility: "${compatibility}"`);
   s.push(`ingredients:`);
-  s.push(`  - ${tool.source.uri}`);
+  // Quote URIs that contain YAML-special chars (@, :, etc.)
+  const uri = tool.source.uri;
+  s.push(uri.includes("@") || uri.includes(":") ? `  - "${uri}"` : `  - ${uri}`);
   s.push(`tags:`);
   const tags = new Set<string>([...(tool.meta.tags as string[]), "cli"]);
   for (const tag of tags) s.push(`  - ${tag}`);
-  if (tool.meta.homepage) s.push(`# homepage: ${tool.meta.homepage}`);
-  if (tool.meta.license) s.push(`# license: ${tool.meta.license}`);
   s.push("---");
   s.push("");
 
   // ── Header ──
   s.push(`# ${name}`);
   s.push("");
-  s.push(desc);
-  s.push("");
+  s.push(desc + ".");
   if (tool.meta.homepage) {
-    s.push(`**Source**: ${tool.meta.homepage}`);
-    s.push("");
+    s.push(`Docs: ${tool.meta.homepage}`);
   }
-
-  // ── Overview / Why this tool matters for agents ──
-  s.push("## Overview");
-  s.push("");
-  const startsWithVerb = DESC_ACTION_VERBS.test(descLower);
-  const descSentence = startsWithVerb ? `${name} can ${descLower}` : `${name} provides ${descLower}`;
-  s.push(`${descSentence}. Agents benefit from ${name} because it provides programmatic access to capabilities that would otherwise require manual interaction or complex scripting.`);
+  if (tool.source.format === "github") {
+    s.push(`Source: https://github.com/${tool.source.uri}`);
+  }
   s.push("");
 
-  // ── Installation ──
-  s.push("## Installation");
+  // ── Quick Start ──
+  s.push("## Quick Start");
   s.push("");
   s.push("```bash");
-  s.push(`# Install via agents-cli`);
-  s.push(`agents-cli add ${tool.source.uri}`);
-  s.push("");
-  if (tool.source.format === "npm" || tool.source.uri.includes("npm:")) {
-    s.push(`# Or install directly via npm`);
-    s.push(`npm install -g ${tool.source.uri.replace("npm:", "")}`);
-  } else if (tool.source.format === "github") {
-    s.push(`# Or clone from GitHub`);
-    s.push(`git clone https://github.com/${tool.source.uri}.git`);
-  }
-  s.push("```");
-  s.push("");
-
-  // ── Commands (if discovered) ──
   if (commands.length > 0) {
-    s.push("## Commands");
-    s.push("");
-    s.push(`${name} exposes ${commands.length} command${commands.length > 1 ? "s" : ""}:`);
-    s.push("");
-
-    // Summary table first
-    if (commands.length > 3) {
-      s.push("| Command | Description |");
-      s.push("|---------|-------------|");
-      for (const cmd of commands) {
-        s.push(`| \`${name} ${cmd.name}\` | ${cmd.description || "—"} |`);
-      }
-      s.push("");
-    }
-
-    // Detailed sections for each command
-    for (const cmd of commands) {
-      s.push(`### \`${name} ${cmd.name}\``);
-      s.push("");
-      if (cmd.description) s.push(cmd.description);
-      s.push("");
-
-      // Example usage for each command
-      s.push("```bash");
-      s.push(`${name} ${cmd.name}`);
-      s.push("```");
-      s.push("");
-
-      if (cmd.flags.length > 0) {
-        s.push("**Flags:**");
-        for (const f of cmd.flags) {
-          const alias = f.alias ? ` (${f.alias})` : "";
-          s.push(`- \`${f.name}\`${alias} — ${f.description}`);
-        }
-        s.push("");
-      }
-    }
-  }
-
-  // ── Global flags (if discovered) ──
-  if (flags.length > 0) {
-    s.push("## Global Options");
-    s.push("");
-    s.push("| Flag | Alias | Description |");
-    s.push("|------|-------|-------------|");
-    for (const f of flags) {
-      s.push(`| \`${f.name}\` | ${f.alias ? `\`${f.alias}\`` : "—"} | ${f.description} |`);
-    }
-    s.push("");
-  }
-
-  // ── Raw help output (when available, especially useful when no commands were parsed) ──
-  if (rawHelp && commands.length === 0) {
-    s.push("## Help Reference");
-    s.push("");
-    s.push("The following is the tool's built-in help output for reference:");
-    s.push("");
-    s.push("```");
-    const trimmedHelp = rawHelp.trim();
-    const helpLines = trimmedHelp.split("\n");
-    const truncated = helpLines.length > MAX_HELP_LINES ? helpLines.slice(0, MAX_HELP_LINES).join("\n") + "\n\n... (truncated, run --help for full output)" : trimmedHelp;
-    s.push(truncated);
-    s.push("```");
-    s.push("");
-  }
-
-  // ── Usage examples ──
-  s.push("## Usage");
-  s.push("");
-  if (commands.length > 0) {
-    s.push("```bash");
-    s.push(`# Show help`);
-    s.push(`${name} --help`);
-    s.push("");
-    for (const cmd of commands.slice(0, MAX_USAGE_EXAMPLES)) {
+    for (const cmd of commands.slice(0, MAX_QUICK_START_EXAMPLES)) {
       s.push(`# ${cmd.description || cmd.name}`);
-      s.push(`${name} ${cmd.name}`);
+      s.push(concreteArgs(cmd, name));
       s.push("");
     }
-    s.push("```");
+  } else if (domain && domain.quickStart.length > 0) {
+    for (const line of domain.quickStart) s.push(line);
+    if (domain.quickStart[domain.quickStart.length - 1] !== "") s.push("");
   } else {
-    // No commands discovered — provide general usage patterns
-    s.push("```bash");
     s.push(`# Show help and available options`);
     s.push(`${name} --help`);
     s.push("");
     s.push(`# Check version`);
     s.push(`${name} --version`);
-    s.push("```");
     s.push("");
-    s.push("Refer to the project documentation for detailed usage:");
-    if (tool.meta.homepage) {
-      s.push(`- ${tool.meta.homepage}`);
-    } else {
-      s.push(`- https://github.com/${tool.source.uri}`);
-    }
   }
-  s.push("");
-
-  // ── Common Workflows ──
-  s.push("## Common Workflows");
-  s.push("");
-  if (commands.length >= 3) {
-    // Build workflow from discovered commands
-    s.push(`### Basic workflow`);
-    s.push("");
-    s.push("```bash");
-    for (const cmd of commands.slice(0, MAX_WORKFLOW_STEPS)) {
-      s.push(`# Step: ${cmd.description || cmd.name}`);
-      s.push(`${name} ${cmd.name}`);
-      s.push("");
-    }
-    s.push("```");
-  } else {
-    // General workflow guidance
-    s.push(`### Getting started`);
-    s.push("");
-    s.push("```bash");
-    s.push(`# 1. Install the tool`);
-    s.push(`agents-cli add ${tool.source.uri}`);
-    s.push("");
-    s.push(`# 2. Verify installation`);
-    s.push(`agents-cli run ${name} -- --version`);
-    s.push("");
-    s.push(`# 3. Explore capabilities`);
-    s.push(`agents-cli schema ${name} --json`);
-    s.push("```");
-    s.push("");
-    s.push(`### Piping with other tools`);
-    s.push("");
-    s.push("```bash");
-    s.push(`# Chain ${name} output with jq for structured processing`);
-    s.push(`agents-cli run ${name} -- <args> | jq '.'`);
-    s.push("");
-    s.push(`# Use with rg for filtering output`);
-    s.push(`agents-cli run ${name} -- <args> | rg '<pattern>'`);
-    s.push("```");
-  }
-  s.push("");
-
-  // ── Agent Integration ──
-  s.push("## Agent Integration");
-  s.push("");
-  s.push("Agents should use `agents-cli` to run this tool for structured output and safety:");
-  s.push("");
-  s.push("```bash");
-  s.push(`# Run via agents-cli (structured JSON envelope)`);
-  s.push(`agents-cli run ${name} -- --help --json`);
-  s.push("");
-  s.push(`# Introspect full command schema`);
-  s.push(`agents-cli schema ${name} --json`);
-  s.push("");
-  s.push(`# Dry-run before executing (safe exploration)`);
-  s.push(`agents-cli run ${name} -- <args> --dry-run`);
-  s.push("");
-  s.push(`# Generate detailed context for agent consumption`);
-  s.push(`agents-cli describe ${name} --json`);
   s.push("```");
   s.push("");
 
-  // ── When to use / When not to use ──
-  s.push("## When to Use This Tool");
-  s.push("");
-  s.push(`Use \`${name}\` when:`);
-  s.push(`- Your task involves ${descLower}`);
-  s.push(`- A task requires ${name}-specific functionality`);
+  // ── Commands (compact — top 5 inline, always link to references) ──
   if (commands.length > 0) {
-    s.push(`- You need any of: ${commands.slice(0, MAX_TRIGGER_COMMANDS).map(c => c.name).join(", ")}`);
+    s.push("## Commands");
+    s.push("");
+    const inlineCommands = commands.slice(0, 5);
+    for (const cmd of inlineCommands) {
+      const flagStr = cmd.flags.length > 0
+        ? " — flags: " + cmd.flags.slice(0, 3).map(f => `\`${f.alias || f.name}\``).join(", ")
+        : "";
+      s.push(`- \`${name} ${cmd.name}\` — ${cmd.description || "(no description)"}${flagStr}`);
+    }
+    if (commands.length > 5) {
+      s.push("");
+      s.push(`_${commands.length - 5} more commands — see [commands reference](references/commands.md)_`);
+    }
+    s.push("");
+  }
+
+  // ── Global Options (compact) ──
+  if (flags.length > 0) {
+    s.push("## Global Options");
+    s.push("");
+    for (const f of flags) {
+      const alias = f.alias ? ` (${f.alias})` : "";
+      s.push(`- \`${f.name}\`${alias} — ${f.description}`);
+    }
+    s.push("");
+  }
+
+  // ── References (always present — content lives in references/) ──
+  s.push("## References");
+  s.push("");
+  s.push("- [Guide](references/guide.md) — Installation, configuration, detailed examples");
+  if (commands.length > 0) {
+    s.push(`- [Commands](references/commands.md) — Full command reference (${commands.length} commands)`);
+  }
+  s.push("- [Examples](references/examples.md) — Common usage patterns and recipes");
+  s.push("- [Troubleshooting](references/troubleshooting.md) — Common issues and fixes");
+  if (helpLines.length > 0) {
+    s.push("- [Help Output](references/help-output.md) — Raw help text");
+  }
+  if (commands.some(c => c.flags.length > 3)) {
+    s.push("- [Flags](references/flags.md) — Detailed flag reference per command");
   }
   s.push("");
-  s.push(`Consider alternatives when:`);
-  s.push(`- The task can be accomplished with simpler built-in tools`);
-  s.push(`- You need a different specialization than what ${name} provides`);
+
+  // ── Scripts ──
+  s.push("## Scripts");
+  s.push("");
+  s.push("- `scripts/install.sh` — Install this tool");
+  s.push("- `scripts/validate.py` — Validate skill compliance (run: `uv run scripts/validate.py`)");
   s.push("");
 
   return s.join("\n");
 }
 
-function esc(s: string): string {
-  return s.replace(/"/g, '\\"').replace(/\n/g, " ");
+/** Internal metadata about what references are needed, shared between generators */
+interface RefDecisions {
+  readonly hasRefCommands: boolean;
+  readonly hasRefHelp: boolean;
+  readonly hasRefFlags: boolean;
+  readonly hasRefGuide: boolean;
+  readonly helpLines: readonly string[];
 }
 
-/** Generate a new SKILL.md scaffold with trigger-aware description */
+function computeRefDecisions(tool: Tool): RefDecisions {
+  const commands = tool.capabilities.commands;
+  const rawHelp = tool.capabilities.rawHelp ?? "";
+  const helpLines = rawHelp.trim() ? rawHelp.trim().split("\n") : [];
+  return {
+    hasRefCommands: commands.length > 0,
+    hasRefHelp: helpLines.length > MAX_HELP_LINES,
+    hasRefFlags: commands.some(c => c.flags.length > 3),
+    hasRefGuide: true,
+    helpLines,
+  };
+}
+
+/**
+ * Generate a full skill directory: SKILL.md + reference files.
+ * Returns a SkillDirectory with the main file and any overflow content.
+ */
+export function generateSkillDirectory(tool: Tool): SkillDirectory {
+  const skillMd = generateRichSkillMd(tool);
+  const files: Record<string, string> = {};
+  const commands = tool.capabilities.commands;
+  const name = tool.meta.name;
+  const desc = normalizeDesc(tool);
+  const domain = inferDomain(tool);
+  const refs = computeRefDecisions(tool);
+
+  // ── references/commands.md — always when commands exist ──
+  if (refs.hasRefCommands) {
+    const lines: string[] = [`# ${name} — Full Command Reference`, ""];
+    for (const cmd of commands) {
+      lines.push(`## \`${name} ${cmd.name}\``);
+      lines.push("");
+      if (cmd.description) lines.push(cmd.description);
+      lines.push("");
+      if (cmd.flags.length > 0) {
+        lines.push("**Flags:**");
+        for (const f of cmd.flags) {
+          const alias = f.alias ? ` (${f.alias})` : "";
+          lines.push(`- \`${f.name}\`${alias} — ${f.description}`);
+        }
+        lines.push("");
+      }
+    }
+    files["references/commands.md"] = lines.join("\n");
+  }
+
+  // ── references/help-output.md — when raw help is long ──
+  if (refs.hasRefHelp) {
+    files["references/help-output.md"] = [
+      `# ${name} — Help Output`,
+      "",
+      "```",
+      refs.helpLines.join("\n"),
+      "```",
+      "",
+    ].join("\n");
+  }
+
+  // ── references/flags.md — when commands have many flags ──
+  const cmdsWithFlags = commands.filter(c => c.flags.length > 3);
+  if (refs.hasRefFlags && cmdsWithFlags.length > 0) {
+    const lines: string[] = [`# ${name} — Detailed Flag Reference`, ""];
+    for (const cmd of cmdsWithFlags) {
+      lines.push(`## \`${name} ${cmd.name}\``);
+      lines.push("");
+      lines.push("| Flag | Alias | Type | Required | Description |");
+      lines.push("|------|-------|------|----------|-------------|");
+      for (const f of cmd.flags) {
+        lines.push(`| \`${f.name}\` | ${f.alias ? `\`${f.alias}\`` : "—"} | ${f.type} | ${f.required ? "yes" : "no"} | ${f.description} |`);
+      }
+      lines.push("");
+    }
+    files["references/flags.md"] = lines.join("\n");
+  }
+
+  // ── references/guide.md — ALWAYS generated ──
+  {
+    const lines: string[] = [
+      `# ${name} — Usage Guide`,
+      "",
+      desc + ".",
+      "",
+    ];
+    if (tool.meta.homepage) {
+      lines.push(`Official docs: ${tool.meta.homepage}`);
+      lines.push("");
+    }
+    lines.push("## Installation");
+    lines.push("");
+    if (tool.source.format === "github") {
+      lines.push("```bash");
+      lines.push(`# Clone from GitHub`);
+      lines.push(`git clone https://github.com/${tool.source.uri}.git`);
+      lines.push(`cd ${name}`);
+      lines.push("");
+      lines.push(`# Follow the project's README for build/install instructions`);
+      lines.push("```");
+    } else if (tool.source.format === "npm") {
+      lines.push("```bash");
+      lines.push(`npm install -g ${tool.source.uri.replace("npm:", "")}`);
+      lines.push("```");
+    } else if (tool.source.format === "pypi") {
+      lines.push("```bash");
+      const pypiPkg = tool.source.uri.replace("pypi:", "");
+      lines.push(`uv tool install ${pypiPkg}`);
+      lines.push(`# Or: pip install ${pypiPkg}`);
+      lines.push("```");
+    } else if (tool.source.format === "crates") {
+      lines.push("```bash");
+      lines.push(`cargo binstall ${tool.source.uri.replace("crates:", "")}`);
+      lines.push(`# Or: cargo install ${tool.source.uri.replace("crates:", "")}`);
+      lines.push("```");
+    }
+    lines.push("");
+    lines.push("## Detailed Examples");
+    lines.push("");
+    if (commands.length > 0) {
+      lines.push("```bash");
+      for (const cmd of commands.slice(0, MAX_PATTERN_EXAMPLES)) {
+        lines.push(`# ${cmd.description || cmd.name}`);
+        lines.push(concreteArgs(cmd, name));
+        lines.push("");
+      }
+      lines.push("```");
+    } else if (domain.patterns.length > 0) {
+      lines.push("```bash");
+      for (const line of domain.patterns) lines.push(line);
+      lines.push("```");
+    }
+    lines.push("");
+    const tagList = tool.meta.tags as string[];
+    if (tagList.length > 0) {
+      lines.push("## Related Topics");
+      lines.push("");
+      lines.push(`Tags: ${tagList.join(", ")}`);
+      lines.push("");
+    }
+    files["references/guide.md"] = lines.join("\n");
+  }
+
+  // ── references/examples.md — ALWAYS generated (patterns + recipes) ──
+  {
+    const lines: string[] = [`# ${name} — Common Usage Patterns`, ""];
+    lines.push("## Patterns");
+    lines.push("");
+    lines.push("```bash");
+    if (commands.length > 0) {
+      for (const cmd of commands.slice(0, MAX_PATTERN_EXAMPLES)) {
+        lines.push(`# ${cmd.description || cmd.name}`);
+        lines.push(concreteArgs(cmd, name));
+        lines.push("");
+      }
+    } else if (domain.patterns.length > 0) {
+      for (const line of domain.patterns) lines.push(line);
+      if (domain.patterns[domain.patterns.length - 1] !== "") lines.push("");
+    } else {
+      lines.push(`# Run with default settings`);
+      lines.push(`${name} .`);
+      lines.push("");
+      lines.push(`# Show verbose output`);
+      lines.push(`${name} --verbose .`);
+      lines.push("");
+      lines.push(`# Output as JSON (if supported)`);
+      lines.push(`${name} --json .`);
+      lines.push("");
+    }
+    lines.push("```");
+    lines.push("");
+    files["references/examples.md"] = lines.join("\n");
+  }
+
+  // ── references/troubleshooting.md — ALWAYS generated ──
+  {
+    const lines: string[] = [`# ${name} — Troubleshooting`, ""];
+    if (domain.troubleshooting.length > 0) {
+      for (const tip of domain.troubleshooting) {
+        lines.push(`- ${tip}`);
+      }
+    } else {
+      lines.push(`- **Command not found**: Ensure ${name} is installed and in your PATH`);
+      lines.push(`- **Permission denied**: Check file permissions or run with appropriate privileges`);
+      lines.push(`- **Version mismatch**: Run \`${name} --version\` to verify the installed version`);
+    }
+    lines.push("");
+    files["references/troubleshooting.md"] = lines.join("\n");
+  }
+
+  // ── scripts/install.sh — ALWAYS generated ──
+  files["scripts/install.sh"] = generateInstallScript(tool);
+
+  // ── scripts/validate.py — ALWAYS generated ──
+  files["scripts/validate.py"] = generateValidateScript();
+
+  return { skillMd, files };
+}
+
+// =============================================================================
+// Script Generators (used by generateSkillDirectory and skill-forge)
+// =============================================================================
+
+/** Shell-quote a value: wrap in single quotes with inner escaping */
+export function shellQuote(s: string): string {
+  return "'" + s.replace(/'/g, "'\\''") + "'";
+}
+
+/** Generate scripts/install.sh — source-aware install helper */
+export function generateInstallScript(tool: Tool): string {
+  validateToolName(tool.meta.name);
+  const name = shellQuote(tool.meta.name);
+  const lines: string[] = [
+    "#!/usr/bin/env bash",
+    `# Install ${tool.meta.name} — auto-detected from source format`,
+    "set -euo pipefail",
+    "",
+  ];
+
+  const pkg = shellQuote(tool.source.uri.replace(/^(pypi|crates|npm):/, ""));
+
+  switch (tool.source.format) {
+    case "npm":
+      lines.push(`# Install via npm (global)`, `npm install -g ${pkg}`, "");
+      lines.push(`# Or run without installing`, `npx ${pkg} --help`);
+      break;
+    case "pypi":
+      lines.push(`# Install via uv (recommended)`, `uv tool install ${pkg}`, "");
+      lines.push(`# Or run without installing`, `uvx ${pkg} --help`);
+      break;
+    case "crates":
+      lines.push(`# Install via cargo-binstall (fast, pre-built binaries)`, `cargo binstall ${pkg}`, "");
+      lines.push(`# Or build from source`, `cargo install ${pkg}`);
+      break;
+    case "github": {
+      const uri = shellQuote(tool.source.uri);
+      lines.push(`# Clone and build from source`);
+      lines.push(`git clone "https://github.com/"${uri}".git"`, `cd ${name}`);
+      lines.push(`# Follow README for build instructions`);
+      break;
+    }
+    default:
+      lines.push(`# Install from: ${tool.source.uri}`);
+      lines.push(`echo "See project README for installation instructions"`);
+  }
+
+  lines.push("");
+  lines.push(`# Verify installation`);
+  lines.push(`${name} --version 2>/dev/null || ${name} version 2>/dev/null || echo "${tool.meta.name} installed (no --version flag)"`);
+  lines.push("");
+
+  return lines.join("\n");
+}
+
+/**
+ * Generate scripts/validate.py — a single-file uv script that validates
+ * the skill directory structure and frontmatter compliance.
+ * Runs with: uv run scripts/validate.py
+ */
+export function generateValidateScript(): string {
+  return `#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["pyyaml>=6.0"]
+# ///
+"""
+Validate skill directory structure and SKILL.md frontmatter.
+Usage: uv run scripts/validate.py
+"""
+
+import sys
+import re
+from pathlib import Path
+
+try:
+    import yaml
+except ImportError:
+    print("WARN: pyyaml not available, using basic parsing")
+    yaml = None
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+SKILL_FILE = SKILL_DIR / "SKILL.md"
+
+def check(condition: bool, msg: str, issues: list[str]) -> None:
+    if not condition:
+        issues.append(msg)
+
+def validate() -> list[str]:
+    issues: list[str] = []
+
+    check(SKILL_FILE.exists(), "SKILL.md not found", issues)
+    check(not (SKILL_DIR / "README.md").exists(), "README.md should not be inside skill folder", issues)
+
+    if not SKILL_FILE.exists():
+        return issues
+
+    content = SKILL_FILE.read_text(encoding="utf-8")
+
+    fm_match = re.match(r"^---\\r?\\n([\\s\\S]*?)\\r?\\n---", content)
+    check(fm_match is not None, "Missing --- frontmatter delimiters", issues)
+    if not fm_match:
+        return issues
+
+    fm_text = fm_match.group(1)
+    fields: dict = {}
+    if yaml:
+        try:
+            fields = yaml.safe_load(fm_text) or {}
+        except yaml.YAMLError as e:
+            issues.append(f"Invalid YAML: {e}")
+            return issues
+    else:
+        for line in fm_text.split("\\n"):
+            m = re.match(r"^(\\w[\\w-]*):\\s*(.+)$", line)
+            if m:
+                fields[m.group(1)] = m.group(2).strip().strip("'\\"")
+
+    name = fields.get("name", "")
+    check(bool(name), "Missing: name", issues)
+    check(len(name) <= 64, f"name too long: {len(name)} (max 64)", issues)
+    check(bool(re.match(r"^[a-z0-9][a-z0-9-]*$", name)) if name else False, f"name not kebab-case: '{name}'", issues)
+    check("claude" not in name.lower() and "anthropic" not in name.lower(), "name has reserved words", issues)
+
+    desc = fields.get("description", "")
+    check(bool(desc), "Missing: description", issues)
+    check(len(desc) <= 1024, f"description too long: {len(desc)} (max 1024)", issues)
+    check("<" not in desc and ">" not in desc, "description has XML tags", issues)
+    check("use when" in desc.lower(), "description missing 'Use when' trigger", issues)
+
+    # Structure checks
+    refs_dir = SKILL_DIR / "references"
+    scripts_dir = SKILL_DIR / "scripts"
+    check(refs_dir.exists(), "Missing references/ directory", issues)
+    check(scripts_dir.exists(), "Missing scripts/ directory", issues)
+    if refs_dir.exists():
+        check((refs_dir / "guide.md").exists(), "Missing references/guide.md", issues)
+
+    return issues
+
+if __name__ == "__main__":
+    issues = validate()
+    if issues:
+        print(f"FAIL: {len(issues)} issue(s)")
+        for i in issues:
+            print(f"  - {i}")
+        sys.exit(1)
+    else:
+        print("PASS: Skill is compliant")
+`;
+}
+
+/** Generate a new SKILL.md scaffold with compliant description */
 export function generateSkillMd(name: string, description: string): string {
-  // Build a trigger-aware description: what it does + when to use it
-  const triggerDesc = `${description}. Use this skill whenever the user works with ${name}-related tasks, even if they don't mention "${name}" explicitly.`;
+  const desc = description.replace(/\.$/, "");
+  const triggerDesc = `${desc}. Use when the user needs ${name} or works on ${desc.toLowerCase()}-related tasks.`;
 
   return [
     "---",
@@ -825,17 +1765,22 @@ export function generateSkillMd(name: string, description: string): string {
     "ingredients: []",
     "tags:",
     `  - ${name}`,
-    "# node: \">=18\"",
-    "# python: \">=3.10\"",
     "---",
     "",
     `# ${name}`,
     "",
-    description,
+    desc + ".",
     "",
-    "## Usage",
+    "## Quick Start",
     "",
-    "Describe how to use this skill here.",
+    "```bash",
+    `# Example usage`,
+    `${name} --help`,
+    "```",
+    "",
+    "## Common Patterns",
+    "",
+    "Add concrete usage patterns here.",
     "",
   ].join("\n");
 }

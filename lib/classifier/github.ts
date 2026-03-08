@@ -233,13 +233,15 @@ export function fetchHtml(url: string, maxRedirects = 5): Promise<string> {
       }
       let data = "";
       let bytes = 0;
+      let settled = false;
       res.on("data", (chunk: Buffer) => {
+        if (settled) return;
         bytes += chunk.length;
-        if (bytes > MAX_RESPONSE_BYTES) { res.destroy(); reject(new Error(`Response exceeded ${MAX_RESPONSE_BYTES} bytes`)); return; }
+        if (bytes > MAX_RESPONSE_BYTES) { settled = true; res.destroy(); reject(new Error(`Response exceeded ${MAX_RESPONSE_BYTES} bytes`)); return; }
         data += chunk.toString();
       });
-      res.on("end", () => resolve(data));
-      res.on("error", reject);
+      res.on("end", () => { if (!settled) { settled = true; resolve(data); } });
+      res.on("error", (err) => { if (!settled) { settled = true; reject(err); } });
     }).on("error", reject);
   });
 }
