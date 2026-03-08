@@ -14,8 +14,10 @@ Built on the "Rewrite Your CLI for AI Agents" philosophy — every command outpu
 - **No default exports** — use named exports only.
 - **Types in `lib/types.ts`** — all shared interfaces and types live there. Don't scatter type definitions.
 - **Security**: The codebase has SSRF protection, path traversal guards, size limits, and input validation. Do NOT bypass these. Do NOT remove `assertWithinDir`, `isPrivateUrl`, `validateToolId`, guard functions, or size checks.
-- **Shell safety**: When interpolating tool names or URIs into generated shell scripts, always call `validateToolName()` first and shell-quote all values. Never pass unsanitized user input into shell commands.
-- **Path containment**: When writing files based on user/tool-provided paths, always verify the resolved path stays within the intended output directory: `resolve(fullPath).startsWith(resolve(baseDir) + "/")`.
+- **SSRF on HTTP helpers**: `fetchHtml()` in `lib/classifier/github.ts` restricts to github.com hosts only. `fetchJson()` in `lib/resolver.ts` uses `isPrivateUrl()`. Any new HTTP helper must check hosts and cap response size (see `MAX_RESPONSE_BYTES`).
+- **Shell safety**: When interpolating tool names or URIs into generated shell scripts, always call `validateToolName()` first and shell-quote all values (`shellQuote()` from `lib/skills.ts`). Never pass unsanitized user input into shell commands.
+- **Path containment**: When writing files based on user/tool-provided paths, always verify the resolved path stays within the intended output directory: `resolve(fullPath).startsWith(resolve(baseDir) + "/")`. Use `rejectPathTraversal()` on all user-provided path arguments (e.g. `--out`).
+- **Promise safety**: When wrapping Node.js streams in Promises, use a `settled` flag to prevent double-resolve/reject (see `fetchHtml` pattern). `res.destroy()` can trigger both error and close events.
 - **No interactive prompts** — the CLI must work non-interactively (CI/agent-friendly).
 - **Tests**: Run `npm test` (vitest). Tests are in `tests/`. Write tests for new functionality.
 - **Atomic writes**: Store uses temp-file + rename for crash safety. Maintain this pattern.
@@ -164,7 +166,40 @@ npx tsx examples/skill-forge.ts --audit
 npx tsx examples/skill-forge.ts --audit --domain agent
 npx tsx examples/skill-forge.ts --audit --ai --strict
 
-# Common flags: --deep, --dry-run, --json, --strict, --limit N
+# Search mode — query indexed skills (FTS/hybrid/vector)
+npx tsx examples/skill-forge.ts --search "python linting"
+npx tsx examples/skill-forge.ts --search "vector search" --search-mode hybrid
+npx tsx examples/skill-forge.ts --search "error handling" --pkg ruff
+
+# Index mode — rebuild search index from generated skills
+npx tsx examples/skill-forge.ts --index
+npx tsx examples/skill-forge.ts --index --domain agent
+
+# Plugin mode — build domain plugins, agent definitions, marketplace
+npx tsx examples/skill-forge.ts --plugin --dry-run
+npx tsx examples/skill-forge.ts --plugin --domain agent --ai
+npx tsx examples/skill-forge.ts --agent-defs --domain agent
+npx tsx examples/skill-forge.ts --marketplace
+
+# Lockfile — freeze/verify skill integrity
+npx tsx examples/skill-forge.ts --freeze
+npx tsx examples/skill-forge.ts --verify
+
+# MCP server — expose forged skills as MCP tools
+npx tsx examples/skill-forge.ts --mcp
+
+# Factory mode — use skill-factory pipeline with AI enhancement
+npx tsx examples/skill-forge.ts --tool pypi:ruff --factory
+npx tsx examples/skill-forge.ts --tool pypi:ruff --factory --ai
+
+# Monorepo mode — discover sub-packages in monorepos
+npx tsx examples/skill-forge.ts --tool owner/repo --monorepo
+
+# Cache control
+npx tsx examples/skill-forge.ts --tool pypi:ruff --no-cache  # skip cache
+npx tsx examples/skill-forge.ts --tool pypi:ruff --force     # force regeneration
+
+# Common flags: --deep, --dry-run, --json, --strict, --limit N, --no-cache, --force
 ```
 
 ## Agent-first design principles
@@ -233,7 +268,23 @@ lib/
     aggregated-db.ts   — aggregated cross-domain database
     sqlite.ts          — SQLite utilities, WAL pragmas, chunk upsert
 examples/
-  skill-forge.ts           — unified pipeline (--tool, --trending, --curated, --workflow, --audit)
+  skill-forge.ts           — CLI dispatcher + arg parsing (thin entry point)
+  forge/
+    types.ts               — ForgedSkill, QualityResult, BatchResult, CliArgs
+    helpers.ts             — log, atomicWrite, fmtTable, toolToManifestEntry, inferDomain
+    parse-args.ts          — CLI argument parser (--tool, --search, --plugin, etc.)
+    stages.ts              — discover, resolveInstallAnalyze, chunkToolSource, forgeSkill, assessQuality, buildIndexes
+    mode-tool.ts           — --tool mode (+ --factory, --monorepo)
+    mode-discovery.ts      — NL prompt discovery mode
+    mode-trending.ts       — --trending mode
+    mode-curated.ts        — --curated mode
+    mode-workflow.ts       — --workflow mode (+ --skill-output)
+    mode-audit.ts          — --audit mode
+    mode-search.ts         — --search mode (FTS/hybrid/vector)
+    mode-index.ts          — --index mode (rebuild search DB)
+    mode-plugin.ts         — --plugin, --agent-defs, --marketplace modes
+    mode-lockfile.ts       — --freeze, --verify modes
+    mode-mcp.ts            — --mcp mode (MCP server)
   regenerate-skills.ts     — batch regeneration of existing skills
   chunker-demo.ts          — AST chunking demonstration
   generated-skills/        — 350+ auto-generated skill directories
@@ -272,15 +323,34 @@ Bare names without `/` or prefix (e.g. `httpie`) fall back to `pypi:` then error
 
 ## Pipeline flow
 
-1. `createResolver()` — detects format (github/npm/pypi/crates/local), fetches metadata from API
-2. `createInstaller()` — downloads tarball, extracts, runs `npm install` / `uv pip install` / `cargo binstall`
-3. `createAnalyzer()` — runs `--help`/`-h`/`help`, parses commands and flags (recursive mode available)
-4. `deepProbe(binPath, { maxDepth })` — recursively probes subcommand trees; returns `{ tree, totalCommands }`
-5. `createStore()` — persists tool JSON + generates CONTEXT.md
-6. `generateRichSkillMd()` / `generateSkillDirectory()` — produces SKILL.md + references/ + scripts/
-7. `testSkillSync()` / `assessQuality()` — trigger scoring + structural quality gate
-8. `groupByDomain()` / `generateMasterIndex()` — domain grouping + index skills
-9. `McpBridge` — exposes installed tools as MCP server
+1. **Resolve** — `createResolver()` detects format (github/npm/pypi/crates/local), fetches metadata from API
+2. **Install** — `createInstaller()` downloads tarball, extracts, runs `npm install` / `uv pip install` / `cargo binstall`
+3. **Analyze** — `createAnalyzer()` runs `--help`/`-h`/`help`, parses commands and flags (recursive mode available)
+4. **Deep probe** — `deepProbe(binPath, { maxDepth })` recursively probes subcommand trees; returns `{ tree, totalCommands }`
+5. **Store** — `createStore()` persists tool JSON + generates CONTEXT.md
+6. **Generate** — `generateRichSkillMd()` / `generateSkillDirectory()` produces SKILL.md + references/ + scripts/
+7. **Quality** — `testSkillSync()` / `assessQuality()` trigger scoring + structural quality gate
+8. **Index** — `groupByDomain()` / `generateMasterIndex()` domain grouping + index skills
+9. **Factory** — `runSkillFactory()` optional 3-layer pipeline (structural → AI-enhanced)
+10. **MCP** — `McpBridge` exposes installed tools as MCP server
+
+### Skill forge modes (examples/skill-forge.ts)
+
+The forge dispatcher delegates to mode modules in `examples/forge/`:
+
+| Mode | Flag | Module | Description |
+|------|------|--------|-------------|
+| Tool | `--tool <source>` | `mode-tool.ts` | Direct tool → skill (+ `--factory`, `--monorepo`) |
+| Discovery | positional prompt | `mode-discovery.ts` | NL prompt → multi-registry search → forge |
+| Trending | `--trending` | `mode-trending.ts` | GitHub trending page → filter CLI → forge |
+| Curated | `--curated` | `mode-curated.ts` | 91 general + 502 AI/ML tools → forge |
+| Workflow | `--workflow` | `mode-workflow.ts` | NL prompt → template-based agent code |
+| Audit | `--audit` | `mode-audit.ts` | Quality check (+ `--domain`, `--ai`) |
+| Search | `--search` | `mode-search.ts` | FTS/hybrid/vector query indexed skills |
+| Index | `--index` | `mode-index.ts` | Rebuild search DB from generated skills |
+| Plugin | `--plugin` | `mode-plugin.ts` | Build domain plugins, agent defs, marketplace |
+| Lockfile | `--freeze`/`--verify` | `mode-lockfile.ts` | Freeze/verify skill integrity |
+| MCP | `--mcp` | `mode-mcp.ts` | Expose forged skills as MCP tools |
 
 ## Classifier API conventions
 
@@ -322,20 +392,26 @@ emit<T>(result: CliOutput<T>, json: boolean): void
 // Guards (lib/guards.ts) — call before using user input
 validateSource(source: string): void      // validates tool URI format
 validateToolName(name: string): void      // validates name for paths/scripts
-rejectPathTraversal(path: string): void   // blocks ../ in paths
+rejectPathTraversal(path: string, label: string): void  // blocks ../ in paths
 
 // Deep probing (lib/analyzer.ts)
 deepProbe(binPath: string, opts: { maxDepth: number }): { tree: ToolCommand[], totalCommands: number }
 
 // Skills (lib/skills.ts)
+parseFrontmatter(content: string): SkillFrontmatter | null  // returns { name, version, description, ingredients, tags, compatibility, domain }
 installTool(source: string, dataDir: string, opts): Promise<Tool>
 generateRichSkillMd(tool: Tool): string
 generateSkillDirectory(tool: Tool): { skillMd: string, files: Record<string, string> }
+generateInstallScript(tool: Tool): string
+generateValidateScript(): string
+shellQuote(s: string): string
 writeLockfile(lockPath: string, tools: Tool[]): void
 
 // Quality (lib/skill-tester.ts)
 testSkillSync(skillPath: string, preloadedContent?: string): SkillTestResult
-testAllSkillsSync(dir: string): SkillTestResult[]
+testAllSkillsSync(dir: string, domainFilter?: string): SkillTestResult[]  // optional domain filter
+testAllSkills(dir: string, useAI?: boolean, domain?: string): Promise<SkillTestResultFull[]>
+printQualityReport(results: SkillTestResult[]): void
 
 // Classifiers (lib/classifier/*.ts) — all follow same pattern
 discoverNpmPackages(query?: string, limit?: number): Promise<ExtendedManifestEntry[]>
@@ -343,7 +419,23 @@ discoverGitHubRepos(query?: string, limit?: number): Promise<ExtendedManifestEnt
 discoverCratesPackages(query?: string, limit?: number): Promise<ExtendedManifestEntry[]>
 discoverPyPIPackages(query?: string, limit?: number): Promise<ExtendedManifestEntry[]>
 
+// GitHub trending scraping (lib/classifier/github.ts)
+fetchHtml(url: string, maxRedirects?: number): Promise<string>  // github.com only, 5MB limit
+scrapeTrendingHtml(language: string, since: string): Promise<TrendingRepo[]>
+isLikelyCli(repo: TrendingRepo): { likely: boolean; reason: string }
+getWellKnownCliRepos(): TrendingRepo[]  // 15 fallback repos
+
+// Curated tools (lib/curated-tools.ts)
+loadAllTools(projectRoot: string): CliTool[]    // 91 general + AI/ML from ai-ml-tools.json
+loadAiMlTools(projectRoot: string): CliTool[]   // AI/ML tools only
+getCategories(tools: CliTool[]): string[]       // unique sorted categories
+GENERAL_TOOLS: CliTool[]                        // 91 general-purpose CLI tools
+
+// Skill factory (lib/skill-factory.ts)
+runSkillFactory(opts: SkillFactoryOptions): Promise<SkillFactoryResult>
+
 // Indexes (lib/indexes.ts)
+groupByDomain(entries: ManifestEntry[]): Map<string, ManifestEntry[]>
 generateDomainIndex(domain: string, entries: ManifestEntry[], triggers: DomainTriggers): string
 generateMasterIndex(manifest: Manifest, triggers: DomainTriggers): string
 ```
@@ -363,3 +455,6 @@ generateMasterIndex(manifest: Manifest, triggers: DomainTriggers): string
 - Use `require()` in ESM modules — use `import` (the codebase is pure ESM)
 - Hardcode `dryRun: false` — always thread the dry-run flag through the full pipeline
 - Return bare `console.error` when `--json` is active — use `emit(failure(...))`
+- Add HTTP helpers without SSRF checks — validate hostname and cap response body size
+- Use magic numbers for detection — check file existence directly (e.g. `existsSync`) not indirect heuristics
+- Match frontmatter fields with full-content regex — use `parseFrontmatter()` return values (it extracts `domain`, `name`, `description`, etc.)
