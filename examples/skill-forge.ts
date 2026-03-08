@@ -610,6 +610,48 @@ export function fmtTable(rows: string[][], headers: string[]): string {
   ].join("\n");
 }
 
+// ── Shared batch processing ────────────────────────────────────────────
+
+interface BatchItem {
+  label: string;   // display name (e.g. "owner/repo" or tool name)
+  source: string;  // forge-compatible source string
+}
+
+interface BatchResult {
+  label: string;
+  tool: Tool;
+  forged: ForgedSkill;
+  quality: QualityResult;
+}
+
+interface BatchOutcome {
+  results: BatchResult[];
+  failures: Array<{ label: string; error: string }>;
+}
+
+/** Process a batch of tool sources through the forge pipeline (resolve → install → analyze → generate → quality). */
+async function processBatch(items: BatchItem[], deep: boolean): Promise<BatchOutcome> {
+  const results: BatchResult[] = [];
+  const failures: Array<{ label: string; error: string }> = [];
+
+  for (const item of items) {
+    log(`\n  ── Forging: ${item.label} ──`);
+    try {
+      const tool = await resolveInstallAnalyze(item.source, deep);
+      const forged = forgeSkill(tool, false);
+      const quality = assessQuality(forged.skillMd, tool.meta.name);
+      results.push({ label: item.label, tool, forged, quality });
+      log(`  → ${quality.passed ? "PASS" : "FAIL"} (trigger: ${quality.triggerScore.toFixed(2)}, quality: ${quality.qualityScore}/10)`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      failures.push({ label: item.label, error: msg });
+      log(`  → SKIP: ${msg}`);
+    }
+  }
+
+  return { results, failures };
+}
+
 // ── Mode: Trending (GitHub trending → skills) ─────────────────────────
 
 async function trendingMode(args: CliArgs, startTime: number): Promise<void> {
@@ -619,6 +661,14 @@ async function trendingMode(args: CliArgs, startTime: number): Promise<void> {
   log(`  Limit:    ${args.limit}`);
   log(`  Dry run:  ${args.dryRun}`);
   log("");
+
+  // Validate --since
+  const validSince = ["daily", "weekly", "monthly"];
+  if (!validSince.includes(args.since)) {
+    log(`  ERROR: --since must be one of: ${validSince.join(", ")} (got "${args.since}")`);
+    process.exitCode = 1;
+    return;
+  }
 
   // Scrape trending repos
   log(`  Scraping GitHub trending page...`);
@@ -672,23 +722,9 @@ async function trendingMode(args: CliArgs, startTime: number): Promise<void> {
   }
 
   // Process each repo through the forge pipeline
-  const results: Array<{ repo: TrendingRepo; tool: Tool; quality: QualityResult }> = [];
-  const failures: Array<{ repo: TrendingRepo; error: string }> = [];
-
-  for (const repo of toProcess) {
-    log(`\n  ── Forging: ${repo.fullName} ──`);
-    try {
-      const tool = await resolveInstallAnalyze(repo.fullName, args.deep);
-      const forged = forgeSkill(tool, false);
-      const quality = assessQuality(forged.skillMd, tool.meta.name);
-      results.push({ repo, tool, quality });
-      log(`  → ${quality.passed ? "PASS" : "FAIL"} (trigger: ${quality.triggerScore.toFixed(2)}, quality: ${quality.qualityScore}/10)`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      failures.push({ repo, error: msg });
-      log(`  → SKIP: ${msg}`);
-    }
-  }
+  const repoMap = new Map(toProcess.map(r => [r.fullName, r]));
+  const batchItems: BatchItem[] = toProcess.map(r => ({ label: r.fullName, source: r.fullName }));
+  const { results, failures } = await processBatch(batchItems, args.deep);
 
   // Build indexes
   if (results.length > 0) {
@@ -703,13 +739,16 @@ async function trendingMode(args: CliArgs, startTime: number): Promise<void> {
   log(`  Processed: ${results.length} | Failed: ${failures.length}`);
 
   if (results.length > 0) {
-    const rows = results.map(r => [
-      r.tool.meta.name.slice(0, 25),
-      r.repo.language,
-      `${r.tool.capabilities.commands.length}`,
-      r.quality.triggerScore.toFixed(2),
-      r.quality.passed ? "PASS" : "FAIL",
-    ]);
+    const rows = results.map(r => {
+      const repo = repoMap.get(r.label);
+      return [
+        r.tool.meta.name.slice(0, 25),
+        repo?.language ?? "",
+        `${r.tool.capabilities.commands.length}`,
+        r.quality.triggerScore.toFixed(2),
+        r.quality.passed ? "PASS" : "FAIL",
+      ];
+    });
     log(fmtTable(rows, ["Skill", "Lang", "Cmds", "Trigger", "Status"]));
   }
 
@@ -719,7 +758,7 @@ async function trendingMode(args: CliArgs, startTime: number): Promise<void> {
       failed: failures.length,
       results: results.map(r => ({
         name: r.tool.meta.name,
-        repo: r.repo.fullName,
+        repo: r.label,
         commands: r.tool.capabilities.commands.length,
         quality: r.quality,
       })),
@@ -798,41 +837,28 @@ async function curatedMode(args: CliArgs, startTime: number): Promise<void> {
     return;
   }
 
-  // Process each tool
-  const store = createStore(DATA_DIR);
-  const results: Array<{ meta: CliTool; tool: Tool; quality: QualityResult }> = [];
-  const failures: Array<{ meta: CliTool; error: string }> = [];
+  // Filter out already-installed tools if requested
   const skipped: CliTool[] = [];
-
+  const toProcess: CliTool[] = [];
   for (const meta of tools) {
-    // Skip installed if requested
-    if (args.skipInstalled) {
-      const skillPath = join(OUTPUT_DIR, meta.name, "SKILL.md");
-      if (existsSync(skillPath)) {
-        log(`  Skipping ${meta.name} (already has SKILL.md)`);
-        skipped.push(meta);
-        continue;
-      }
-    }
-
-    log(`\n  ── Forging: ${meta.name} ──`);
-    try {
-      // Convert CliTool source to forge-compatible source
-      const source = meta.sourceType === "npm"
-        ? (meta.source.startsWith("@") ? meta.source : `npm:${meta.source}`)
-        : meta.source;
-
-      const tool = await resolveInstallAnalyze(source, args.deep);
-      const forged = forgeSkill(tool, false);
-      const quality = assessQuality(forged.skillMd, tool.meta.name);
-      results.push({ meta, tool, quality });
-      log(`  → ${quality.passed ? "PASS" : "FAIL"} (trigger: ${quality.triggerScore.toFixed(2)}, quality: ${quality.qualityScore}/10)`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      failures.push({ meta, error: msg });
-      log(`  → SKIP: ${msg}`);
+    if (args.skipInstalled && existsSync(join(OUTPUT_DIR, meta.name, "SKILL.md"))) {
+      log(`  Skipping ${meta.name} (already has SKILL.md)`);
+      skipped.push(meta);
+    } else {
+      toProcess.push(meta);
     }
   }
+
+  // Convert CliTool sources to forge-compatible BatchItems
+  const metaMap = new Map(toProcess.map(m => [m.name, m]));
+  const batchItems: BatchItem[] = toProcess.map(meta => ({
+    label: meta.name,
+    source: meta.sourceType === "npm"
+      ? (meta.source.startsWith("@") ? meta.source : `npm:${meta.source}`)
+      : meta.source,
+  }));
+
+  const { results, failures } = await processBatch(batchItems, args.deep);
 
   // Build indexes
   if (results.length > 0) {
@@ -847,13 +873,16 @@ async function curatedMode(args: CliArgs, startTime: number): Promise<void> {
   log(`  Processed: ${results.length} | Failed: ${failures.length} | Skipped: ${skipped.length}`);
 
   if (results.length > 0) {
-    const rows = results.map(r => [
-      r.tool.meta.name.slice(0, 25),
-      r.meta.category,
-      `${r.tool.capabilities.commands.length}`,
-      r.quality.triggerScore.toFixed(2),
-      r.quality.passed ? "PASS" : "FAIL",
-    ]);
+    const rows = results.map(r => {
+      const meta = metaMap.get(r.label);
+      return [
+        r.tool.meta.name.slice(0, 25),
+        meta?.category ?? "",
+        `${r.tool.capabilities.commands.length}`,
+        r.quality.triggerScore.toFixed(2),
+        r.quality.passed ? "PASS" : "FAIL",
+      ];
+    });
     log(fmtTable(rows, ["Skill", "Category", "Cmds", "Trigger", "Status"]));
   }
 
@@ -864,7 +893,7 @@ async function curatedMode(args: CliArgs, startTime: number): Promise<void> {
       skipped: skipped.length,
       results: results.map(r => ({
         name: r.tool.meta.name,
-        category: r.meta.category,
+        category: metaMap.get(r.label)?.category ?? "",
         commands: r.tool.capabilities.commands.length,
         quality: r.quality,
       })),
@@ -991,7 +1020,10 @@ function workflowMode(args: CliArgs, startTime: number): void {
 
 // ── Mode: Audit existing skills ────────────────────────────────────────
 
-async function runAudit(strict: boolean, jsonMode: boolean, startTime: number, domain?: string, ai?: boolean): Promise<void> {
+interface AuditOpts { strict: boolean; json: boolean; domain: string; ai: boolean }
+
+async function runAudit(opts: AuditOpts, startTime: number): Promise<void> {
+  const { strict, json: jsonMode, domain, ai } = opts;
   log("\n  Skill Quality Audit");
   log(`  Directory: ${OUTPUT_DIR}`);
   if (domain) log(`  Domain:    ${domain}`);
@@ -999,7 +1031,7 @@ async function runAudit(strict: boolean, jsonMode: boolean, startTime: number, d
   log("");
 
   // testAllSkillsSync supports domain filtering
-  const results = testAllSkillsSync(OUTPUT_DIR, domain);
+  const results = testAllSkillsSync(OUTPUT_DIR, domain || undefined);
 
   if (results.length === 0) {
     log("  No skills found to audit.");
@@ -1048,7 +1080,7 @@ async function runAudit(strict: boolean, jsonMode: boolean, startTime: number, d
     log("  Running AI quality scoring...");
     try {
       const { testAllSkills } = await import("../lib/skill-tester.js");
-      const fullResults = await testAllSkills(OUTPUT_DIR, true, domain);
+      const fullResults = await testAllSkills(OUTPUT_DIR, true, domain || undefined);
       aiScores = fullResults.map(r => ({
         name: r.skillName,
         score: r.qualityScore,
@@ -1082,10 +1114,14 @@ async function runAudit(strict: boolean, jsonMode: boolean, startTime: number, d
   log("");
 
   if (jsonMode) {
+    // Build a set of passing skill names to compute per-domain pass counts
+    const passingNames = new Set(results.filter(r => r.passed).map(r => r.name));
     const domains: Record<string, { total: number; passed: number }> = {};
     for (const [d, items] of grouped) {
-      domains[d] = { total: items.length, passed: 0 };
+      domains[d] = { total: items.length, passed: items.filter(e => passingNames.has(e.name)).length };
     }
+    // Pre-build lookup map for AI scores (avoids O(n*m) .find() in loop)
+    const aiMap = aiScores ? new Map(aiScores.map(a => [a.name, a.score])) : null;
     emit(success("skill-forge:audit", {
       total: results.length,
       passed,
@@ -1099,7 +1135,7 @@ async function runAudit(strict: boolean, jsonMode: boolean, startTime: number, d
         triggerScore: r.triggerScore,
         qualityScore: r.qualityScore,
         issues: r.issues,
-        aiScore: aiScores?.find(a => a.name === r.name)?.score ?? null,
+        aiScore: aiMap?.get(r.name) ?? null,
       })),
     }, startTime), true);
   }
@@ -1143,7 +1179,7 @@ async function main(): Promise<void> {
 
   // ── Mode: Audit ──
   if (args.audit) {
-    await runAudit(args.strict, args.json, startTime, args.domain || undefined, args.ai || undefined);
+    await runAudit({ strict: args.strict, json: args.json, domain: args.domain, ai: args.ai }, startTime);
     return;
   }
 

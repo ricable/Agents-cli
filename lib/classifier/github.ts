@@ -211,12 +211,13 @@ export interface TrendingRepo {
   url: string;
 }
 
-/** Fetch raw HTML from a URL, following redirects */
-export function fetchHtml(url: string): Promise<string> {
+/** Fetch raw HTML from a URL, following redirects (max 5) */
+export function fetchHtml(url: string, maxRedirects = 5): Promise<string> {
   return new Promise((resolve, reject) => {
+    if (maxRedirects <= 0) { reject(new Error("Too many redirects")); return; }
     httpsGet(url, { headers: { "User-Agent": "agents-cli/0.1.0", Accept: "text/html" } }, (res) => {
       if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        fetchHtml(res.headers.location).then(resolve, reject);
+        fetchHtml(res.headers.location, maxRedirects - 1).then(resolve, reject);
         return;
       }
       let data = "";
