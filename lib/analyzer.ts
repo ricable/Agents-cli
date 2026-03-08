@@ -1,7 +1,16 @@
 import type { ToolAnalyzer, ToolCapabilities, ToolCommand, ToolFlag, AnalyzeOptions } from "./types.js";
 import { execFileSync } from "node:child_process";
-import { readdirSync, statSync, readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { readdirSync, statSync, readFileSync, existsSync, realpathSync } from "node:fs";
+import { join, resolve as resolvePath } from "node:path";
+
+/** Validate that a resolved path stays within the given base directory */
+function assertWithinDir(resolved: string, baseDir: string): void {
+  const real = existsSync(resolved) ? realpathSync(resolved) : resolvePath(resolved);
+  const realBase = realpathSync(baseDir);
+  if (!real.startsWith(realBase + "/") && real !== realBase) {
+    throw new Error(`Path traversal blocked: ${resolved} escapes ${baseDir}`);
+  }
+}
 
 /** Try running a binary with --help or -h and capture output */
 function probeHelp(binPath: string, timeout: number): string | null {
@@ -116,11 +125,13 @@ export function findMainBinary(toolDir: string): string | null {
       const bin = pkg.bin;
       if (typeof bin === "string") {
         const resolved = join(toolDir, bin);
+        try { assertWithinDir(resolved, toolDir); } catch { return null; }
         if (existsSync(resolved)) return resolved;
       } else if (typeof bin === "object" && bin !== null) {
         const entries = Object.values(bin as Record<string, string>);
         if (entries[0]) {
           const resolved = join(toolDir, entries[0]);
+          try { assertWithinDir(resolved, toolDir); } catch { return null; }
           if (existsSync(resolved)) return resolved;
         }
       }
@@ -128,6 +139,7 @@ export function findMainBinary(toolDir: string): string | null {
       const main = pkg.main;
       if (typeof main === "string") {
         const resolved = join(toolDir, main);
+        try { assertWithinDir(resolved, toolDir); } catch { return null; }
         if (existsSync(resolved)) return resolved;
       }
     } catch { /* ignore parse errors */ }

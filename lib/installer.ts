@@ -7,7 +7,7 @@ import type {
 } from "./types.js";
 import { get as httpsGet } from "node:https";
 import { get as httpGet } from "node:http";
-import { createWriteStream, mkdirSync, existsSync, readdirSync, statSync, chmodSync } from "node:fs";
+import { createWriteStream, mkdirSync, existsSync, readdirSync, statSync, chmodSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -32,34 +32,43 @@ function downloadFile(url: string, dest: string, redirectCount = 0): Promise<str
     const getter = url.startsWith("https") ? httpsGet : httpGet;
     getter(url, { headers: { "User-Agent": "agents-cli/0.1.0" } }, (res) => {
       if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        downloadFile(res.headers.location, dest, redirectCount + 1).then(resolve, reject);
+        const redirectUrl = res.headers.location;
+        if (!redirectUrl.startsWith("http://") && !redirectUrl.startsWith("https://")) {
+          reject(new Error(`Refusing non-HTTP redirect to: ${redirectUrl}`));
+          return;
+        }
+        downloadFile(redirectUrl, dest, redirectCount + 1).then(resolve, reject);
         return;
       }
       if (res.statusCode && res.statusCode >= 400) {
         reject(new Error(`HTTP ${res.statusCode} downloading ${url}`));
         return;
       }
-      // Check Content-Length if available
+      // Check Content-Length if available (NaN-safe)
       const contentLength = parseInt(res.headers["content-length"] ?? "", 10);
-      if (contentLength > MAX_DOWNLOAD_SIZE) {
+      if (!isNaN(contentLength) && contentLength > MAX_DOWNLOAD_SIZE) {
         res.destroy();
         reject(new Error(`Download too large (${contentLength} bytes, max ${MAX_DOWNLOAD_SIZE})`));
         return;
       }
       let received = 0;
+      let settled = false;
       const stream = createWriteStream(dest);
       res.on("data", (chunk: Buffer) => {
+        if (settled) return;
         received += chunk.length;
         if (received > MAX_DOWNLOAD_SIZE) {
+          settled = true;
           res.destroy();
           stream.destroy();
           reject(new Error(`Download exceeded size limit (${MAX_DOWNLOAD_SIZE} bytes)`));
+          return;
         }
       });
       res.pipe(stream);
-      stream.on("finish", () => { stream.close(); resolve(dest); });
-      stream.on("error", reject);
-      res.on("error", reject);
+      stream.on("finish", () => { if (!settled) { stream.close(); resolve(dest); } });
+      stream.on("error", (err) => { if (!settled) { settled = true; reject(err); } });
+      res.on("error", (err) => { if (!settled) { settled = true; reject(err); } });
     }).on("error", reject);
   });
 }
@@ -172,31 +181,32 @@ async function installFromNpm(
 
   mkdirSync(dest, { recursive: true });
 
-  // Use npm pack to download and extract
+  // Use a unique temporary directory for npm pack to prevent TOCTOU races
+  const packDir = join(tmpdir(), `agents-cli-pack-${randomBytes(8).toString("hex")}`);
+  mkdirSync(packDir, { recursive: true });
+
   try {
-    execFileSync("npm", ["pack", pkg, "--pack-destination", tmpdir()], {
+    // Use npm pack to download tarball into isolated directory
+    execFileSync("npm", ["pack", pkg, "--pack-destination", packDir], {
       stdio: "pipe",
       timeout: 60000,
     });
-  } catch {
-    throw new Error(`Failed to download npm package: ${pkg}`);
-  }
 
-  // Find the tarball that was created
-  const safeName = pkg.replace(/^@/, "").replace(/\//g, "-");
-  const tmpFiles = readdirSync(tmpdir()).filter(
-    (f) => f.startsWith(safeName) && f.endsWith(".tgz"),
-  );
-  const tarball = tmpFiles.sort().pop();
-  if (!tarball) {
-    throw new Error(`npm pack did not produce a tarball for: ${pkg}`);
-  }
+    // Find the tarball in our isolated directory
+    const tmpFiles = readdirSync(packDir).filter((f) => f.endsWith(".tgz"));
+    const tarball = tmpFiles[0];
+    if (!tarball) {
+      throw new Error(`npm pack did not produce a tarball for: ${pkg}`);
+    }
 
-  const tarPath = join(tmpdir(), tarball);
-  try {
+    const tarPath = join(packDir, tarball);
     execFileSync("tar", ["-xzf", tarPath, "--strip-components=1", "-C", dest], { stdio: "pipe" });
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("npm pack")) throw err;
+    throw new Error(`Failed to download npm package: ${pkg}`);
   } finally {
-    try { unlinkSync(tarPath); } catch { /* ignore */ }
+    // Clean up the isolated pack directory
+    try { rmSync(packDir, { recursive: true, force: true }); } catch { /* ignore */ }
   }
 
   // Install production deps

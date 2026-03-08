@@ -127,6 +127,11 @@ export async function runTool(
 
     const timer = setTimeout(() => {
       child.kill("SIGTERM");
+      // SIGKILL fallback after 5 seconds
+      const killTimer = setTimeout(() => {
+        try { child.kill("SIGKILL"); } catch { /* already dead */ }
+      }, 5000);
+      killTimer.unref();
       const duration = Date.now() - start;
       resolve({
         success: false,

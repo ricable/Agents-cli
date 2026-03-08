@@ -19,7 +19,7 @@ describe("runTool", () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  function installFixtureTool(name: string): string {
+  async function installFixtureTool(name: string): Promise<string> {
     const store = createStore(dataDir);
     const installDir = getToolInstallDir(dataDir, name);
     mkdirSync(join(installDir, "bin"), { recursive: true });
@@ -50,8 +50,7 @@ console.log('Args: ' + process.argv.slice(2).join(' '));
       installedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    // Save synchronously via the store
-    store.save(tool);
+    await store.save(tool);
     return installDir;
   }
 
@@ -62,21 +61,21 @@ console.log('Args: ' + process.argv.slice(2).join(' '));
   });
 
   it("runs a fixture tool successfully", async () => {
-    installFixtureTool("hello-tool");
+    await installFixtureTool("hello-tool");
     const result = await runTool("hello-tool", [], { dataDir, timeout: 5000 });
     expect(result.success).toBe(true);
     expect(result.data).toContain("Hello from hello-tool");
   });
 
   it("passes arguments to the tool", async () => {
-    installFixtureTool("arg-tool");
+    await installFixtureTool("arg-tool");
     const result = await runTool("arg-tool", ["--foo", "bar"], { dataDir, timeout: 5000 });
     expect(result.success).toBe(true);
     expect(result.data).toContain("--foo bar");
   });
 
   it("reports duration", async () => {
-    installFixtureTool("time-tool");
+    await installFixtureTool("time-tool");
     const result = await runTool("time-tool", [], { dataDir, timeout: 5000 });
     expect(result.duration).toBeGreaterThanOrEqual(0);
   });

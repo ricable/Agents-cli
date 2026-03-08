@@ -63,25 +63,33 @@ export function fetchJson(url: string, redirectCount = 0): Promise<unknown> {
     const getter = url.startsWith("https") ? httpsGet : httpGet;
     getter(url, { headers: { "User-Agent": "agents-cli/0.1.0", Accept: "application/json" } }, (res) => {
       if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        fetchJson(res.headers.location, redirectCount + 1).then(resolve, reject);
+        const redirectUrl = res.headers.location;
+        if (!redirectUrl.startsWith("http://") && !redirectUrl.startsWith("https://")) {
+          reject(new Error(`Refusing non-HTTP redirect to: ${redirectUrl}`));
+          return;
+        }
+        fetchJson(redirectUrl, redirectCount + 1).then(resolve, reject);
         return;
       }
       if (res.statusCode && res.statusCode >= 400) {
         reject(new Error(`HTTP ${res.statusCode} for ${url}`));
         return;
       }
-      // Check Content-Length if available
+      // Check Content-Length if available (NaN-safe)
       const contentLength = parseInt(res.headers["content-length"] ?? "", 10);
-      if (contentLength > MAX_JSON_SIZE) {
+      if (!isNaN(contentLength) && contentLength > MAX_JSON_SIZE) {
         res.destroy();
         reject(new Error(`Response too large (${contentLength} bytes, max ${MAX_JSON_SIZE}) from ${url}`));
         return;
       }
       let data = "";
       let received = 0;
+      let settled = false;
       res.on("data", (chunk: Buffer) => {
+        if (settled) return;
         received += chunk.length;
         if (received > MAX_JSON_SIZE) {
+          settled = true;
           res.destroy();
           reject(new Error(`Response exceeded size limit (${MAX_JSON_SIZE} bytes) from ${url}`));
           return;

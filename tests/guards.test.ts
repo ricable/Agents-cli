@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { detectFormat } from "../lib/resolver.js";
+import { detectFormat, isPrivateUrl } from "../lib/resolver.js";
+import { findMainBinary } from "../lib/analyzer.js";
+import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { randomBytes } from "node:crypto";
 
 /**
  * Security guard fuzz tests for the 4 guard types:
@@ -93,5 +98,66 @@ describe("Guard: network-scope", () => {
 
   it("does not treat non-https URLs as github", () => {
     expect(detectFormat("ftp://github.com/owner/repo")).toBeNull();
+  });
+});
+
+describe("Guard: SSRF private IP blocking", () => {
+  it("blocks loopback addresses", () => {
+    expect(isPrivateUrl("http://127.0.0.1/secret")).toBe(true);
+    expect(isPrivateUrl("http://127.0.0.254/secret")).toBe(true);
+    expect(isPrivateUrl("http://localhost/secret")).toBe(true);
+  });
+
+  it("blocks private network ranges", () => {
+    expect(isPrivateUrl("http://10.0.0.1/")).toBe(true);
+    expect(isPrivateUrl("http://172.16.0.1/")).toBe(true);
+    expect(isPrivateUrl("http://172.31.255.255/")).toBe(true);
+    expect(isPrivateUrl("http://192.168.1.1/")).toBe(true);
+  });
+
+  it("blocks link-local and metadata", () => {
+    expect(isPrivateUrl("http://169.254.169.254/latest/meta-data")).toBe(true);
+  });
+
+  it("allows public URLs", () => {
+    expect(isPrivateUrl("https://github.com/owner/repo")).toBe(false);
+    expect(isPrivateUrl("https://registry.npmjs.org/pkg")).toBe(false);
+  });
+
+  it("returns false for invalid URLs", () => {
+    expect(isPrivateUrl("not-a-url")).toBe(false);
+  });
+});
+
+describe("Guard: path traversal via package.json", () => {
+  it("findMainBinary blocks path traversal in bin field", () => {
+    const dir = join(tmpdir(), `guard-test-${randomBytes(6).toString("hex")}`);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "package.json"), JSON.stringify({
+      name: "malicious",
+      bin: "../../etc/passwd",
+    }));
+    try {
+      const result = findMainBinary(dir);
+      // Should return null (blocked or not found), never resolve outside dir
+      expect(result === null || result.startsWith(dir)).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("findMainBinary blocks path traversal in main field", () => {
+    const dir = join(tmpdir(), `guard-test-${randomBytes(6).toString("hex")}`);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "package.json"), JSON.stringify({
+      name: "malicious",
+      main: "../../../.bashrc",
+    }));
+    try {
+      const result = findMainBinary(dir);
+      expect(result === null || result.startsWith(dir)).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

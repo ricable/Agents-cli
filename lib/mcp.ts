@@ -96,12 +96,22 @@ export class McpBridge {
     this._started = true;
   }
 
+  private static readonly KILL_TIMEOUT = 5_000; // 5 seconds before SIGKILL
+
   /**
    * Stop the MCP server process.
    */
   stopServer(): void {
     if (this.process) {
-      this.process.kill("SIGTERM");
+      const proc = this.process;
+      proc.kill("SIGTERM");
+
+      // SIGKILL fallback if process doesn't exit within timeout
+      const killTimer = setTimeout(() => {
+        try { proc.kill("SIGKILL"); } catch { /* already dead */ }
+      }, McpBridge.KILL_TIMEOUT);
+      killTimer.unref(); // Don't block Node.js exit
+
       this.process = null;
       this._started = false;
       this.buffer = "";
