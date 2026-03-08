@@ -69,7 +69,7 @@ const program = new Command()
 // ══════════════════════════════════════════════════════════════════════════════
 program
   .command("add <source>")
-  .description("Install a tool from a source identifier (owner/repo, @scope/pkg, pypi:name, or ./path)")
+  .description("Install a tool from a source identifier (owner/repo, @scope/pkg, pypi:name, crates:name, or ./path)")
   .option("-f, --force", "Force reinstall if already installed")
   .option("--json", "Output as structured JSON")
   .option("--dry-run", "Show what would be installed without installing")
@@ -522,10 +522,11 @@ skills
     const start = Date.now();
     const json = isJsonMode(opts);
 
+    const store = createStore(DATA_DIR);
+    const toolKey = opts.fromTool ?? name;
+    const tool = await store.get(toolKey);
+
     if (opts.fromTool) {
-      // Generate rich skill from installed tool's discovered capabilities
-      const store = createStore(DATA_DIR);
-      const tool = await store.get(opts.fromTool);
       if (!tool) {
         emit(failure("skills generate", "NOT_FOUND", `Tool not found: ${opts.fromTool}`, start), json);
         return;
@@ -542,9 +543,6 @@ skills
         console.log(`  ${content.split("\n").length} lines`);
       }
     } else {
-      // Try to find the tool by name and generate rich skill automatically
-      const store = createStore(DATA_DIR);
-      const tool = await store.get(name);
       if (tool) {
         const content = generateRichSkillMd(tool);
         const outPath = resolve(`${name}.SKILL.md`);

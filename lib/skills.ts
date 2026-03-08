@@ -552,6 +552,16 @@ export function buildContext(skill: Skill): string {
  * yields no commands (libraries, compiled tools without --help), it still
  * generates useful content from rawHelp text, description, and metadata.
  */
+// Verbs that commonly start CLI tool descriptions — used to build natural sentences.
+// "run large language models" → "X can run large language models"
+// "lightweight JSON processor" → "X provides lightweight JSON processor"
+const DESC_ACTION_VERBS = /^(run|build|create|manage|provide|enable|generate|convert|analyze|search|scan|test|deploy|monitor|transform|process|execute|install|serve|compile|validate|extract|detect|train|optimize|automate|format|lint|check|bundle|watch|debug|profile|benchmark|audit|schedule|orchestrate|evaluate|annotate|label|embed|index|query|fetch|sync|stream|log|track|visualize|render|parse|resolve|discover|inspect|measure|report|read|write)/;
+
+const MAX_TRIGGER_COMMANDS = 5;
+const MAX_USAGE_EXAMPLES = 5;
+const MAX_WORKFLOW_STEPS = 4;
+const MAX_HELP_LINES = 80;
+
 export function generateRichSkillMd(tool: Tool): string {
   const commands = tool.capabilities.commands;
   const flags = tool.capabilities.globalFlags;
@@ -561,7 +571,7 @@ export function generateRichSkillMd(tool: Tool): string {
   const descLower = desc.toLowerCase().replace(/\.$/, "");
 
   // Build trigger-aware description — always rich, never generic
-  const cmdNames = commands.slice(0, 5).map(c => c.name).join(", ");
+  const cmdNames = commands.slice(0, MAX_TRIGGER_COMMANDS).map(c => c.name).join(", ");
   const triggerHint = commands.length > 0
     ? `Use this skill when the user needs ${name} (commands: ${cmdNames}), even if they don't mention "${name}" explicitly.`
     : `Use this skill whenever the user works with ${name} or tasks related to ${descLower} — even if they don't mention "${name}" by name.`;
@@ -596,8 +606,7 @@ export function generateRichSkillMd(tool: Tool): string {
   // ── Overview / Why this tool matters for agents ──
   s.push("## Overview");
   s.push("");
-  // Use description as-is if it starts with a verb, otherwise prefix naturally
-  const startsWithVerb = /^(run|build|create|manage|provide|enable|generate|convert|analyze|search|scan|test|deploy|monitor|transform|process|execute|install|serve|compile|validate|extract|detect|train|optimize|automate|format|lint|check|bundle|watch|debug|profile|benchmark|audit|schedule|orchestrate|evaluate|annotate|label|embed|index|query|fetch|sync|stream|log|track|visualize|render|parse|resolve|discover|inspect|measure|report|read|write)/.test(descLower);
+  const startsWithVerb = DESC_ACTION_VERBS.test(descLower);
   const descSentence = startsWithVerb ? `${name} can ${descLower}` : `${name} provides ${descLower}`;
   s.push(`${descSentence}. Agents benefit from ${name} because it provides programmatic access to capabilities that would otherwise require manual interaction or complex scripting.`);
   s.push("");
@@ -679,9 +688,9 @@ export function generateRichSkillMd(tool: Tool): string {
     s.push("The following is the tool's built-in help output for reference:");
     s.push("");
     s.push("```");
-    // Truncate very long help to keep skill readable
-    const helpLines = rawHelp.trim().split("\n");
-    const truncated = helpLines.length > 80 ? helpLines.slice(0, 80).join("\n") + "\n\n... (truncated, run --help for full output)" : rawHelp.trim();
+    const trimmedHelp = rawHelp.trim();
+    const helpLines = trimmedHelp.split("\n");
+    const truncated = helpLines.length > MAX_HELP_LINES ? helpLines.slice(0, MAX_HELP_LINES).join("\n") + "\n\n... (truncated, run --help for full output)" : trimmedHelp;
     s.push(truncated);
     s.push("```");
     s.push("");
@@ -695,7 +704,7 @@ export function generateRichSkillMd(tool: Tool): string {
     s.push(`# Show help`);
     s.push(`${name} --help`);
     s.push("");
-    for (const cmd of commands.slice(0, 5)) {
+    for (const cmd of commands.slice(0, MAX_USAGE_EXAMPLES)) {
       s.push(`# ${cmd.description || cmd.name}`);
       s.push(`${name} ${cmd.name}`);
       s.push("");
@@ -728,7 +737,7 @@ export function generateRichSkillMd(tool: Tool): string {
     s.push(`### Basic workflow`);
     s.push("");
     s.push("```bash");
-    for (const cmd of commands.slice(0, 4)) {
+    for (const cmd of commands.slice(0, MAX_WORKFLOW_STEPS)) {
       s.push(`# Step: ${cmd.description || cmd.name}`);
       s.push(`${name} ${cmd.name}`);
       s.push("");
@@ -788,7 +797,7 @@ export function generateRichSkillMd(tool: Tool): string {
   s.push(`- Your task involves ${descLower}`);
   s.push(`- A task requires ${name}-specific functionality`);
   if (commands.length > 0) {
-    s.push(`- You need any of: ${commands.slice(0, 5).map(c => c.name).join(", ")}`);
+    s.push(`- You need any of: ${commands.slice(0, MAX_TRIGGER_COMMANDS).map(c => c.name).join(", ")}`);
   }
   s.push("");
   s.push(`Consider alternatives when:`);
