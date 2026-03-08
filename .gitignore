@@ -35,5 +35,8 @@ __pycache__/
 *.sqlite3
 *.sqlite3-journal
 
+# Claude Code agent metadata
+.claude/
+
 # Lock files are committed
 # !agentcli.lock
