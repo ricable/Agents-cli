@@ -2,7 +2,7 @@
 /**
  * skill-forge.ts — Unified skill generation pipeline
  *
- * Combines EVERY capability from agents-cli/lib into a single pipeline that
+ * Combines key capabilities from agents-cli/lib into a single pipeline that
  * produces Claude-compliant skills with full directory structure:
  *
  *   skill-name/
@@ -115,7 +115,8 @@ import type {
 // Node
 import { homedir } from "node:os";
 import { join, resolve, basename, dirname } from "node:path";
-import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, chmodSync, statSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, chmodSync, statSync, renameSync } from "node:fs";
+import { randomBytes } from "node:crypto";
 
 // ── Config ─────────────────────────────────────────────────────────────
 
@@ -135,7 +136,7 @@ interface CliArgs {
   strict: boolean;     // fail on quality gate
 }
 
-function parseArgs(): CliArgs {
+export function parseArgs(): CliArgs {
   const argv = process.argv.slice(2);
   const opts: CliArgs = {
     prompt: "", tool: "", deep: false, audit: false,
@@ -148,7 +149,13 @@ function parseArgs(): CliArgs {
     else if (a === "--deep")              { opts.deep = true; }
     else if (a === "--audit")             { opts.audit = true; }
     else if (a === "--dry-run")           { opts.dryRun = true; }
-    else if (a === "--limit" && argv[i+1]){ opts.limit = parseInt(argv[++i]!, 10); }
+    else if (a === "--limit" && argv[i+1]){
+      const parsed = parseInt(argv[++i]!, 10);
+      if (Number.isNaN(parsed) || parsed < 1) {
+        throw new Error(`Invalid --limit value: "${argv[i]}" (must be a positive integer)`);
+      }
+      opts.limit = parsed;
+    }
     else if (a === "--json")              { opts.json = true; }
     else if (a === "--strict")            { opts.strict = true; }
     else if (!a.startsWith("--"))         { opts.prompt += (opts.prompt ? " " : "") + a; }
@@ -346,7 +353,9 @@ interface ForgedSkill {
 }
 
 function forgeSkill(tool: Tool, dryRun: boolean): ForgedSkill {
-  const skillDir = join(OUTPUT_DIR, tool.meta.name);
+  // Validate tool name before using it in paths or scripts
+  validateToolName(tool.meta.name);
+  const skillDir = resolve(OUTPUT_DIR, tool.meta.name);
 
   // Use generateSkillDirectory for SKILL.md + references/
   let directory: SkillDirectory;
@@ -359,12 +368,17 @@ function forgeSkill(tool: Tool, dryRun: boolean): ForgedSkill {
   }
 
   // Chunk source for stats (informational — not written to disk)
+  // Skip in dry-run mode to avoid wasted CPU/memory on large tool trees
   let chunkStats: ChunkStats;
-  try {
-    chunkStats = chunkToolSource(tool);
-  } catch (err) {
-    log(`  WARN: chunking failed: ${(err as Error).message}`);
+  if (dryRun) {
     chunkStats = { files: 0, chunks: 0, byType: {} };
+  } else {
+    try {
+      chunkStats = chunkToolSource(tool);
+    } catch (err) {
+      log(`  WARN: chunking failed: ${(err as Error).message}`);
+      chunkStats = { files: 0, chunks: 0, byType: {} };
+    }
   }
 
   // Build the full file set
@@ -404,13 +418,18 @@ function forgeSkill(tool: Tool, dryRun: boolean): ForgedSkill {
 
   // Write files unless dry-run
   if (!dryRun) {
-    mkdirSync(skillDir, { recursive: true });
-    writeFileSync(join(skillDir, "SKILL.md"), directory.skillMd, "utf-8");
+    const resolvedSkillDir = resolve(skillDir);
+    mkdirSync(resolvedSkillDir, { recursive: true });
+    atomicWrite(join(resolvedSkillDir, "SKILL.md"), directory.skillMd);
 
     for (const [relPath, content] of Object.entries(files)) {
-      const fullPath = join(skillDir, relPath);
+      const fullPath = resolve(resolvedSkillDir, relPath);
+      // Path containment check: prevent directory traversal
+      if (!fullPath.startsWith(resolvedSkillDir + "/")) {
+        throw new Error(`Path traversal detected: "${relPath}" escapes skill directory`);
+      }
       mkdirSync(dirname(fullPath), { recursive: true });
-      writeFileSync(fullPath, content, "utf-8");
+      atomicWrite(fullPath, content);
 
       // Make scripts executable
       if (relPath.endsWith(".sh") || relPath.endsWith(".py")) {
@@ -454,43 +473,52 @@ function assessQuality(skillMd: string, name: string): QualityResult {
 
 // ── Stage 8: Indexing ──────────────────────────────────────────────────
 
-function buildIndexes(tools: Tool[]): void {
+function buildIndexes(tools: Tool[], dryRun: boolean): void {
   const entries: ManifestEntry[] = tools.map(toolToManifestEntry).filter(Boolean) as ManifestEntry[];
   if (entries.length === 0) return;
 
   const byDomain = groupByDomain(entries);
 
-  // Write domain index for each domain
-  for (const [domain, domainEntries] of byDomain) {
-    const indexContent = generateDomainIndex(domain, domainEntries, DOMAIN_TRIGGERS);
-    const indexDir = join(OUTPUT_DIR, `_index-${domain}`);
-    mkdirSync(indexDir, { recursive: true });
-    writeFileSync(join(indexDir, "SKILL.md"), indexContent, "utf-8");
+  if (!dryRun) {
+    // Write domain index for each domain
+    for (const [domain, domainEntries] of byDomain) {
+      const indexContent = generateDomainIndex(domain, domainEntries, DOMAIN_TRIGGERS);
+      const indexDir = join(OUTPUT_DIR, `_index-${domain}`);
+      mkdirSync(indexDir, { recursive: true });
+      atomicWrite(join(indexDir, "SKILL.md"), indexContent);
+    }
+
+    // Write master index
+    const manifest: Manifest = { repos: entries };
+    const masterContent = generateMasterIndex(manifest, DOMAIN_TRIGGERS);
+    const masterDir = join(OUTPUT_DIR, "_index-master");
+    mkdirSync(masterDir, { recursive: true });
+    atomicWrite(join(masterDir, "SKILL.md"), masterContent);
   }
 
-  // Write master index
-  const manifest: Manifest = { repos: entries };
-  const masterContent = generateMasterIndex(manifest, DOMAIN_TRIGGERS);
-  const masterDir = join(OUTPUT_DIR, "_index-master");
-  mkdirSync(masterDir, { recursive: true });
-  writeFileSync(join(masterDir, "SKILL.md"), masterContent, "utf-8");
-
-  log(`  Indexes: master + ${byDomain.size} domain indexes`);
+  log(`  Indexes: master + ${byDomain.size} domain indexes${dryRun ? " (dry-run, not written)" : ""}`);
 }
 
 // ── Script Generators ──────────────────────────────────────────────────
 
-function generateInstallScript(tool: Tool): string {
-  const name = tool.meta.name;
+/** Shell-quote a value: wrap in single quotes with inner escaping */
+export function shellQuote(s: string): string {
+  return "'" + s.replace(/'/g, "'\\''") + "'";
+}
+
+export function generateInstallScript(tool: Tool): string {
+  // Validate before interpolating into shell
+  validateToolName(tool.meta.name);
+  const name = shellQuote(tool.meta.name);
   const lines: string[] = [
     "#!/usr/bin/env bash",
-    `# Install ${name} — auto-detected from source format`,
+    `# Install ${tool.meta.name} — auto-detected from source format`,
     "set -euo pipefail",
     "",
   ];
 
   // Strip registry prefix from URI for install commands
-  const pkg = tool.source.uri.replace(/^(pypi|crates|npm):/, "");
+  const pkg = shellQuote(tool.source.uri.replace(/^(pypi|crates|npm):/, ""));
 
   switch (tool.source.format) {
     case "npm":
@@ -505,11 +533,13 @@ function generateInstallScript(tool: Tool): string {
       lines.push(`# Install via cargo-binstall (fast, pre-built binaries)`, `cargo binstall ${pkg}`, "");
       lines.push(`# Or build from source`, `cargo install ${pkg}`);
       break;
-    case "github":
+    case "github": {
+      const uri = shellQuote(tool.source.uri);
       lines.push(`# Clone and build from source`);
-      lines.push(`git clone https://github.com/${tool.source.uri}.git`, `cd ${name}`);
+      lines.push(`git clone "https://github.com/"${uri}".git"`, `cd ${name}`);
       lines.push(`# Follow README for build instructions`);
       break;
+    }
     default:
       lines.push(`# Install from: ${tool.source.uri}`);
       lines.push(`echo "See project README for installation instructions"`);
@@ -517,7 +547,7 @@ function generateInstallScript(tool: Tool): string {
 
   lines.push("");
   lines.push(`# Verify installation`);
-  lines.push(`${name} --version 2>/dev/null || ${name} version 2>/dev/null || echo "${name} installed (no --version flag)"`);
+  lines.push(`${name} --version 2>/dev/null || ${name} version 2>/dev/null || echo "${tool.meta.name} installed (no --version flag)"`);
   lines.push("");
 
   return lines.join("\n");
@@ -616,6 +646,17 @@ def validate() -> list[str]:
     check("use when" in desc.lower() or "use for" in desc.lower(),
           "description should include trigger phrase ('Use when...')", issues)
 
+    # tags field
+    tags = fields.get("tags", [])
+    if isinstance(tags, list):
+        for tag in tags:
+            check(isinstance(tag, str), f"tag must be a string, got: {type(tag).__name__}", issues)
+            if isinstance(tag, str):
+                check(bool(re.match(r"^[a-z0-9][a-z0-9-]*$", tag)),
+                      f"tag must be kebab-case: '{tag}'", issues)
+    elif tags:
+        issues.append(f"tags must be a list, got: {type(tags).__name__}")
+
     # Description quality
     if desc:
         words = desc.split()
@@ -662,7 +703,7 @@ if __name__ == "__main__":
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
-function inferDomainFromTool(tool: Tool): string {
+export function inferDomainFromTool(tool: Tool): string {
   const text = `${tool.meta.name} ${tool.meta.description} ${(tool.meta.tags as string[]).join(" ")}`.toLowerCase();
   let bestDomain = "build";
   let bestScore = 0;
@@ -674,13 +715,15 @@ function inferDomainFromTool(tool: Tool): string {
   return bestDomain;
 }
 
-function toolToManifestEntry(tool: Tool): ManifestEntry | null {
+export function toolToManifestEntry(tool: Tool): ManifestEntry | null {
   // lookupDomain requires a manifest entries list; we don't have one in direct mode,
   // so infer domain from DOMAIN_TRIGGERS keywords matching the tool description
   const domain = inferDomainFromTool(tool);
+  // Only use URI as repo if it's a GitHub slug; otherwise use the tool name
+  const repo = tool.source.format === "github" ? tool.source.uri : tool.meta.name;
   return {
     name: tool.meta.name,
-    repo: tool.source.uri,
+    repo,
     domain,
     description: tool.meta.description || `CLI tool: ${tool.meta.name}`,
   };
@@ -691,7 +734,14 @@ function log(msg: string): void {
   if (!quiet) console.log(msg);
 }
 
-function fmtTable(rows: string[][], headers: string[]): string {
+/** Atomic write: write to temp file then rename for crash safety */
+function atomicWrite(filePath: string, content: string): void {
+  const tmp = filePath + ".tmp." + randomBytes(4).toString("hex");
+  writeFileSync(tmp, content, "utf-8");
+  renameSync(tmp, filePath);
+}
+
+export function fmtTable(rows: string[][], headers: string[]): string {
   const widths = headers.map((h, i) =>
     Math.max(h.length, ...rows.map(r => (r[i] ?? "").length))
   );
@@ -710,7 +760,7 @@ function fmtTable(rows: string[][], headers: string[]): string {
 
 // ── Mode: Audit existing skills ────────────────────────────────────────
 
-function runAudit(strict: boolean): void {
+function runAudit(strict: boolean, jsonMode: boolean, startTime: number): void {
   log("\n  Skill Quality Audit");
   log(`  Directory: ${OUTPUT_DIR}\n`);
 
@@ -718,6 +768,9 @@ function runAudit(strict: boolean): void {
 
   if (results.length === 0) {
     log("  No skills found to audit.");
+    if (jsonMode) {
+      emit(success("skill-forge:audit", { total: 0, passed: 0, failed: 0, results: [] }, startTime), true);
+    }
     return;
   }
 
@@ -749,6 +802,26 @@ function runAudit(strict: boolean): void {
   }
   log("");
 
+  if (jsonMode) {
+    const domains: Record<string, { total: number; passed: number }> = {};
+    for (const [domain, group] of domainGroups) {
+      domains[domain] = { total: group.length, passed: group.filter(r => r.passed).length };
+    }
+    emit(success("skill-forge:audit", {
+      total: results.length,
+      passed,
+      failed,
+      domains,
+      results: results.map(r => ({
+        name: r.name,
+        passed: r.passed,
+        triggerScore: r.triggerScore,
+        qualityScore: r.qualityScore,
+        issues: r.issues,
+      })),
+    }, startTime), true);
+  }
+
   if (strict && failed > 0) {
     process.exitCode = 1;
     log(`  STRICT MODE: ${failed} skills failed quality gate.`);
@@ -770,7 +843,7 @@ async function main(): Promise<void> {
 
   // ── Mode: Audit ──
   if (args.audit) {
-    runAudit(args.strict);
+    runAudit(args.strict, args.json, startTime);
     return;
   }
 
@@ -861,7 +934,7 @@ async function main(): Promise<void> {
                    : pkg.source === "npm" ? (pkg.name.startsWith("@") ? pkg.name : `npm:${pkg.name}`)
                    : pkg.name;
       const tool = await resolveInstallAnalyze(source, args.deep);
-      const result = forgeSkill(tool, false);
+      const result = forgeSkill(tool, args.dryRun);
       const quality = assessQuality(result.skillMd, tool.meta.name);
       tools.push(tool);
       forged.push({ tool, result, quality });
@@ -874,11 +947,11 @@ async function main(): Promise<void> {
   // Stage 8: Build indexes
   if (tools.length > 0) {
     log("\n  Building indexes...");
-    buildIndexes(tools);
+    buildIndexes(tools, args.dryRun);
   }
 
   // Generate lockfile
-  if (tools.length > 0) {
+  if (tools.length > 0 && !args.dryRun) {
     try {
       const lockPath = join(OUTPUT_DIR, "agentcli.lock");
       writeLockfile(lockPath, tools);
@@ -975,6 +1048,11 @@ function printResult(tool: Tool, forged: ForgedSkill, quality: QualityResult, ar
 }
 
 main().catch((err) => {
-  console.error(`\nFatal: ${err instanceof Error ? err.message : String(err)}`);
+  const message = err instanceof Error ? err.message : String(err);
+  if (process.argv.includes("--json")) {
+    emit(failure("skill-forge", "FATAL", message, Date.now()), true);
+  } else {
+    console.error(`\nFatal: ${message}`);
+  }
   process.exitCode = 1;
 });
