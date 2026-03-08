@@ -2,19 +2,16 @@
  * forge/mode-audit.ts — Audit existing skills for quality.
  */
 
-import { readFileSync } from "node:fs";
 import { success, emit } from "../../lib/output.js";
-import { parseFrontmatter } from "../../lib/skills.js";
 import {
   testAllSkillsSync,
   printQualityReport,
 } from "../../lib/skill-tester.js";
 import { groupByDomain } from "../../lib/indexes.js";
 import { DOMAIN_TRIGGERS } from "../../lib/domains.js";
-import type { ManifestEntry } from "../../lib/types.js";
 import type { CliArgs } from "./types.js";
 import { OUTPUT_DIR } from "./types.js";
-import { log } from "./helpers.js";
+import { log, scanSkillEntries } from "./helpers.js";
 
 interface AuditOpts { strict: boolean; json: boolean; domain: string; ai: boolean }
 
@@ -38,22 +35,7 @@ export async function auditMode(args: CliArgs, startTime: number): Promise<void>
     return;
   }
 
-  const entries: ManifestEntry[] = [];
-  for (const r of results) {
-    try {
-      const content = readFileSync(r.skillPath, "utf-8");
-      const fm = parseFrontmatter(content);
-      if (fm) {
-        const domainMatch = content.match(/^domain:\s*(\S+)/m);
-        entries.push({
-          name: fm.name,
-          repo: "",
-          domain: domainMatch?.[1] ?? "uncategorized",
-          description: fm.description ?? "",
-        });
-      }
-    } catch { /* skip */ }
-  }
+  const entries = scanSkillEntries(OUTPUT_DIR);
   const grouped = groupByDomain(entries);
 
   printQualityReport(results);

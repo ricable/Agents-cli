@@ -3,15 +3,13 @@
  * (Gap 5: --plugin, --agent-defs, --marketplace)
  */
 
-import { join, resolve } from "node:path";
-import { existsSync, readdirSync, readFileSync, mkdirSync } from "node:fs";
+import { resolve } from "node:path";
+import { mkdirSync } from "node:fs";
 import { success, emit } from "../../lib/output.js";
-import { parseFrontmatter } from "../../lib/skills.js";
 import { groupByDomain } from "../../lib/indexes.js";
-import type { ManifestEntry } from "../../lib/types.js";
 import type { CliArgs } from "./types.js";
 import { OUTPUT_DIR } from "./types.js";
-import { log, atomicWrite } from "./helpers.js";
+import { log, atomicWrite, scanSkillEntries } from "./helpers.js";
 
 export async function pluginMode(args: CliArgs, startTime: number): Promise<void> {
   const { buildPlugins } = await import("../../lib/plugin/builder.js");
@@ -22,7 +20,7 @@ export async function pluginMode(args: CliArgs, startTime: number): Promise<void
   log("");
 
   // Scan OUTPUT_DIR for SKILL.md files and build manifest
-  const entries = scanSkillEntries();
+  const entries = scanSkillEntries(OUTPUT_DIR);
   if (entries.length === 0) {
     log("  No skills found. Generate skills first.");
     return;
@@ -67,7 +65,7 @@ export async function agentDefsMode(args: CliArgs, startTime: number): Promise<v
   if (args.domain) log(`  Domain: ${args.domain}`);
   log("");
 
-  const entries = scanSkillEntries();
+  const entries = scanSkillEntries(OUTPUT_DIR);
   if (entries.length === 0) {
     log("  No skills found.");
     return;
@@ -133,32 +131,3 @@ export async function marketplaceMode(args: CliArgs, startTime: number): Promise
   }
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────
-
-function scanSkillEntries(): ManifestEntry[] {
-  const entries: ManifestEntry[] = [];
-
-  if (!existsSync(OUTPUT_DIR)) return entries;
-
-  for (const dir of readdirSync(OUTPUT_DIR)) {
-    if (dir.startsWith("_") || dir.startsWith(".")) continue;
-    const skillPath = join(OUTPUT_DIR, dir, "SKILL.md");
-    if (!existsSync(skillPath)) continue;
-
-    try {
-      const content = readFileSync(skillPath, "utf-8");
-      const fm = parseFrontmatter(content);
-      if (fm) {
-        const domainMatch = content.match(/^domain:\s*(\S+)/m);
-        entries.push({
-          name: fm.name,
-          repo: "",
-          domain: domainMatch?.[1] ?? "uncategorized",
-          description: fm.description ?? "",
-        });
-      }
-    } catch { /* skip */ }
-  }
-
-  return entries;
-}

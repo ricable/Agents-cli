@@ -36,7 +36,7 @@
  */
 
 import { setQuiet } from "./forge/helpers.js";
-import { failure, emit } from "../lib/output.js";
+import { failure, emit, toErrorMessage } from "../lib/output.js";
 
 // Re-export for backward compatibility with tests
 export { parseArgs } from "./forge/parse-args.js";
@@ -166,7 +166,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  const message = err instanceof Error ? err.message : String(err);
+  const message = toErrorMessage(err);
   if (process.argv.includes("--json")) {
     emit(failure("skill-forge", "FATAL", message, Date.now()), true);
   } else {

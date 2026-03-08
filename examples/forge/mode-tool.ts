@@ -56,8 +56,8 @@ export async function toolMode(args: CliArgs, startTime: number): Promise<void> 
       if (persisted > 0) {
         log(`  Persisted ${persisted} chunks to ${domain} DB`);
       }
-    } catch {
-      // DB persistence is non-fatal
+    } catch (err) {
+      log(`  WARN: DB persistence failed (non-fatal): ${(err as Error).message}`);
     }
   }
 
@@ -83,7 +83,7 @@ export async function toolMode(args: CliArgs, startTime: number): Promise<void> 
 
 async function factoryMode(tool: Tool, args: CliArgs, startTime: number): Promise<void> {
   const { join } = await import("node:path");
-  const { writeFileSync, mkdirSync, symlinkSync, existsSync } = await import("node:fs");
+  const { writeFileSync, mkdirSync, symlinkSync, existsSync, rmSync } = await import("node:fs");
   const { tmpdir } = await import("node:os");
   const { randomBytes } = await import("node:crypto");
   const { runSkillFactory } = await import("../../lib/skill-factory.js");
@@ -115,23 +115,27 @@ async function factoryMode(tool: Tool, args: CliArgs, startTime: number): Promis
   const manifestPath = join(tmpDir, "manifest.json");
   writeFileSync(manifestPath, JSON.stringify({ repos: [factoryEntry] }), "utf-8");
 
-  const result = await runSkillFactory({
-    manifestPath,
-    skillsDir: OUTPUT_DIR,
-    opensrcDir: tmpDir,
-    ai: args.ai,
-    force: args.force,
-    dryRun: args.dryRun,
-    strict: args.strict,
-  });
+  try {
+    const result = await runSkillFactory({
+      manifestPath,
+      skillsDir: OUTPUT_DIR,
+      opensrcDir: tmpDir,
+      ai: args.ai,
+      force: args.force,
+      dryRun: args.dryRun,
+      strict: args.strict,
+    });
 
-  log(`\n  Factory result: generated=${result.generated}, skipped=${result.skipped}, errors=${result.errors.length}`);
-  if (result.errors.length > 0) {
-    for (const e of result.errors) log(`    ! ${e}`);
-  }
+    log(`\n  Factory result: generated=${result.generated}, skipped=${result.skipped}, errors=${result.errors.length}`);
+    if (result.errors.length > 0) {
+      for (const e of result.errors) log(`    ! ${e}`);
+    }
 
-  if (args.json) {
-    emit(success("skill-forge:factory", result, startTime), true);
+    if (args.json) {
+      emit(success("skill-forge:factory", result, startTime), true);
+    }
+  } finally {
+    try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* best-effort cleanup */ }
   }
 }
 

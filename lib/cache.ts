@@ -32,9 +32,12 @@ export class SkillCache {
   constructor(skillsDir: string) {
     this.filePath = join(skillsDir, ".skill-cache.json");
     try {
-      this.data = JSON.parse(readFileSync(this.filePath, "utf-8")) as CacheData;
+      if (existsSync(this.filePath)) {
+        this.data = JSON.parse(readFileSync(this.filePath, "utf-8")) as CacheData;
+      }
     } catch {
-      /* first run - start empty */
+      // Corrupted or unreadable cache — start empty
+      this.data = {};
     }
   }
 
@@ -93,8 +96,6 @@ export function getRepoHeadSha(repoDir: string): string {
 
 // ── File hash caching (better-sqlite3 gated behind lazy import) ──────────
 
-import { ensureSqlite, getSqlite } from "./db/sqlite.js";
-
 interface FileHashEntry {
   path: string;
   hash: string;
@@ -105,11 +106,22 @@ interface FileHashEntry {
 let _db: any = null;
 let _dbPath: string | null = null;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _getSqlite: (() => any) | null = null;
+
+async function loadSqlite(): Promise<void> {
+  if (!_getSqlite) {
+    const mod = await import("./db/sqlite.js");
+    await mod.ensureSqlite();
+    _getSqlite = mod.getSqlite;
+  }
+}
+
 function getDb(dbPath: string): unknown {
   const resolvedPath = resolve(dbPath);
   if (!_db || _dbPath !== resolvedPath) {
     _db?.close();
-    const Database = getSqlite();
+    const Database = _getSqlite!();
     _db = new Database(resolvedPath);
     _dbPath = resolvedPath;
     _db.pragma("journal_mode = WAL");
@@ -142,7 +154,7 @@ export async function isFileUnchanged(
   filePath: string,
   currentHash: string,
 ): Promise<boolean> {
-  await ensureSqlite();
+  await loadSqlite();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = getDb(dbPath) as any;
   const row = db
@@ -161,7 +173,7 @@ export async function recordFileHash(
   hash: string,
   skillMtime: number,
 ): Promise<void> {
-  await ensureSqlite();
+  await loadSqlite();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = getDb(dbPath) as any;
   db.prepare(
@@ -174,7 +186,7 @@ export async function recordFileHash(
  * Requires better-sqlite3 (call ensureHashCacheDb first).
  */
 export async function clearFileHash(dbPath: string, filePath: string): Promise<void> {
-  await ensureSqlite();
+  await loadSqlite();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = getDb(dbPath) as any;
   db.prepare("DELETE FROM file_hashes WHERE path = ?").run(filePath);

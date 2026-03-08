@@ -90,6 +90,7 @@ import type {
 } from "./types.js";
 import { DATA_DIR, OUTPUT_DIR } from "./types.js";
 import { log, atomicWrite, toolToManifestEntry } from "./helpers.js";
+import { toErrorMessage } from "../../lib/output.js";
 
 // ── Stage 1: Discovery (NL prompt → multi-registry search) ────────────
 
@@ -201,12 +202,14 @@ export async function resolveInstallAnalyze(
 
 // ── Stage 5: Chunking (AST-aware) ─────────────────────────────────────
 
-export function chunkToolSource(tool: Tool): ChunkStats {
-  const installDir = getToolInstallDir(DATA_DIR, tool.meta.name);
-  if (!existsSync(installDir)) return { files: 0, chunks: 0, byType: {} };
+import type { AstChunk } from "../../lib/chunker.js";
 
-  const stats: ChunkStats = { files: 0, chunks: 0, byType: {} };
-
+/** Walk a tool's install dir and collect AST chunks from each file. */
+function walkAndChunk(
+  installDir: string,
+  pkg: string,
+  callback: (chunks: AstChunk[], filePath: string) => void,
+): void {
   function walk(dir: string, depth = 0): void {
     if (depth > 4) return;
     let dirEntries: string[];
@@ -221,19 +224,9 @@ export function chunkToolSource(tool: Tool): ChunkStats {
         if (st.isDirectory()) {
           walk(full, depth + 1);
         } else if (st.isFile() && st.size < 200_000) {
-          const chunks = chunkFileAST(full, tool.meta.name, installDir);
+          const chunks = chunkFileAST(full, pkg, installDir);
           if (chunks.length > 0) {
-            stats.files++;
-            stats.chunks += chunks.length;
-            for (const c of chunks) {
-              stats.byType[c.chunk_type] = (stats.byType[c.chunk_type] ?? 0) + 1;
-            }
-          }
-
-          // Also extract metadata chunks (JSDoc + signatures)
-          const metaChunks = extractMetadataChunks(full, tool.meta.name, installDir);
-          if (metaChunks.length > 0) {
-            stats.byType["metadata"] = (stats.byType["metadata"] ?? 0) + metaChunks.length;
+            callback(chunks, full);
           }
         }
       } catch { /* skip unreadable */ }
@@ -241,6 +234,28 @@ export function chunkToolSource(tool: Tool): ChunkStats {
   }
 
   walk(installDir);
+}
+
+export function chunkToolSource(tool: Tool): ChunkStats {
+  const installDir = getToolInstallDir(DATA_DIR, tool.meta.name);
+  if (!existsSync(installDir)) return { files: 0, chunks: 0, byType: {} };
+
+  const stats: ChunkStats = { files: 0, chunks: 0, byType: {} };
+
+  walkAndChunk(installDir, tool.meta.name, (chunks, filePath) => {
+    stats.files++;
+    stats.chunks += chunks.length;
+    for (const c of chunks) {
+      stats.byType[c.chunk_type] = (stats.byType[c.chunk_type] ?? 0) + 1;
+    }
+
+    // Also extract metadata chunks (JSDoc + signatures)
+    const metaChunks = extractMetadataChunks(filePath, tool.meta.name, installDir);
+    if (metaChunks.length > 0) {
+      stats.byType["metadata"] = (stats.byType["metadata"] ?? 0) + metaChunks.length;
+    }
+  });
+
   return stats;
 }
 
@@ -250,38 +265,17 @@ export async function persistChunks(tool: Tool, domain: string): Promise<number>
   const installDir = getToolInstallDir(DATA_DIR, tool.meta.name);
   if (!existsSync(installDir)) return 0;
 
-  // Lazy imports — only load DB modules when actually persisting
   const { getDomainDb } = await import("../../lib/db/domain-db.js");
   const { upsertChunks } = await import("../../lib/db/sqlite.js");
 
   const domainDb = await getDomainDb(domain);
   let totalPersisted = 0;
 
-  function walk(dir: string, depth = 0): void {
-    if (depth > 4) return;
-    let dirEntries: string[];
-    try { dirEntries = readdirSync(dir); } catch { return; }
+  walkAndChunk(installDir, tool.meta.name, (chunks) => {
+    upsertChunks(domainDb, chunks);
+    totalPersisted += chunks.length;
+  });
 
-    for (const entry of dirEntries) {
-      const full = join(dir, entry);
-      if (shouldSkipFile(full)) continue;
-
-      try {
-        const st = statSync(full);
-        if (st.isDirectory()) {
-          walk(full, depth + 1);
-        } else if (st.isFile() && st.size < 200_000) {
-          const chunks = chunkFileAST(full, tool.meta.name, installDir);
-          if (chunks.length > 0) {
-            upsertChunks(domainDb, chunks);
-            totalPersisted += chunks.length;
-          }
-        }
-      } catch { /* skip unreadable */ }
-    }
-  }
-
-  walk(installDir);
   return totalPersisted;
 }
 
@@ -296,26 +290,24 @@ interface ForgeSkillOptions {
 export function forgeSkill(tool: Tool, opts: ForgeSkillOptions): ForgedSkill {
   validateToolName(tool.meta.name);
   const skillDir = resolve(OUTPUT_DIR, tool.meta.name);
+  const installDir = getToolInstallDir(DATA_DIR, tool.meta.name);
+  const manifestEntry = toolToManifestEntry(tool);
+  const cache = (!opts.noCache && !opts.dryRun) ? new SkillCache(OUTPUT_DIR) : null;
 
   // Cache check (Gap 1)
-  if (!opts.noCache && !opts.force && !opts.dryRun) {
-    const cache = new SkillCache(OUTPUT_DIR);
-    const entry = toolToManifestEntry(tool);
-    if (entry) {
-      const mHash = manifestHash(entry);
-      const installDir = getToolInstallDir(DATA_DIR, tool.meta.name);
-      const rSha = getRepoHeadSha(installDir);
-      const cached = cache.get(tool.meta.name);
-      if (cached && cached.manifestHash === mHash && cached.repoSha === rSha) {
-        log(`  → Cache hit: ${tool.meta.name} (skipping regeneration)`);
-        return {
-          dir: skillDir,
-          skillMd: "",
-          files: {},
-          chunkStats: { files: 0, chunks: 0, byType: {} },
-          skipped: true,
-        };
-      }
+  if (cache && !opts.force && manifestEntry) {
+    const mHash = manifestHash(manifestEntry);
+    const rSha = getRepoHeadSha(installDir);
+    const cached = cache.get(tool.meta.name);
+    if (cached && cached.manifestHash === mHash && cached.repoSha === rSha) {
+      log(`  → Cache hit: ${tool.meta.name} (skipping regeneration)`);
+      return {
+        dir: skillDir,
+        skillMd: "",
+        files: {},
+        chunkStats: { files: 0, chunks: 0, byType: {} },
+        skipped: true,
+      };
     }
   }
 
@@ -346,12 +338,10 @@ export function forgeSkill(tool: Tool, opts: ForgeSkillOptions): ForgedSkill {
 
   files["CONTEXT.md"] = generateContextMd(tool);
 
-  const manifestEntry = toolToManifestEntry(tool);
   if (manifestEntry) {
     files["scripts/search.sh"] = generateSearchScript(manifestEntry);
     files["scripts/grep.sh"]   = generateGrepScript(manifestEntry);
 
-    const installDir = getToolInstallDir(DATA_DIR, tool.meta.name);
     if (existsSync(installDir)) {
       try {
         const analysis = analyzeRepo(manifestEntry, installDir);
@@ -391,8 +381,8 @@ export function forgeSkill(tool: Tool, opts: ForgeSkillOptions): ForgedSkill {
           }
         }
         if (enrichedApi) files["references/api.md"] = enrichedApi;
-      } catch {
-        // analyzeRepo may fail
+      } catch (err) {
+        log(`  WARN: repo analysis failed: ${(err as Error).message}`);
       }
     }
   }
@@ -417,16 +407,11 @@ export function forgeSkill(tool: Tool, opts: ForgeSkillOptions): ForgedSkill {
     }
 
     // Update cache (Gap 1)
-    if (!opts.noCache) {
-      const entry = toolToManifestEntry(tool);
-      if (entry) {
-        const cache = new SkillCache(OUTPUT_DIR);
-        const mHash = manifestHash(entry);
-        const installDirForCache = getToolInstallDir(DATA_DIR, tool.meta.name);
-        const rSha = getRepoHeadSha(installDirForCache);
-        cache.set(tool.meta.name, { manifestHash: mHash, repoSha: rSha, generatedAt: Date.now() });
-        cache.save();
-      }
+    if (cache && manifestEntry) {
+      const mHash = manifestHash(manifestEntry);
+      const rSha = getRepoHeadSha(installDir);
+      cache.set(tool.meta.name, { manifestHash: mHash, repoSha: rSha, generatedAt: Date.now() });
+      cache.save();
     }
   }
 
@@ -527,7 +512,7 @@ export async function processBatch(items: BatchItem[], opts: ProcessBatchOptions
       results.push({ label: item.label, tool, forged, quality });
       log(`  → ${quality.passed ? "PASS" : "FAIL"} (trigger: ${quality.triggerScore.toFixed(2)}, quality: ${quality.qualityScore}/10)`);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = toErrorMessage(err);
       failures.push({ label: item.label, error: msg });
       log(`  → SKIP: ${msg}`);
     }

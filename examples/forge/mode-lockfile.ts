@@ -51,7 +51,9 @@ export function freezeMode(args: CliArgs, startTime: number): void {
           updatedAt: new Date().toISOString(),
         });
       }
-    } catch { /* skip */ }
+    } catch {
+      log(`  WARN: Failed to parse ${skillPath}`);
+    }
   }
 
   if (tools.length === 0) {

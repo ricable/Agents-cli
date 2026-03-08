@@ -2,8 +2,10 @@
  * forge/helpers.ts — Shared utility functions for skill-forge.
  */
 
-import { writeFileSync, renameSync } from "node:fs";
+import { writeFileSync, renameSync, existsSync, readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { randomBytes } from "node:crypto";
+import { parseFrontmatter } from "../../lib/skills.js";
 import type { Tool, ManifestEntry } from "../../lib/types.js";
 import { DOMAIN_TRIGGERS } from "../../lib/domains.js";
 
@@ -52,6 +54,40 @@ export function toolToManifestEntry(tool: Tool): ManifestEntry | null {
     domain,
     description: tool.meta.description || `CLI tool: ${tool.meta.name}`,
   };
+}
+
+// ── Scan skill directories ────────────────────────────────────────────
+
+/**
+ * Scan a skills directory for SKILL.md files and return ManifestEntry[].
+ * Shared by mode-audit, mode-plugin, mode-lockfile, and bin/agents-cli.
+ */
+export function scanSkillEntries(dir: string): ManifestEntry[] {
+  const entries: ManifestEntry[] = [];
+  if (!existsSync(dir)) return entries;
+
+  for (const name of readdirSync(dir)) {
+    if (name.startsWith("_") || name.startsWith(".")) continue;
+    const skillPath = join(dir, name, "SKILL.md");
+    if (!existsSync(skillPath)) continue;
+
+    try {
+      const content = readFileSync(skillPath, "utf-8");
+      const fm = parseFrontmatter(content);
+      if (fm) {
+        entries.push({
+          name: fm.name,
+          repo: "",
+          domain: fm.domain ?? "uncategorized",
+          description: fm.description ?? "",
+        });
+      }
+    } catch {
+      log(`  WARN: Failed to parse ${skillPath}`);
+    }
+  }
+
+  return entries;
 }
 
 // ── Table formatter ───────────────────────────────────────────────────
