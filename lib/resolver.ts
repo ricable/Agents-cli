@@ -31,6 +31,8 @@ export function isPrivateUrl(url: string): boolean {
 /** Pattern matchers for source format detection */
 const FORMAT_PATTERNS: ReadonlyArray<{ pattern: RegExp; format: SourceFormat }> = [
   { pattern: /^pypi:/, format: "pypi" },
+  { pattern: /^crates:/, format: "crates" },
+  { pattern: /^npm:/, format: "npm" },
   { pattern: /^@[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+$/, format: "npm" },
   { pattern: /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+$/, format: "github" },
   { pattern: /^https?:\/\/github\.com\//, format: "github" },
@@ -146,7 +148,8 @@ async function resolveGithub(input: string): Promise<{ meta: Partial<ToolMeta>; 
 
 /** Fetch metadata from npm registry */
 async function resolveNpm(input: string): Promise<{ meta: Partial<ToolMeta>; version?: string }> {
-  const pkg = input.startsWith("@") ? input : input.split("/").pop() ?? input;
+  const raw = input.startsWith("npm:") ? input.slice(4) : input;
+  const pkg = raw.startsWith("@") ? raw : raw.split("/").pop() ?? raw;
   try {
     // npm registry expects @scope%2fpkg format for scoped packages
     const encodedPkg = pkg.startsWith("@")
@@ -206,6 +209,38 @@ async function resolvePypi(input: string): Promise<{ meta: Partial<ToolMeta>; ve
   }
 }
 
+/** Parse a crate name from a crates: prefixed input */
+export function parseCratesPackage(input: string): string {
+  const pkg = input.replace(/^crates:/, "");
+  if (!pkg || !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(pkg)) {
+    throw new Error(`Invalid crate name: ${pkg}`);
+  }
+  return pkg;
+}
+
+/** Fetch metadata from crates.io API */
+async function resolveCrates(input: string): Promise<{ meta: Partial<ToolMeta>; version?: string }> {
+  const pkg = parseCratesPackage(input);
+  try {
+    const data = await fetchJson(`https://crates.io/api/v1/crates/${encodeURIComponent(pkg)}`) as Record<string, unknown>;
+    const crate = data.crate as Record<string, unknown> | undefined;
+    if (!crate) return { meta: { name: pkg, tags: [] } };
+    return {
+      meta: {
+        name: (crate.name as string) ?? pkg,
+        version: (crate.max_version as string) ?? "",
+        description: (crate.description as string) ?? "",
+        homepage: (crate.homepage as string) || (crate.repository as string) || undefined,
+        license: undefined,
+        tags: Array.isArray(crate.categories) ? crate.categories as string[] : [],
+      },
+      version: (crate.max_version as string) ?? undefined,
+    };
+  } catch {
+    return { meta: { name: pkg, tags: [] } };
+  }
+}
+
 /** Create a resolver instance */
 export function createResolver(): ToolResolver {
   return {
@@ -234,6 +269,10 @@ export function createResolver(): ToolResolver {
         const pypiResult = await resolvePypi(input);
         meta = pypiResult.meta;
         ref = pypiResult.version;
+      } else if (format === "crates") {
+        const cratesResult = await resolveCrates(input);
+        meta = cratesResult.meta;
+        ref = cratesResult.version;
       }
 
       return {
