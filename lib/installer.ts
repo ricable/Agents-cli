@@ -13,7 +13,7 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { randomBytes } from "node:crypto";
 import { unlinkSync } from "node:fs";
-import { isPrivateUrl, parseGithubOwnerRepo } from "./resolver.js";
+import { isPrivateUrl, parseGithubOwnerRepo, parsePypiPackage } from "./resolver.js";
 import { readPkgJson, walkPackageDirs } from "./pkg-utils.js";
 import type { PkgInfo } from "./pkg-utils.js";
 
@@ -326,11 +326,60 @@ async function installFromLocal(
   };
 }
 
+/** Patterns for standard venv scripts to exclude from binary discovery */
+const VENV_EXCLUDE = /^(python[0-9.]*|pip[0-9.]*|activate.*|easy_install[0-9.]*|wheel|setuptools)$/;
+
+/** Install from PyPI via uv */
+async function installFromPypi(
+  source: ToolSource,
+  dest: string,
+): Promise<InstallResult> {
+  const start = Date.now();
+  const pkg = parsePypiPackage(source.uri);
+  const version = source.ref;
+
+  mkdirSync(dest, { recursive: true });
+
+  // Create isolated venv
+  const venvDir = join(dest, ".venv");
+  execFileSync("uv", ["venv", venvDir], { stdio: "pipe", timeout: 30000 });
+
+  // Install the package
+  const installArgs = version ? [`${pkg}==${version}`] : [pkg];
+  execFileSync("uv", ["pip", "install", ...installArgs, "--python", join(venvDir, "bin", "python")], {
+    stdio: "pipe",
+    timeout: 120000,
+  });
+
+  // Discover binaries (exclude standard venv scripts)
+  const binDir = join(venvDir, "bin");
+  const binaries: string[] = [];
+  if (existsSync(binDir)) {
+    for (const entry of readdirSync(binDir)) {
+      if (VENV_EXCLUDE.test(entry)) continue;
+      const full = join(binDir, entry);
+      try {
+        const st = statSync(full);
+        if (st.isFile() && (st.mode & 0o111)) {
+          chmodSync(full, 0o755);
+          binaries.push(full);
+        }
+      } catch { /* skip */ }
+    }
+  }
+
+  return {
+    installPath: dest,
+    binaries,
+    duration: Date.now() - start,
+  };
+}
+
 /** Create an installer instance */
 export function createInstaller(): ToolInstaller {
   return {
     supports(format: SourceFormat): boolean {
-      return ["github", "npm", "local"].includes(format);
+      return ["github", "npm", "pypi", "local"].includes(format);
     },
 
     async install(
@@ -345,6 +394,8 @@ export function createInstaller(): ToolInstaller {
           return installFromNpm(source, dest);
         case "local":
           return installFromLocal(source, dest);
+        case "pypi":
+          return installFromPypi(source, dest);
         default:
           throw new Error(`Unsupported install format: ${source.format}`);
       }

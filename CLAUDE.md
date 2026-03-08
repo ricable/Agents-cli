@@ -47,6 +47,7 @@ All commands support `--json` for structured JSON output, or set `OUTPUT_FORMAT=
 # Add a tool (supports --dry-run, --deep, --skill, --force)
 agents-cli add owner/repo              # from GitHub
 agents-cli add @scope/pkg              # from npm
+agents-cli add pypi:ruff               # from PyPI
 agents-cli add ./local-path            # from local directory
 agents-cli add owner/repo --deep       # deep-probe subcommands recursively
 agents-cli add owner/repo --skill      # auto-generate rich SKILL.md

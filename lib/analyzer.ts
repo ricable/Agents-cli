@@ -261,8 +261,26 @@ function resolveBinFromPkg(dir: string, bin: Record<string, string> | string | u
   return null;
 }
 
+/** Patterns for standard venv scripts to exclude from binary discovery */
+const VENV_EXCLUDE = /^(python[0-9.]*|pip[0-9.]*|activate.*|easy_install[0-9.]*|wheel|setuptools)$/;
+
 /** Try to find the main binary in a tool directory */
 export function findMainBinary(toolDir: string): string | null {
+  // Check .venv/bin/ for PyPI-installed tools
+  const venvBinDir = join(toolDir, ".venv", "bin");
+  if (existsSync(venvBinDir)) {
+    try {
+      for (const entry of readdirSync(venvBinDir)) {
+        if (VENV_EXCLUDE.test(entry)) continue;
+        const full = join(venvBinDir, entry);
+        try {
+          const st = statSync(full);
+          if (st.isFile() && (st.mode & 0o111)) return full;
+        } catch { /* skip */ }
+      }
+    } catch { /* skip */ }
+  }
+
   // Check root package.json bin/main fields
   const rootPkg = readPkgJson(toolDir);
   if (rootPkg) {

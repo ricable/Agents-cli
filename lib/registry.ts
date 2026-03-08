@@ -97,11 +97,50 @@ async function searchNpm(
   }
 }
 
-/** Create a registry with 4-layer cascade */
+/** Search PyPI for a package by exact name lookup */
+async function searchPypi(
+  query: string,
+  limit: number,
+): Promise<RegistryEntry[]> {
+  try {
+    const data = await fetchJson(
+      `https://pypi.org/pypi/${encodeURIComponent(query)}/json`,
+    ) as Record<string, unknown>;
+
+    const info = data.info as Record<string, unknown> | undefined;
+    if (!info) return [];
+
+    const name = (info.name as string) ?? query;
+    return [{
+      id: name,
+      meta: {
+        name,
+        version: (info.version as string) ?? "0.0.0",
+        description: (info.summary as string) ?? "",
+        homepage: (info.home_page as string) || (info.project_url as string) || undefined,
+        license: (info.license as string) || undefined,
+        tags: typeof info.keywords === "string" && info.keywords
+          ? (info.keywords as string).split(/[,\s]+/).filter(Boolean)
+          : [],
+      },
+      source: {
+        format: "pypi" as const,
+        uri: `pypi:${name}`,
+      },
+      layer: "pypi" as RegistryLayer,
+      verified: false,
+      downloads: 0,
+    }].slice(0, limit);
+  } catch {
+    return [];
+  }
+}
+
+/** Create a registry with 5-layer cascade */
 export function createRegistry(store?: ToolStore): ToolRegistry {
   return {
     async search(options: RegistrySearchOptions): Promise<readonly RegistryEntry[]> {
-      const layers = options.layers ?? ["local", "community", "github", "npm"];
+      const layers = options.layers ?? ["local", "community", "github", "npm", "pypi"];
       const limit = options.limit ?? 20;
       const perLayer = Math.ceil(limit / layers.length);
       const results: RegistryEntry[] = [];
@@ -123,6 +162,9 @@ export function createRegistry(store?: ToolStore): ToolRegistry {
             break;
           case "npm":
             results.push(...await searchNpm(options.query, perLayer));
+            break;
+          case "pypi":
+            results.push(...await searchPypi(options.query, perLayer));
             break;
         }
       }
@@ -153,6 +195,10 @@ export function createRegistry(store?: ToolStore): ToolRegistry {
       // Try npm
       const npmResults = await searchNpm(id, 1);
       if (npmResults[0]) return npmResults[0];
+
+      // Try PyPI
+      const pypiResults = await searchPypi(id, 1);
+      if (pypiResults[0]) return pypiResults[0];
 
       return null;
     },

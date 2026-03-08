@@ -30,6 +30,7 @@ export function isPrivateUrl(url: string): boolean {
 
 /** Pattern matchers for source format detection */
 const FORMAT_PATTERNS: ReadonlyArray<{ pattern: RegExp; format: SourceFormat }> = [
+  { pattern: /^pypi:/, format: "pypi" },
   { pattern: /^@[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+$/, format: "npm" },
   { pattern: /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+$/, format: "github" },
   { pattern: /^https?:\/\/github\.com\//, format: "github" },
@@ -169,6 +170,42 @@ async function resolveNpm(input: string): Promise<{ meta: Partial<ToolMeta>; ver
   }
 }
 
+/** Parse a PyPI package name from a pypi: prefixed input */
+export function parsePypiPackage(input: string): string {
+  const pkg = input.replace(/^pypi:/, "");
+  if (!pkg || !/^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$/.test(pkg)) {
+    throw new Error(`Invalid PyPI package name: ${pkg}`);
+  }
+  return pkg;
+}
+
+/** Fetch metadata from PyPI JSON API */
+async function resolvePypi(input: string): Promise<{ meta: Partial<ToolMeta>; version?: string }> {
+  const pkg = parsePypiPackage(input);
+  try {
+    const data = await fetchJson(`https://pypi.org/pypi/${encodeURIComponent(pkg)}/json`) as Record<string, unknown>;
+    const info = data.info as Record<string, unknown> | undefined;
+    if (!info) return { meta: { name: pkg, tags: [] } };
+    return {
+      meta: {
+        name: (info.name as string) ?? pkg,
+        version: (info.version as string) ?? "",
+        description: (info.summary as string) ?? "",
+        homepage: (info.home_page as string) || (info.project_url as string) || undefined,
+        license: (info.license as string) || undefined,
+        tags: Array.isArray(info.keywords)
+          ? info.keywords as string[]
+          : typeof info.keywords === "string" && info.keywords
+            ? (info.keywords as string).split(/[,\s]+/).filter(Boolean)
+            : [],
+      },
+      version: (info.version as string) ?? undefined,
+    };
+  } catch {
+    return { meta: { name: pkg, tags: [] } };
+  }
+}
+
 /** Create a resolver instance */
 export function createResolver(): ToolResolver {
   return {
@@ -193,6 +230,10 @@ export function createResolver(): ToolResolver {
         const npmResult = await resolveNpm(input);
         meta = npmResult.meta;
         ref = npmResult.version;
+      } else if (format === "pypi") {
+        const pypiResult = await resolvePypi(input);
+        meta = pypiResult.meta;
+        ref = pypiResult.version;
       }
 
       return {

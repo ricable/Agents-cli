@@ -6,6 +6,7 @@
 export type SourceFormat =
   | "github"
   | "npm"
+  | "pypi"
   | "local";
 
 /** Tool installation status */
@@ -34,7 +35,8 @@ export type RegistryLayer =
   | "local"
   | "community"
   | "github"
-  | "npm";
+  | "npm"
+  | "pypi";
 
 // =============================================================================
 // Tool interfaces

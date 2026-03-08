@@ -69,12 +69,12 @@ const program = new Command()
 // ══════════════════════════════════════════════════════════════════════════════
 program
   .command("add <source>")
-  .description("Install a tool from a source identifier")
+  .description("Install a tool from a source identifier (owner/repo, @scope/pkg, pypi:name, or ./path)")
   .option("-f, --force", "Force reinstall if already installed")
   .option("--json", "Output as structured JSON")
   .option("--dry-run", "Show what would be installed without installing")
   .option("--deep", "Deep-probe subcommands recursively after install")
-  .option("--skill", "Auto-generate a rich SKILL.md after install")
+  .option("--no-skill", "Skip auto-generating SKILL.md after install")
   .action(async (source: string, opts: { force?: boolean; json?: boolean; dryRun?: boolean; deep?: boolean; skill?: boolean }) => {
     const start = Date.now();
     const json = isJsonMode(opts);
@@ -146,9 +146,9 @@ program
         recursive: opts.deep,
       });
 
-      // Auto-generate rich SKILL.md if --skill flag
+      // Always auto-generate rich SKILL.md (use --no-skill to skip)
       let skillPath: string | undefined;
-      if (opts.skill) {
+      if (opts.skill !== false) {
         const skillContent = generateRichSkillMd(tool);
         const skillDir = join(DATA_DIR, "tools", tool.id, "skill");
         const { mkdirSync } = await import("node:fs");
@@ -542,14 +542,30 @@ skills
         console.log(`  ${content.split("\n").length} lines`);
       }
     } else {
-      // Scaffold a blank SKILL.md
-      const content = generateSkillMd(name, opts.description);
-      const outPath = resolve("SKILL.md");
-      writeFileSync(outPath, content, "utf-8");
-      if (json) {
-        emit(success("skills generate", { path: outPath }, start), true);
+      // Try to find the tool by name and generate rich skill automatically
+      const store = createStore(DATA_DIR);
+      const tool = await store.get(name);
+      if (tool) {
+        const content = generateRichSkillMd(tool);
+        const outPath = resolve(`${name}.SKILL.md`);
+        writeFileSync(outPath, content, "utf-8");
+        if (json) {
+          emit(success("skills generate", { path: outPath, fromTool: name, lines: content.split("\n").length }, start), true);
+        } else {
+          console.log(`Generated rich SKILL.md from installed tool "${name}": ${outPath}`);
+          console.log(`  ${content.split("\n").length} lines`);
+        }
       } else {
-        console.log(`Generated ${outPath}`);
+        // Fallback: scaffold a blank SKILL.md (no installed tool to analyze)
+        if (!json) console.log(`  ⚠ Tool "${name}" not installed — generating basic scaffold. Use --from-tool or install first for a rich skill.`);
+        const content = generateSkillMd(name, opts.description);
+        const outPath = resolve("SKILL.md");
+        writeFileSync(outPath, content, "utf-8");
+        if (json) {
+          emit(success("skills generate", { path: outPath, rich: false }, start), true);
+        } else {
+          console.log(`Generated ${outPath}`);
+        }
       }
     }
   });
