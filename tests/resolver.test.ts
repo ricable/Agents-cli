@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { detectFormat, createResolver } from "../lib/resolver.js";
+import { detectFormat, createResolver, parseGithubOwnerRepo } from "../lib/resolver.js";
 
 describe("detectFormat", () => {
   it("detects GitHub owner/repo format", () => {
@@ -51,15 +51,44 @@ describe("createResolver", () => {
     expect(resolver.supports("bare-name")).toBe(false);
   });
 
-  it("resolves a GitHub source", async () => {
-    const result = await resolver.resolve("owner/repo");
-    expect(result.source.format).toBe("github");
-    expect(result.source.uri).toBe("owner/repo");
+  it("resolves a local source (no network)", async () => {
+    const result = await resolver.resolve("./my-tool");
+    expect(result.source.format).toBe("local");
+    expect(result.source.uri).toBe("./my-tool");
+  });
+
+  it("resolves a tarball source (no network)", async () => {
+    const result = await resolver.resolve("https://example.com/tool.tar.gz");
+    expect(result.source.format).toBe("tarball");
   });
 
   it("throws on unrecognized input", async () => {
     await expect(resolver.resolve("bare-name")).rejects.toThrow(
       "Cannot resolve source format",
     );
+  });
+});
+
+describe("parseGithubOwnerRepo", () => {
+  it("parses owner/repo shorthand", () => {
+    expect(parseGithubOwnerRepo("ruvnet/ruflo")).toEqual({ owner: "ruvnet", repo: "ruflo" });
+  });
+
+  it("parses GitHub URL", () => {
+    expect(parseGithubOwnerRepo("https://github.com/ruvnet/agentic-flow")).toEqual({
+      owner: "ruvnet",
+      repo: "agentic-flow",
+    });
+  });
+
+  it("handles .git suffix", () => {
+    expect(parseGithubOwnerRepo("https://github.com/ruvnet/ruflo.git")).toEqual({
+      owner: "ruvnet",
+      repo: "ruflo",
+    });
+  });
+
+  it("returns null for invalid input", () => {
+    expect(parseGithubOwnerRepo("just-a-name")).toBeNull();
   });
 });

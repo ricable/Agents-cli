@@ -47,10 +47,10 @@ export type {
   GuardConfig,
 } from "./types.js";
 
-export { createResolver, detectFormat } from "./resolver.js";
+export { createResolver, detectFormat, fetchJson, parseGithubOwnerRepo } from "./resolver.js";
 export { createInstaller } from "./installer.js";
-export { createAnalyzer } from "./analyzer.js";
-export { createStore } from "./store.js";
+export { createAnalyzer, findMainBinary } from "./analyzer.js";
+export { createStore, generateContextMd, getToolInstallDir } from "./store.js";
 export { createRegistry } from "./registry.js";
 export {
   parseFrontmatter,

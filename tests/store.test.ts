@@ -1,6 +1,9 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { createStore } from "../lib/store.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { createStore, generateContextMd } from "../lib/store.js";
 import type { Tool, ToolStore } from "../lib/types.js";
+import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 function makeTool(overrides: Partial<Tool> = {}): Tool {
   return {
@@ -27,9 +30,15 @@ function makeTool(overrides: Partial<Tool> = {}): Tool {
 
 describe("createStore", () => {
   let store: ToolStore;
+  let tmpDir: string;
 
   beforeEach(() => {
-    store = createStore("/tmp/test");
+    tmpDir = mkdtempSync(join(tmpdir(), "agents-cli-test-"));
+    store = createStore(tmpDir);
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it("starts empty", async () => {
@@ -45,16 +54,35 @@ describe("createStore", () => {
     expect(retrieved).toEqual(tool);
   });
 
+  it("persists across instances", async () => {
+    await store.save(makeTool());
+    const store2 = createStore(tmpDir);
+    const retrieved = await store2.get("test-tool");
+    expect(retrieved?.meta.name).toBe("test-tool");
+  });
+
+  it("writes CONTEXT.md on save", async () => {
+    await store.save(makeTool());
+    const contextPath = join(tmpDir, "tools", "test-tool", "CONTEXT.md");
+    expect(existsSync(contextPath)).toBe(true);
+    const content = readFileSync(contextPath, "utf-8");
+    expect(content).toContain("# test-tool");
+    expect(content).toContain("A test tool");
+  });
+
   it("checks existence", async () => {
     expect(await store.has("test-tool")).toBe(false);
     await store.save(makeTool());
     expect(await store.has("test-tool")).toBe(true);
   });
 
-  it("removes a tool", async () => {
+  it("removes a tool and cleans directory", async () => {
     await store.save(makeTool());
+    const toolDir = join(tmpDir, "tools", "test-tool");
+    expect(existsSync(toolDir)).toBe(true);
     expect(await store.remove("test-tool")).toBe(true);
     expect(await store.get("test-tool")).toBeNull();
+    expect(existsSync(toolDir)).toBe(false);
   });
 
   it("returns false when removing nonexistent tool", async () => {
@@ -91,5 +119,32 @@ describe("createStore", () => {
     const page = await store.list({ limit: 2, offset: 1 });
     expect(page.tools).toHaveLength(2);
     expect(page.total).toBe(5);
+  });
+});
+
+describe("generateContextMd", () => {
+  it("includes tool metadata", () => {
+    const tool = makeTool({
+      capabilities: {
+        commands: [{ name: "run", description: "Run the tool", flags: [] }],
+        globalFlags: [{ name: "--verbose", description: "Verbose output", type: "boolean", required: false }],
+        analysisMethod: "flag-parse",
+        rawHelp: "Usage: test-tool [options]",
+      },
+    });
+    const md = generateContextMd(tool);
+    expect(md).toContain("# test-tool");
+    expect(md).toContain("A test tool");
+    expect(md).toContain("## Commands");
+    expect(md).toContain("`run`");
+    expect(md).toContain("## Global Options");
+    expect(md).toContain("`--verbose`");
+    expect(md).toContain("## Raw Help Output");
+  });
+
+  it("handles minimal tool", () => {
+    const md = generateContextMd(makeTool());
+    expect(md).toContain("# test-tool");
+    expect(md).not.toContain("## Commands");
   });
 });
