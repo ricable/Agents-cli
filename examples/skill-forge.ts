@@ -120,7 +120,7 @@ import type { WorkflowIntent } from "../lib/types.js";
 import { success, failure, emit } from "../lib/output.js";
 
 // Guards
-import { validateSource, validateToolName } from "../lib/guards.js";
+import { validateSource, validateToolName, rejectPathTraversal } from "../lib/guards.js";
 
 // Types
 import type {
@@ -698,10 +698,11 @@ async function trendingMode(args: CliArgs, startTime: number): Promise<void> {
   const seen = new Set(allRepos.map(r => r.fullName));
   const extra = supplementRepos.filter(r => !seen.has(r.fullName));
 
+  // Prioritize CLI candidates, then well-known repos, then non-CLI as backfill
   const toProcess = [
     ...cliCandidates.map(c => c.repo),
-    ...nonCli,
     ...extra,
+    ...nonCli,
   ].slice(0, args.limit);
 
   log(`  CLI candidates: ${cliCandidates.length} (strong match)`);
@@ -771,6 +772,10 @@ async function trendingMode(args: CliArgs, startTime: number): Promise<void> {
 async function curatedMode(args: CliArgs, startTime: number): Promise<void> {
   const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
   const allTools = loadAllTools(projectRoot);
+
+  if (allTools.length < 100) {
+    log("  Warning: ai-ml-tools.json not found — only general tools loaded.");
+  }
 
   // --list-categories
   if (args.listCategories) {
@@ -904,6 +909,7 @@ async function curatedMode(args: CliArgs, startTime: number): Promise<void> {
 // ── Mode: Workflow (NL prompt → agent code from templates) ─────────────
 
 function workflowMode(args: CliArgs, startTime: number): void {
+  if (args.out) rejectPathTraversal(args.out, "--out path");
   const outDir = resolve(args.out || "examples/generated-workflows");
 
   // --list: show available templates
@@ -1048,10 +1054,12 @@ async function runAudit(opts: AuditOpts, startTime: number): Promise<void> {
       const content = readFileSync(r.skillPath, "utf-8");
       const fm = parseFrontmatter(content);
       if (fm) {
+        // domain is not in SkillFrontmatter type — extract from raw frontmatter
+        const domainMatch = content.match(/^domain:\s*(\S+)/m);
         entries.push({
           name: fm.name,
           repo: "",
-          domain: (fm as unknown as Record<string, unknown>).domain as string ?? "uncategorized",
+          domain: domainMatch?.[1] ?? "uncategorized",
           description: fm.description ?? "",
         });
       }

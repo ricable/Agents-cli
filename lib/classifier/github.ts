@@ -211,17 +211,33 @@ export interface TrendingRepo {
   url: string;
 }
 
-/** Fetch raw HTML from a URL, following redirects (max 5) */
+const MAX_RESPONSE_BYTES = 5 * 1024 * 1024; // 5 MB
+
+/** Fetch raw HTML from a URL, following redirects (max 5). Only allows github.com hosts. */
 export function fetchHtml(url: string, maxRedirects = 5): Promise<string> {
   return new Promise((resolve, reject) => {
     if (maxRedirects <= 0) { reject(new Error("Too many redirects")); return; }
+    // SSRF protection: only allow github.com URLs
+    try {
+      const parsed = new URL(url);
+      if (parsed.hostname !== "github.com" && !parsed.hostname.endsWith(".github.com")) {
+        reject(new Error(`fetchHtml blocked: only github.com URLs allowed (got ${parsed.hostname})`));
+        return;
+      }
+    } catch { reject(new Error(`fetchHtml: invalid URL: ${url}`)); return; }
+
     httpsGet(url, { headers: { "User-Agent": "agents-cli/0.1.0", Accept: "text/html" } }, (res) => {
       if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         fetchHtml(res.headers.location, maxRedirects - 1).then(resolve, reject);
         return;
       }
       let data = "";
-      res.on("data", (chunk: Buffer) => { data += chunk.toString(); });
+      let bytes = 0;
+      res.on("data", (chunk: Buffer) => {
+        bytes += chunk.length;
+        if (bytes > MAX_RESPONSE_BYTES) { res.destroy(); reject(new Error(`Response exceeded ${MAX_RESPONSE_BYTES} bytes`)); return; }
+        data += chunk.toString();
+      });
       res.on("end", () => resolve(data));
       res.on("error", reject);
     }).on("error", reject);
