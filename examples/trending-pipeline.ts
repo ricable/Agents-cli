@@ -10,7 +10,7 @@ import { createResolver } from "../lib/resolver.js";
 import { createInstaller } from "../lib/installer.js";
 import { createAnalyzer, findMainBinary } from "../lib/analyzer.js";
 import { createStore, getToolInstallDir, generateContextMd } from "../lib/store.js";
-import { generateSkillMd, parseFrontmatter, buildContext, installTool } from "../lib/skills.js";
+import { generateSkillMd, generateRichSkillMd, parseFrontmatter, buildContext, installTool } from "../lib/skills.js";
 import { readPkgVersion, readPkgJson } from "../lib/pkg-utils.js";
 import type { Tool, ToolCapabilities, Skill } from "../lib/types.js";
 import { get as httpsGet } from "node:https";
@@ -215,11 +215,29 @@ function generateSkillForTool(tool: Tool, repo: TrendingRepo): string {
   const skillDir = join(OUTPUT_DIR, tool.meta.name);
   mkdirSync(skillDir, { recursive: true });
 
-  // Build a rich SKILL.md from the analyzed tool
+  // Use the rich skill generator from lib/skills.ts — produces trigger-aware
+  // descriptions, command references, flag tables, usage examples, and agent
+  // integration sections. Falls back to basic generation only if the tool has
+  // zero discovered capabilities.
+  const content = generateRichSkillMd(tool);
+  const skillPath = join(skillDir, "SKILL.md");
+  writeFileSync(skillPath, content, "utf-8");
+
+  // Also write CONTEXT.md for full reference
+  const contextPath = join(skillDir, "CONTEXT.md");
+  writeFileSync(contextPath, generateContextMd(tool), "utf-8");
+
+  return skillPath;
+}
+
+/** @deprecated — kept for reference. The pipeline now uses generateRichSkillMd from lib/skills.ts. */
+function _legacyGenerateSkillForTool(tool: Tool, repo: TrendingRepo): string {
+  const skillDir = join(OUTPUT_DIR, tool.meta.name);
+  mkdirSync(skillDir, { recursive: true });
+
   const commands = tool.capabilities.commands;
   const flags = tool.capabilities.globalFlags;
 
-  // Create description with trigger hints
   const desc = tool.meta.description || repo.description || `A CLI tool from ${repo.fullName}`;
   const triggerHint = buildTriggerHint(tool, repo);
 
