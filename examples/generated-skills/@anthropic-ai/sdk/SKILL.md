@@ -13,11 +13,31 @@ tags:
 
 The official TypeScript library for the Anthropic API
 
+## Overview
+
+@anthropic-ai/sdk provides the official typescript library for the anthropic api. Agents benefit from @anthropic-ai/sdk because it provides programmatic access to capabilities that would otherwise require manual interaction or complex scripting.
+
+## Installation
+
+```bash
+# Install via agents-cli
+agents-cli add @anthropic-ai/sdk
+
+# Or install directly via npm
+npm install -g @anthropic-ai/sdk
+```
+
 ## Commands
+
+@anthropic-ai/sdk exposes 1 command:
 
 ### `@anthropic-ai/sdk migrate`
 
 Run migrations to update your code using @anthropic-ai/sdk@0.41 to be compatible with @anthropic-ai/sdk@0.50
+
+```bash
+@anthropic-ai/sdk migrate
+```
 
 ## Usage
 
@@ -30,15 +50,56 @@ Run migrations to update your code using @anthropic-ai/sdk@0.41 to be compatible
 
 ```
 
-## Agent Integration
+## Common Workflows
+
+### Getting started
 
 ```bash
-# Run via agents-cli (structured JSON output)
+# 1. Install the tool
+agents-cli add @anthropic-ai/sdk
+
+# 2. Verify installation
+agents-cli run @anthropic-ai/sdk -- --version
+
+# 3. Explore capabilities
+agents-cli schema @anthropic-ai/sdk --json
+```
+
+### Piping with other tools
+
+```bash
+# Chain @anthropic-ai/sdk output with jq for structured processing
+agents-cli run @anthropic-ai/sdk -- <args> | jq '.'
+
+# Use with rg for filtering output
+agents-cli run @anthropic-ai/sdk -- <args> | rg '<pattern>'
+```
+
+## Agent Integration
+
+Agents should use `agents-cli` to run this tool for structured output and safety:
+
+```bash
+# Run via agents-cli (structured JSON envelope)
 agents-cli run @anthropic-ai/sdk -- --help --json
 
-# Introspect command schema
+# Introspect full command schema
 agents-cli schema @anthropic-ai/sdk --json
 
-# Dry-run before executing
+# Dry-run before executing (safe exploration)
 agents-cli run @anthropic-ai/sdk -- <args> --dry-run
+
+# Generate detailed context for agent consumption
+agents-cli describe @anthropic-ai/sdk --json
 ```
+
+## When to Use This Tool
+
+Use `@anthropic-ai/sdk` when:
+- Your task involves the official typescript library for the anthropic api
+- A task requires @anthropic-ai/sdk-specific functionality
+- You need any of: migrate
+
+Consider alternatives when:
+- The task can be accomplished with simpler built-in tools
+- You need a different specialization than what @anthropic-ai/sdk provides

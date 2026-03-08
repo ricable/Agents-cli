@@ -66,7 +66,7 @@ export function validateToolName(name: string): void {
   rejectControlChars(name, "Tool name");
   rejectPathTraversal(name, "Tool name");
   rejectEmbeddedParams(name, "Tool name");
-  if (!/^[\w][\w.@/-]*$/.test(name)) {
+  if (!/^[@\w][\w.@/-]*$/.test(name)) {
     throw new InputValidationError(
       `Tool name "${name}" contains invalid characters`,
       "INVALID_NAME",
