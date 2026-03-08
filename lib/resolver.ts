@@ -24,13 +24,19 @@ export function detectFormat(input: string): SourceFormat | null {
   return null;
 }
 
+const MAX_REDIRECTS = 10;
+
 /** Fetch JSON from a URL (follows redirects) */
-export function fetchJson(url: string): Promise<unknown> {
+export function fetchJson(url: string, redirectCount = 0): Promise<unknown> {
   return new Promise((resolve, reject) => {
+    if (redirectCount > MAX_REDIRECTS) {
+      reject(new Error(`Too many redirects (>${MAX_REDIRECTS}) for ${url}`));
+      return;
+    }
     const getter = url.startsWith("https") ? httpsGet : httpGet;
     getter(url, { headers: { "User-Agent": "agents-cli/0.1.0", Accept: "application/json" } }, (res) => {
       if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        fetchJson(res.headers.location).then(resolve, reject);
+        fetchJson(res.headers.location, redirectCount + 1).then(resolve, reject);
         return;
       }
       if (res.statusCode && res.statusCode >= 400) {

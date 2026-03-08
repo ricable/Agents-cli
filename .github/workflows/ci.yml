@@ -34,6 +34,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run test:coverage
       - name: Check coverage thresholds
-        run: npx vitest run --coverage 2>&1 | grep -E "Lines|Statements" || true
+        run: npm run test:coverage

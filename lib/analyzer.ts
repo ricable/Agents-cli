@@ -1,5 +1,5 @@
 import type { ToolAnalyzer, ToolCapabilities, ToolCommand, ToolFlag, AnalyzeOptions } from "./types.js";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { readdirSync, statSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
@@ -7,7 +7,7 @@ import { join } from "node:path";
 function probeHelp(binPath: string, timeout: number): string | null {
   for (const flag of ["--help", "-h", "help"]) {
     try {
-      const output = execSync(`"${binPath}" ${flag} 2>&1`, {
+      const output = execFileSync(binPath, [flag], {
         timeout,
         stdio: ["pipe", "pipe", "pipe"],
         encoding: "utf-8",
@@ -33,9 +33,11 @@ function parseFlag(line: string): ToolFlag | null {
     ?? /^\s+(--[\w-]+)(?:\s+[<\[]\w+[>\]])?(?:\s{2,}(.+))?/.exec(line);
   if (!m) return null;
 
-  const alias = m[1]?.startsWith("--") ? undefined : m[1];
-  const name = m[2] ?? m[1] ?? "";
-  const description = (m[3] ?? m[2] ?? "").trim();
+  // First regex: m[1]=short, m[2]=long, m[3]=desc. Second regex: m[1]=long, m[2]=desc
+  const isFirstRegex = m[3] !== undefined || (m[1] !== undefined && !m[1].startsWith("--"));
+  const alias = isFirstRegex ? m[1] : undefined;
+  const name = isFirstRegex ? (m[2] ?? m[1] ?? "") : (m[1] ?? "");
+  const description = (isFirstRegex ? (m[3] ?? "") : (m[2] ?? "")).trim();
 
   if (!name) return null;
 

@@ -4,7 +4,8 @@
   "description": "CLI tool for discovering, installing, and managing agent tools",
   "type": "module",
   "bin": {
-    "agents-cli": "./dist/bin/agents-cli.js"
+    "agents-cli": "./dist/bin/agents-cli.js",
+    "agent-run": "./dist/bin/agent-run.js"
   },
   "main": "./dist/lib/index.js",
   "types": "./dist/lib/index.d.ts",
@@ -37,6 +38,7 @@
     "@types/node": "^20.11.0",
     "tsup": "^8.0.0",
     "typescript": "^5.4.0",
+    "@vitest/coverage-v8": "^1.6.0",
     "vitest": "^1.6.0"
   },
   "dependencies": {

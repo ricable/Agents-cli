@@ -9,17 +9,24 @@ import { get as httpsGet } from "node:https";
 import { get as httpGet } from "node:http";
 import { createWriteStream, mkdirSync, existsSync, readdirSync, statSync, chmodSync } from "node:fs";
 import { join } from "node:path";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { randomBytes } from "node:crypto";
+import { unlinkSync } from "node:fs";
+
+const MAX_REDIRECTS = 10;
 
 /** Download a file following redirects, return saved path */
-function downloadFile(url: string, dest: string): Promise<string> {
+function downloadFile(url: string, dest: string, redirectCount = 0): Promise<string> {
   return new Promise((resolve, reject) => {
+    if (redirectCount > MAX_REDIRECTS) {
+      reject(new Error(`Too many redirects (>${MAX_REDIRECTS}) downloading ${url}`));
+      return;
+    }
     const getter = url.startsWith("https") ? httpsGet : httpGet;
     getter(url, { headers: { "User-Agent": "agents-cli/0.1.0" } }, (res) => {
       if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        downloadFile(res.headers.location, dest).then(resolve, reject);
+        downloadFile(res.headers.location, dest, redirectCount + 1).then(resolve, reject);
         return;
       }
       if (res.statusCode && res.statusCode >= 400) {
@@ -94,10 +101,10 @@ async function installFromGithub(
 
   // Extract to dest
   mkdirSync(dest, { recursive: true });
-  execSync(`tar -xzf "${tmpFile}" --strip-components=1 -C "${dest}"`, { stdio: "pipe" });
+  execFileSync("tar", ["-xzf", tmpFile, "--strip-components=1", "-C", dest], { stdio: "pipe" });
 
   // Clean up tarball
-  try { execSync(`rm -f "${tmpFile}"`, { stdio: "pipe" }); } catch { /* ignore */ }
+  try { unlinkSync(tmpFile); } catch { /* ignore */ }
 
   // Find binaries
   const binaries = findBinaries(dest);
@@ -107,7 +114,7 @@ async function installFromGithub(
   const pkgJson = join(dest, "package.json");
   if (existsSync(pkgJson)) {
     try {
-      execSync("npm install --production --ignore-scripts 2>/dev/null || true", {
+      execFileSync("npm", ["install", "--production", "--ignore-scripts"], {
         cwd: dest,
         stdio: "pipe",
         timeout: 60000,
@@ -119,7 +126,7 @@ async function installFromGithub(
   const reqTxt = join(dest, "requirements.txt");
   if (existsSync(reqTxt)) {
     try {
-      execSync(`pip install -r requirements.txt --target "${join(dest, ".venv")}" 2>/dev/null || true`, {
+      execFileSync("pip", ["install", "-r", "requirements.txt", "--target", join(dest, ".venv")], {
         cwd: dest,
         stdio: "pipe",
         timeout: 60000,
@@ -146,16 +153,16 @@ async function installFromNpm(
 
   // Use npm pack to download and extract
   try {
-    execSync(
-      `npm pack "${pkg}" --pack-destination "${tmpdir()}" 2>/dev/null`,
-      { stdio: "pipe", timeout: 60000 },
-    );
+    execFileSync("npm", ["pack", pkg, "--pack-destination", tmpdir()], {
+      stdio: "pipe",
+      timeout: 60000,
+    });
   } catch {
     throw new Error(`Failed to download npm package: ${pkg}`);
   }
 
   // Find the tarball that was created
-  const safeName = pkg.replace(/^@/, "").replace(/\//, "-");
+  const safeName = pkg.replace(/^@/, "").replace(/\//g, "-");
   const tmpFiles = readdirSync(tmpdir()).filter(
     (f) => f.startsWith(safeName) && f.endsWith(".tgz"),
   );
@@ -165,14 +172,17 @@ async function installFromNpm(
   }
 
   const tarPath = join(tmpdir(), tarball);
-  execSync(`tar -xzf "${tarPath}" --strip-components=1 -C "${dest}"`, { stdio: "pipe" });
-  try { execSync(`rm -f "${tarPath}"`, { stdio: "pipe" }); } catch { /* ignore */ }
+  try {
+    execFileSync("tar", ["-xzf", tarPath, "--strip-components=1", "-C", dest], { stdio: "pipe" });
+  } finally {
+    try { unlinkSync(tarPath); } catch { /* ignore */ }
+  }
 
   // Install production deps
   const pkgJson = join(dest, "package.json");
   if (existsSync(pkgJson)) {
     try {
-      execSync("npm install --production --ignore-scripts 2>/dev/null || true", {
+      execFileSync("npm", ["install", "--production", "--ignore-scripts"], {
         cwd: dest,
         stdio: "pipe",
         timeout: 60000,
@@ -203,7 +213,11 @@ async function installFromLocal(
   }
 
   mkdirSync(dest, { recursive: true });
-  execSync(`cp -r "${srcPath}/." "${dest}/" 2>/dev/null || cp -r "${srcPath}" "${dest}/"`, { stdio: "pipe" });
+  try {
+    execFileSync("cp", ["-r", `${srcPath}/.`, `${dest}/`], { stdio: "pipe" });
+  } catch {
+    execFileSync("cp", ["-r", srcPath, `${dest}/`], { stdio: "pipe" });
+  }
 
   const binaries = findBinaries(dest);
   makeExecutable(binaries);

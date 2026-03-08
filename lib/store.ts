@@ -5,6 +5,13 @@ import { join } from "node:path";
 const TOOLS_DIR = "tools";
 const STORE_FILE = "tools.json";
 
+/** Validate a tool ID to prevent path traversal */
+function validateToolId(id: string): void {
+  if (!id || id.includes("..") || /[\x00-\x1f]/.test(id) || /^[/\\]/.test(id)) {
+    throw new Error(`Invalid tool ID: ${id}`);
+  }
+}
+
 /** Generate CONTEXT.md content for a tool */
 export function generateContextMd(tool: Tool): string {
   const lines: string[] = [
@@ -125,6 +132,7 @@ export function createStore(dataDir: string): ToolStore {
     },
 
     async save(tool: Tool): Promise<void> {
+      validateToolId(tool.id);
       const tools = loadTools();
       tools.set(tool.id, tool);
       saveTools(tools);
@@ -136,6 +144,7 @@ export function createStore(dataDir: string): ToolStore {
     },
 
     async remove(id: string): Promise<boolean> {
+      validateToolId(id);
       const tools = loadTools();
       const existed = tools.delete(id);
       if (existed) {
@@ -157,5 +166,6 @@ export function createStore(dataDir: string): ToolStore {
 
 /** Get the install path for a tool */
 export function getToolInstallDir(dataDir: string, toolId: string): string {
+  validateToolId(toolId);
   return join(dataDir, TOOLS_DIR, toolId, "package");
 }
