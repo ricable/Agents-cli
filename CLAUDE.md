@@ -126,14 +126,6 @@ agents-cli mcp start                   # expose tools as MCP server
 agents-cli mcp list                    # list MCP-available tools
 ```
 
-### Trending pipeline
-
-```bash
-npx tsx examples/trending-pipeline.ts --limit 25
-npx tsx examples/trending-pipeline.ts --language rust --since weekly
-npx tsx examples/trending-pipeline.ts --dry-run
-```
-
 ### Skill Forge (unified skill generation pipeline)
 
 ```bash
@@ -152,11 +144,27 @@ npx tsx examples/skill-forge.ts "build a RAG pipeline with vector search"
 npx tsx examples/skill-forge.ts "python linting" --limit 5
 npx tsx examples/skill-forge.ts --dry-run "vector search"   # preview without installing
 
-# Audit mode — quality check all existing skills
-npx tsx examples/skill-forge.ts --audit
-npx tsx examples/skill-forge.ts --audit --strict            # exit 1 on failures
+# Trending mode — scrape GitHub trending → filter CLI tools → forge skills
+npx tsx examples/skill-forge.ts --trending
+npx tsx examples/skill-forge.ts --trending --language rust --since weekly --limit 10
+npx tsx examples/skill-forge.ts --trending --dry-run
 
-# Flags: --deep, --dry-run, --json, --strict, --limit N
+# Curated mode — 91 general + 502 AI/ML tools from registry → forge skills
+npx tsx examples/skill-forge.ts --curated --list-categories
+npx tsx examples/skill-forge.ts --curated --category ai-ml/llm-inference
+npx tsx examples/skill-forge.ts --curated --category code-search --limit 5
+npx tsx examples/skill-forge.ts --curated --skip-installed --limit 20
+
+# Workflow mode — NL prompt → template-based agent code generation
+npx tsx examples/skill-forge.ts --workflow "build a content publishing pipeline"
+npx tsx examples/skill-forge.ts --workflow --list
+
+# Enhanced audit mode — quality check with domain filter and AI scoring
+npx tsx examples/skill-forge.ts --audit
+npx tsx examples/skill-forge.ts --audit --domain agent
+npx tsx examples/skill-forge.ts --audit --ai --strict
+
+# Common flags: --deep, --dry-run, --json, --strict, --limit N
 ```
 
 ## Agent-first design principles
@@ -195,6 +203,7 @@ lib/
   mcp-skill.ts         — opensrc MCP skill bridge (callOpensrc, opensrc)
   chunker.ts           — AST-aware semantic chunking of source files
   extractor.ts         — README excerpts, code blocks, export groups, repo analysis
+  curated-tools.ts     — 91 general + AI/ML tool registry for --curated mode
   cache.ts             — SkillCache, file hashing, incremental generation
   search.ts            — hybrid FTS + vector search (lazy better-sqlite3)
   indexer.ts           — source indexing pipeline (files → chunks → SQLite)
@@ -224,15 +233,11 @@ lib/
     aggregated-db.ts   — aggregated cross-domain database
     sqlite.ts          — SQLite utilities, WAL pragmas, chunk upsert
 examples/
-  skill-forge.ts           — unified 8-stage skill generation pipeline
-  trending-pipeline.ts     — batch: GitHub trending → skills
-  pipeline-discover.ts     — NL prompt → multi-registry discovery
+  skill-forge.ts           — unified pipeline (--tool, --trending, --curated, --workflow, --audit)
   regenerate-skills.ts     — batch regeneration of existing skills
-  skill-quality-audit.ts   — quality audit across skill directories
-  workflow-builder.ts      — workflow → skill generation
   chunker-demo.ts          — AST chunking demonstration
-  top100-pipeline.ts       — top-100 trending repos pipeline
   generated-skills/        — 350+ auto-generated skill directories
+  generated-workflows/     — template-generated agent code
 tests/
   skills.test.ts, resolver.test.ts, guards.test.ts, analyzer.test.ts,
   store.test.ts, registry.test.ts, schemas.test.ts, mcp.test.ts,
