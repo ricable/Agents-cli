@@ -2,9 +2,9 @@ import type { ToolResolver, ResolveResult, SourceFormat } from "./types.js";
 
 /** Pattern matchers for source format detection */
 const FORMAT_PATTERNS: ReadonlyArray<{ pattern: RegExp; format: SourceFormat }> = [
+  { pattern: /^@[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+$/, format: "npm" },
   { pattern: /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+$/, format: "github" },
   { pattern: /^https?:\/\/github\.com\//, format: "github" },
-  { pattern: /^@?[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+$/, format: "npm" },
   { pattern: /^https?:\/\/.*\.tar\.gz$/, format: "tarball" },
   { pattern: /^https?:\/\/.*\.tgz$/, format: "tarball" },
   { pattern: /^https?:\/\//, format: "url" },

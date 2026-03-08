@@ -29,6 +29,11 @@ describe("detectFormat", () => {
     expect(detectFormat("~/tools/my-tool")).toBe("local");
   });
 
+  it("detects npm scoped packages", () => {
+    expect(detectFormat("@claude-flow/cli")).toBe("npm");
+    expect(detectFormat("@ruvnet/bmssp")).toBe("npm");
+  });
+
   it("returns null for unrecognized input", () => {
     expect(detectFormat("just-a-name")).toBeNull();
   });
