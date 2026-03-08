@@ -31,9 +31,24 @@ __pycache__/
 # Logs
 *.log
 
-# SQLite (Phase 3)
+# SQLite databases (runtime-generated)
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
 *.sqlite3
 *.sqlite3-journal
+/db/
+
+# Generated artifacts (runtime)
+.mcp.json
+examples/plugins/
+examples/generated-workflows/
+examples/generated-skills/
+examples/generated-skills-old/
+examples/generated-workflows-old/
+
+# Local tool management
+mise.toml
 
 # Claude Code agent metadata
 .claude/

@@ -90,3 +90,135 @@ export class InputValidationError extends Error {
     this.code = code;
   }
 }
+
+// =============================================================================
+// SKILL.md frontmatter validation
+// =============================================================================
+
+/** Allowed top-level YAML fields in SKILL.md frontmatter */
+const ALLOWED_FIELDS = new Set([
+  "name", "description", "allowed-tools", "compatibility", "license", "metadata",
+]) as ReadonlySet<string>;
+
+/**
+ * Validate SKILL.md content structure and frontmatter.
+ *
+ * Enforces Anthropic's official spec:
+ *   - Required: name, description
+ *   - Optional: allowed-tools, compatibility, license, metadata
+ *   - name: kebab-case, a-z0-9- only, max 64 chars
+ *   - description: max 1024 chars, non-empty
+ *   - No XML angle brackets (security restriction)
+ */
+export function validateSkillContent(content: string): string[] {
+  const errors: string[] = [];
+
+  const fmMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!fmMatch || !fmMatch[1]) {
+    errors.push("Missing YAML frontmatter (--- delimiters required)");
+    return errors;
+  }
+
+  const fm: string = fmMatch[1];
+
+  // Security: no XML angle brackets anywhere in frontmatter
+  if (/<|>/.test(fm)) {
+    errors.push("XML angle brackets found in frontmatter (security violation)");
+  }
+
+  // name field: required, kebab-case only
+  const nameMatch = fm.match(/^name:\s*["']?(.+?)["']?\s*$/m);
+  if (!nameMatch || !nameMatch[1]) {
+    errors.push("Missing 'name' field in frontmatter");
+  } else {
+    const name = nameMatch[1].replace(/^["']|["']$/g, "").trim();
+    if (/[^a-z0-9-]/.test(name)) {
+      errors.push(`name "${name}" has invalid chars -- must be kebab-case [a-z0-9-] only`);
+    }
+    if (name.length > 64) {
+      errors.push(`name "${name}" exceeds 64 chars (${name.length})`);
+    }
+    if (name.length === 0) {
+      errors.push("name is empty");
+    }
+  }
+
+  // description field: required, max 1024 chars
+  const descQuoted  = fm.match(/^description:\s*"([\s\S]*?)"\s*$/m)?.[1] ?? "";
+  const descSingle  = fm.match(/^description:\s*'([\s\S]*?)'\s*$/m)?.[1] ?? "";
+  const descRaw     = fm.match(/^description:\s*([^"'][^\n]*?)\s*$/m)?.[1] ?? "";
+  const descValue   = (descQuoted || descSingle || descRaw).trim();
+
+  if (!descValue) {
+    errors.push("Missing or empty 'description' field");
+  } else if (descValue.length > 1024) {
+    errors.push(`description exceeds 1024 chars (${descValue.length})`);
+  }
+
+  // Warn on unexpected top-level YAML fields
+  for (const line of fm.split("\n")) {
+    const field = line.match(/^([a-z][\w-]*):/)?.[1];
+    if (field && !ALLOWED_FIELDS.has(field)) {
+      errors.push(`Unexpected YAML field: "${field}" (allowed: ${[...ALLOWED_FIELDS].join(", ")})`);
+    }
+  }
+
+  return errors;
+}
+
+/**
+ * Validates all fields in the extended frontmatter spec.
+ * Includes allowed-tools, compatibility, license, and metadata.
+ */
+export function validateFullFrontmatter(content: string): string[] {
+  const errors = validateSkillContent(content); // base validation
+
+  const fmMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!fmMatch || !fmMatch[1]) return errors;
+
+  const fm: string = fmMatch[1];
+
+  // allowed-tools: space-separated tool specs (e.g. "Bash(npm:*) Bash(npx:*)")
+  const allowedToolsMatch = fm.match(/^allowed-tools:\s*["']?(.+?)["']?\s*$/m);
+  if (allowedToolsMatch && allowedToolsMatch[1]) {
+    const val = allowedToolsMatch[1].trim();
+    if (val.length === 0) {
+      errors.push("allowed-tools is empty -- omit field or provide tool specs");
+    }
+    // Basic format check: each spec should be a word optionally followed by (...)
+    const specs = val.split(/\s+/);
+    for (const spec of specs) {
+      if (!/^[A-Za-z][A-Za-z0-9_]*(\([^)]*\))?$/.test(spec)) {
+        errors.push(`allowed-tools spec "${spec}" has invalid format (expected: ToolName or ToolName(filter))`);
+      }
+    }
+  }
+
+  // compatibility: 1-500 chars
+  const compatMatch = fm.match(/^compatibility:\s*["']?(.+?)["']?\s*$/m);
+  if (compatMatch && compatMatch[1]) {
+    const val = compatMatch[1].trim();
+    if (val.length > 500) {
+      errors.push(`compatibility exceeds 500 chars (${val.length})`);
+    }
+  }
+
+  // license: should be a known SPDX identifier
+  const licenseMatch = fm.match(/^license:\s*["']?(.+?)["']?\s*$/m);
+  if (licenseMatch && licenseMatch[1]) {
+    const val = licenseMatch[1].trim();
+    if (val.length === 0) {
+      errors.push("license is empty");
+    }
+  }
+
+  // metadata: must be a YAML block (we just check it starts the block)
+  if (fm.includes("metadata:")) {
+    const metaBlock = fm.match(/^metadata:\n((?:  [^\n]*\n?)*)/m)?.[1];
+    if (!metaBlock || metaBlock.trim().length === 0) {
+      errors.push("metadata block is empty -- omit field or provide key-value pairs");
+    }
+  }
+
+  return errors;
+}

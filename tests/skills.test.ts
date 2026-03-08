@@ -19,7 +19,11 @@ import {
   writeLockfile,
   readLockfile,
   installSkill,
+  generateRichSkillMd,
+  generateSkillDirectory,
+
 } from "../lib/skills.js";
+import { testSkillSync } from "../lib/skill-tester.js";
 import type { Tool, Skill } from "../lib/types.js";
 
 // =============================================================================
@@ -215,12 +219,12 @@ describe("generateSkillMd", () => {
     expect(md).toContain("ingredients: []");
     expect(md).toContain("test-skill");
     // Description includes trigger hint
-    expect(md).toContain("Use this skill whenever");
+    expect(md).toContain("Use when");
   });
 
   it("includes usage section", () => {
     const md = generateSkillMd("usage-test", "Testing usage");
-    expect(md).toContain("## Usage");
+    expect(md).toContain("## Quick Start");
   });
 });
 
@@ -608,5 +612,216 @@ Just a body.
     expect(skill.frontmatter.name).toBe("empty-skill");
     expect(skill.ingredients).toHaveLength(0);
     expect(existsSync(skill.contextPath)).toBe(true);
+  });
+});
+
+// =============================================================================
+// Spec-compliant skill generation (battle test)
+// =============================================================================
+
+describe("spec-compliant skill generation", () => {
+  /** Create a mock Tool for testing generation */
+  function makeMockTool(overrides: Partial<Tool> = {}): Tool {
+    return {
+      id: "ruff",
+      meta: {
+        name: "ruff",
+        version: "0.1.0",
+        description: "An extremely fast Python linter and code formatter, written in Rust",
+        license: "MIT",
+        tags: ["python", "linter", "formatter"],
+      },
+      source: { format: "pypi", uri: "pypi:ruff" },
+      capabilities: {
+        commands: [
+          { name: "check", description: "Check files for issues", flags: [
+            { name: "--fix", description: "Auto-fix issues", type: "boolean", required: false },
+          ] },
+          { name: "format", description: "Format files", flags: [] },
+          { name: "rule", description: "Show rule details", flags: [] },
+        ],
+        globalFlags: [
+          { name: "--config", description: "Config file", type: "string", required: false },
+        ],
+        analysisMethod: "help-probe",
+      },
+      installPath: "/tmp/tools/ruff",
+      status: "installed",
+      installedAt: "2024-01-01T00:00:00.000Z",
+      updatedAt: "2024-01-01T00:00:00.000Z",
+      ...overrides,
+    };
+  }
+
+  describe("buildDescription via generateRichSkillMd", () => {
+    it("produces 'Use when' with action verbs, no 'CLI tool:' prefix", () => {
+      const tool = makeMockTool();
+      const md = generateRichSkillMd(tool);
+      const fm = parseFrontmatter(md);
+      expect(fm).not.toBeNull();
+      expect(fm!.description).toContain("Use when");
+      expect(fm!.description).not.toMatch(/^CLI tool:/i);
+      expect(fm!.description!.length).toBeLessThanOrEqual(1024);
+    });
+
+    it("uses domain-inferred triggers for tools without commands", () => {
+      const tool = makeMockTool({
+        capabilities: { commands: [], globalFlags: [], analysisMethod: "help-probe" },
+      });
+      const md = generateRichSkillMd(tool);
+      const fm = parseFrontmatter(md);
+      expect(fm!.description).toContain("Use when");
+      // Should use linter domain triggers, not "the task involves"
+      expect(fm!.description).not.toContain("the task involves");
+    });
+  });
+
+  describe("generateRichSkillMd frontmatter compliance", () => {
+    it("has kebab-case name, license, and compatibility", () => {
+      const tool = makeMockTool();
+      const md = generateRichSkillMd(tool);
+      // Check frontmatter fields
+      expect(md).toContain("name: ruff");
+      expect(md).toContain("license: MIT");
+      expect(md).toContain('compatibility: "Python 3.10+"');
+    });
+
+    it("normalizes names to kebab-case", () => {
+      const tool = makeMockTool({
+        meta: { ...makeMockTool().meta, name: "MyTool_v2" },
+      });
+      const md = generateRichSkillMd(tool);
+      expect(md).toMatch(/^name: mytool-v2$/m);
+    });
+
+    it("strips reserved words from names", () => {
+      const tool = makeMockTool({
+        meta: { ...makeMockTool().meta, name: "claude-helper" },
+      });
+      const md = generateRichSkillMd(tool);
+      // "claude" stripped, leaving "helper"
+      expect(md).toMatch(/^name: helper$/m);
+    });
+  });
+
+  describe("generateSkillDirectory structure", () => {
+    it("always produces references/guide.md", () => {
+      const tool = makeMockTool();
+      const dir = generateSkillDirectory(tool);
+      expect(dir.files["references/guide.md"]).toBeDefined();
+      expect(dir.files["references/guide.md"]).toContain("Usage Guide");
+    });
+
+    it("always produces references/examples.md", () => {
+      const tool = makeMockTool();
+      const dir = generateSkillDirectory(tool);
+      expect(dir.files["references/examples.md"]).toBeDefined();
+      expect(dir.files["references/examples.md"]).toContain("Common Usage Patterns");
+    });
+
+    it("always produces references/troubleshooting.md", () => {
+      const tool = makeMockTool();
+      const dir = generateSkillDirectory(tool);
+      expect(dir.files["references/troubleshooting.md"]).toBeDefined();
+      expect(dir.files["references/troubleshooting.md"]).toContain("Troubleshooting");
+    });
+
+    it("always produces scripts/install.sh", () => {
+      const tool = makeMockTool();
+      const dir = generateSkillDirectory(tool);
+      expect(dir.files["scripts/install.sh"]).toBeDefined();
+      expect(dir.files["scripts/install.sh"]).toContain("uv tool install");
+    });
+
+    it("always produces scripts/validate.py", () => {
+      const tool = makeMockTool();
+      const dir = generateSkillDirectory(tool);
+      expect(dir.files["scripts/validate.py"]).toBeDefined();
+      expect(dir.files["scripts/validate.py"]).toContain("uv run");
+    });
+
+    it("produces references/commands.md when commands exist", () => {
+      const tool = makeMockTool();
+      const dir = generateSkillDirectory(tool);
+      expect(dir.files["references/commands.md"]).toBeDefined();
+      expect(dir.files["references/commands.md"]).toContain("Full Command Reference");
+    });
+
+    it("SKILL.md has References section with links", () => {
+      const tool = makeMockTool();
+      const dir = generateSkillDirectory(tool);
+      expect(dir.skillMd).toContain("## References");
+      expect(dir.skillMd).toContain("[Guide](references/guide.md)");
+      expect(dir.skillMd).toContain("[Examples](references/examples.md)");
+      expect(dir.skillMd).toContain("[Troubleshooting](references/troubleshooting.md)");
+    });
+
+    it("SKILL.md has Scripts section", () => {
+      const tool = makeMockTool();
+      const dir = generateSkillDirectory(tool);
+      expect(dir.skillMd).toContain("## Scripts");
+      expect(dir.skillMd).toContain("scripts/install.sh");
+      expect(dir.skillMd).toContain("scripts/validate.py");
+    });
+
+    it("SKILL.md does NOT inline Common Patterns or Troubleshooting", () => {
+      const tool = makeMockTool();
+      const dir = generateSkillDirectory(tool);
+      expect(dir.skillMd).not.toContain("## Common Patterns");
+      expect(dir.skillMd).not.toContain("## Troubleshooting");
+    });
+  });
+
+  describe("quality gate integration", () => {
+    it("generated skill passes testSkillSync with trigger >= 0.80 and quality >= 6", () => {
+      const tool = makeMockTool();
+      const md = generateRichSkillMd(tool);
+      const result = testSkillSync("inline", md);
+      expect(result.triggerScore).toBeGreaterThanOrEqual(0.80);
+      expect(result.qualityScore).toBeGreaterThanOrEqual(6);
+      expect(result.passed).toBe(true);
+    });
+
+    it("tool without commands also passes quality gate", () => {
+      const tool = makeMockTool({
+        capabilities: { commands: [], globalFlags: [], analysisMethod: "help-probe" },
+      });
+      const md = generateRichSkillMd(tool);
+      const result = testSkillSync("inline", md);
+      expect(result.triggerScore).toBeGreaterThanOrEqual(0.80);
+      expect(result.qualityScore).toBeGreaterThanOrEqual(6);
+      expect(result.passed).toBe(true);
+    });
+  });
+
+  describe("source format coverage", () => {
+    it("npm tool gets correct install script and compatibility", () => {
+      const tool = makeMockTool({
+        source: { format: "npm", uri: "npm:express" },
+        meta: { ...makeMockTool().meta, name: "express" },
+      });
+      const dir = generateSkillDirectory(tool);
+      expect(dir.files["scripts/install.sh"]).toContain("npm install -g");
+      expect(dir.skillMd).toContain('compatibility: "Node.js v18+"');
+    });
+
+    it("crates tool gets correct install script and compatibility", () => {
+      const tool = makeMockTool({
+        source: { format: "crates", uri: "crates:ripgrep" },
+        meta: { ...makeMockTool().meta, name: "ripgrep" },
+      });
+      const dir = generateSkillDirectory(tool);
+      expect(dir.files["scripts/install.sh"]).toContain("cargo binstall");
+      expect(dir.skillMd).toContain('compatibility: "Rust toolchain"');
+    });
+
+    it("github tool gets correct install script", () => {
+      const tool = makeMockTool({
+        source: { format: "github", uri: "astral-sh/uv" },
+        meta: { ...makeMockTool().meta, name: "uv" },
+      });
+      const dir = generateSkillDirectory(tool);
+      expect(dir.files["scripts/install.sh"]).toContain("git clone");
+    });
   });
 });

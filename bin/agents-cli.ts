@@ -19,7 +19,7 @@ import { resolve } from "node:path";
 import { readPkgVersion } from "../lib/pkg-utils.js";
 import { createResolver } from "../lib/resolver.js";
 import { createInstaller } from "../lib/installer.js";
-import { createAnalyzer, findMainBinary, deepProbe, countSubcommands } from "../lib/analyzer.js";
+import { createAnalyzer, findMainBinary, deepProbe } from "../lib/analyzer.js";
 import { createStore, getToolInstallDir, generateContextMd } from "../lib/store.js";
 import { createRegistry } from "../lib/registry.js";
 import { McpBridge, createMcpConfig } from "../lib/mcp.js";
@@ -38,7 +38,7 @@ import {
   writeLockfile,
   readLockfile,
 } from "../lib/skills.js";
-import type { Tool, ToolCapabilities, ToolSubcommand, ToolSchema } from "../lib/types.js";
+import type { Tool, ToolCapabilities, ToolSubcommand, ToolSchema, ManifestEntry } from "../lib/types.js";
 
 const VERSION = "0.1.0";
 const DATA_DIR = join(homedir(), ".agents-cli");
@@ -1152,6 +1152,424 @@ program
       console.log(`Publishing ${name} to community registry...`);
       console.log("Community registry publishing is not yet available.");
       console.log("Contribution: add topic 'agents-cli' to your GitHub repo to be indexed.");
+    }
+  });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// skills test — test skill quality
+// ══════════════════════════════════════════════════════════════════════════════
+skills
+  .command("test [dir]")
+  .description("Test skill quality (trigger scoring + structural quality)")
+  .option("--strict", "Fail if any skill doesn't pass quality gate")
+  .option("--domain <domain>", "Filter by domain")
+  .option("--json", "Output as structured JSON")
+  .action(async (dir: string | undefined, opts: { strict?: boolean; domain?: string; json?: boolean }) => {
+    const start = Date.now();
+    const json = isJsonMode(opts);
+
+    try {
+      const { testAllSkillsSync } = await import("../lib/skill-tester.js");
+      const skillsDir = dir ? resolve(dir) : join(DATA_DIR, "skills");
+
+      if (!existsSync(skillsDir)) {
+        const result = failure("skills test", "DIR_NOT_FOUND", `Skills directory not found: ${skillsDir}`, start);
+        emit(result, json);
+        if (!json) console.error(result.error!.message);
+        return;
+      }
+
+      const results = testAllSkillsSync(skillsDir, opts.domain);
+
+      if (json) {
+        emit(success("skills test", { results, total: results.length }, start), true);
+      } else {
+        const { printQualityReport } = await import("../lib/skill-tester.js");
+        printQualityReport(results);
+      }
+
+      if (opts.strict) {
+        const failing = results.filter(r => !r.passed);
+        if (failing.length > 0) {
+          if (!json) console.error(`\n${failing.length} skill(s) below quality gate (0.5)`);
+          process.exitCode = 1;
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (json) { emit(failure("skills test", "TEST_FAILED", msg, start), true); }
+      else { console.error(`Skill test failed: ${msg}`); process.exitCode = 1; }
+    }
+  });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// skills group — group skills by domain and generate indexes
+// ══════════════════════════════════════════════════════════════════════════════
+skills
+  .command("group")
+  .description("Group skills by domain and generate hierarchical indexes")
+  .option("--dir <path>", "Skills directory")
+  .option("--json", "Output as structured JSON")
+  .action(async (opts: { dir?: string; json?: boolean }) => {
+    const start = Date.now();
+    const json = isJsonMode(opts);
+
+    try {
+      const { groupByDomain } = await import("../lib/indexes.js");
+      const { readdirSync } = await import("node:fs");
+
+      const dir = opts.dir ? resolve(opts.dir) : join(DATA_DIR, "skills");
+
+      if (!existsSync(dir)) {
+        const result = failure("skills group", "DIR_NOT_FOUND", `Skills directory not found: ${dir}`, start);
+        emit(result, json);
+        if (!json) console.error(result.error!.message);
+        return;
+      }
+
+      // Scan for SKILL.md files and extract manifest entries
+      const { parseFrontmatter: parseFm } = await import("../lib/skills.js");
+      const entries: ManifestEntry[] = [];
+      const items = readdirSync(dir, { withFileTypes: true });
+
+      for (const item of items) {
+        if (!item.isDirectory()) continue;
+        const skillPath = join(dir, item.name, "SKILL.md");
+        if (!existsSync(skillPath)) continue;
+        const content = readFileSync(skillPath, "utf-8");
+        const fm = parseFm(content);
+        if (fm) {
+          entries.push({
+            name: fm.name,
+            repo: "",
+            domain: (fm as unknown as Record<string, unknown>).domain as string ?? "uncategorized",
+            description: fm.description ?? "",
+          });
+        }
+      }
+
+      const grouped = groupByDomain(entries);
+      const domainCount = grouped.size;
+
+      if (json) {
+        const domains: Record<string, number> = {};
+        for (const [domain, items] of grouped) {
+          domains[domain] = items.length;
+        }
+        emit(success("skills group", { domains, totalSkills: entries.length, domainCount }, start), true);
+      } else {
+        console.log(`\nGrouped ${entries.length} skills into ${domainCount} domains:\n`);
+        for (const [domain, items] of grouped) {
+          console.log(`  ${domain} (${items.length})`);
+        }
+        console.log();
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (json) { emit(failure("skills group", "GROUP_FAILED", msg, start), true); }
+      else { console.error(`Skills grouping failed: ${msg}`); process.exitCode = 1; }
+    }
+  });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// skills factory — run 3-layer skill factory
+// ══════════════════════════════════════════════════════════════════════════════
+skills
+  .command("factory")
+  .description("Run 3-layer skill factory (structural + optional AI)")
+  .option("--manifest <path>", "Path to skills-manifest.json")
+  .option("--domain <name>", "Filter by domain")
+  .option("--repo <name>", "Filter by repo")
+  .option("--ai", "Enable Layer 3 (Claude Batch API)")
+  .option("--force", "Force regeneration")
+  .option("--dry-run", "Preview without writing")
+  .option("--json", "Output as structured JSON")
+  .action(async (opts: { manifest?: string; domain?: string; repo?: string; ai?: boolean; force?: boolean; dryRun?: boolean; json?: boolean }) => {
+    const start = Date.now();
+    const json = isJsonMode(opts);
+
+    try {
+      const { runSkillFactory } = await import("../lib/skill-factory.js");
+
+      const factoryOpts = {
+        manifestPath: opts.manifest ?? join(DATA_DIR, "skills-manifest.json"),
+        skillsDir: join(DATA_DIR, "skills"),
+        opensrcDir: join(DATA_DIR, "opensrc"),
+        domain: opts.domain,
+        repo: opts.repo,
+        ai: opts.ai,
+        force: opts.force,
+        dryRun: opts.dryRun,
+      };
+
+      const result = await runSkillFactory(factoryOpts);
+
+      if (json) {
+        emit(success("skills factory", result, start), true);
+      } else {
+        console.log(opts.dryRun ? `Skill factory (dry-run):` : `Skill factory complete.`);
+        console.log(`  Generated: ${result.generated}`);
+        console.log(`  Skipped: ${result.skipped}`);
+        console.log(`  Total: ${result.total}`);
+        console.log(`  Domains: ${result.domains.join(", ") || "none"}`);
+        if (result.errors.length > 0) {
+          console.log(`  Errors: ${result.errors.length}`);
+          for (const e of result.errors) console.log(`    - ${e}`);
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (json) { emit(failure("skills factory", "FACTORY_FAILED", msg, start), true); }
+      else { console.error(`Skill factory failed: ${msg}`); process.exitCode = 1; }
+    }
+  });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// pipeline — discover packages from natural language prompt
+// ══════════════════════════════════════════════════════════════════════════════
+program
+  .command("pipeline <prompt>")
+  .description("Analyze prompt and discover packages from npm/GitHub/crates")
+  .option("--dry-run", "Analyze prompt without searching registries")
+  .option("--json", "Output as structured JSON")
+  .action(async (prompt: string, opts: { dryRun?: boolean; json?: boolean }) => {
+    const start = Date.now();
+    const json = isJsonMode(opts);
+
+    try {
+      const { classifyIntent } = await import("../lib/pipeline/intent.js");
+      const { parsePrompt } = await import("../lib/pipeline/prompt-parser.js");
+      const { extractEntities } = await import("../lib/pipeline/entity-extractor.js");
+
+      const intent = classifyIntent(prompt);
+      const parsed = parsePrompt(prompt);
+      const entities = extractEntities(prompt);
+
+      if (opts.dryRun) {
+        const data = { prompt, intent, parsed, entities };
+        if (json) { emit(success("pipeline", data, start), true); }
+        else {
+          console.log("Pipeline analysis (dry-run):");
+          console.log(`  Prompt: ${prompt}`);
+          console.log(`  Intent: ${intent.intent} (confidence: ${intent.confidence})`);
+          if (parsed.capabilities.length > 0) console.log(`  Capabilities: ${parsed.capabilities.join(", ")}`);
+          console.log(`  Entities: ${entities.map(e => e.name).join(", ") || "none"}`);
+        }
+        return;
+      }
+
+      // Non-dry-run: actually discover packages from registries
+      const { discoverNpmPackages } = await import("../lib/classifier/npm.js");
+      const { discoverGitHubRepos } = await import("../lib/classifier/github.js");
+      const { CAPABILITY_SEARCH_MAP } = await import("../lib/pipeline/capability-map.js");
+
+      // Collect search terms from parsed capabilities
+      const searchTerms = new Set<string>();
+      for (const cap of parsed.capabilities) {
+        const mapping = CAPABILITY_SEARCH_MAP[cap];
+        if (mapping) {
+          for (const term of mapping.npm) searchTerms.add(term);
+        }
+      }
+      // Also use entity names as search terms
+      for (const e of entities) {
+        searchTerms.add(e.name.toLowerCase());
+      }
+
+      // Discover from npm and GitHub in parallel
+      const [npmResults, githubResults] = await Promise.allSettled([
+        discoverNpmPackages(),
+        discoverGitHubRepos(),
+      ]);
+
+      const npmPkgs = npmResults.status === "fulfilled" ? npmResults.value : [];
+      const githubPkgs = githubResults.status === "fulfilled" ? githubResults.value : [];
+
+      // Filter to relevant packages using search terms
+      const allPkgs = [...npmPkgs, ...githubPkgs];
+      const relevant = searchTerms.size > 0
+        ? allPkgs.filter(p =>
+            [...searchTerms].some(t =>
+              p.name.includes(t) || p.description.toLowerCase().includes(t)
+            )
+          )
+        : allPkgs;
+
+      // Deduplicate by repo
+      const seen = new Set<string>();
+      const packages = relevant.filter(p => {
+        if (seen.has(p.repo)) return false;
+        seen.add(p.repo);
+        return true;
+      }).slice(0, 25);
+
+      const data = { prompt, intent, parsed, entities, packages };
+
+      if (json) {
+        emit(success("pipeline", data, start), true);
+      } else {
+        console.log(`\nPipeline analysis:`);
+        console.log(`  Intent: ${intent.intent} (confidence: ${intent.confidence})`);
+        if (parsed.capabilities.length > 0) console.log(`  Capabilities: ${parsed.capabilities.join(", ")}`);
+        if (entities.length > 0) {
+          console.log(`  Entities:`);
+          for (const e of entities) {
+            console.log(`    - ${e.name} (${e.type})`);
+          }
+        }
+        if (packages.length > 0) {
+          console.log(`\n  Discovered packages (${packages.length}):`);
+          for (const p of packages) {
+            console.log(`    ${p.name} — ${p.description.slice(0, 80)}`);
+          }
+        } else {
+          console.log(`\n  No packages discovered.`);
+        }
+        console.log();
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (json) { emit(failure("pipeline", "PIPELINE_FAILED", msg, start), true); }
+      else { console.error(`Pipeline failed: ${msg}`); process.exitCode = 1; }
+    }
+  });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// index — index source directory for FTS search
+// ══════════════════════════════════════════════════════════════════════════════
+program
+  .command("index <source>")
+  .description("Index source directory for FTS search")
+  .option("--domain <name>", "Domain for indexing")
+  .option("--dry-run", "Preview without indexing")
+  .option("--json", "Output as structured JSON")
+  .action(async (source: string, opts: { domain?: string; dryRun?: boolean; json?: boolean }) => {
+    const start = Date.now();
+    const json = isJsonMode(opts);
+    const sourcePath = resolve(source);
+
+    if (!existsSync(sourcePath)) {
+      const result = failure("index", "DIR_NOT_FOUND", `Source directory not found: ${sourcePath}`, start);
+      emit(result, json);
+      if (!json) console.error(result.error!.message);
+      return;
+    }
+
+    try {
+      const { indexSources } = await import("../lib/indexer.js");
+
+      if (opts.dryRun) {
+        const data = { action: "index", source: sourcePath, domain: opts.domain ?? "default" };
+        if (json) { emit(success("index", data, start), true); }
+        else {
+          console.log(`Would index: ${sourcePath}`);
+          console.log(`  Domain: ${opts.domain ?? "default"}`);
+        }
+        return;
+      }
+
+      const result = await indexSources({ sourceDirs: [sourcePath], domain: opts.domain });
+
+      if (json) {
+        emit(success("index", result, start), true);
+      } else {
+        console.log(`Indexed ${sourcePath}`);
+        console.log(`  Packages: ${result.packages}`);
+        console.log(`  Chunks: ${result.totalChunks}`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (json) { emit(failure("index", "INDEX_FAILED", msg, start), true); }
+      else { console.error(`Indexing failed: ${msg}`); process.exitCode = 1; }
+    }
+  });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// plugin — plugin management
+// ══════════════════════════════════════════════════════════════════════════════
+const plugin = program.command("plugin").description("Plugin management");
+
+plugin
+  .command("build")
+  .description("Build domain plugins from skills")
+  .option("--domain <name>", "Build only this domain")
+  .option("--ai", "Generate AI-enhanced agent definitions")
+  .option("--dry-run", "Preview without building")
+  .option("--json", "Output as structured JSON")
+  .action(async (opts: { domain?: string; ai?: boolean; dryRun?: boolean; json?: boolean }) => {
+    const start = Date.now();
+    const json = isJsonMode(opts);
+
+    try {
+      const { buildPlugins } = await import("../lib/plugin/builder.js");
+
+      if (opts.dryRun) {
+        const data = { action: "build", domain: opts.domain ?? "all", ai: opts.ai ?? false };
+        if (json) { emit(success("plugin build", data, start), true); }
+        else {
+          console.log("Would build plugins:");
+          console.log(`  Domain: ${opts.domain ?? "all"}`);
+          console.log(`  AI: ${opts.ai ?? false}`);
+        }
+        return;
+      }
+
+      await buildPlugins({
+        domain: opts.domain,
+        aiGenerate: opts.ai,
+        rootDir: DATA_DIR,
+      });
+
+      const data = { domain: opts.domain ?? "all", ai: opts.ai ?? false };
+      if (json) {
+        emit(success("plugin build", data, start), true);
+      } else {
+        console.log(`Plugin build complete.`);
+        console.log(`  Domain: ${opts.domain ?? "all"}`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (json) { emit(failure("plugin build", "BUILD_FAILED", msg, start), true); }
+      else { console.error(`Plugin build failed: ${msg}`); process.exitCode = 1; }
+    }
+  });
+
+plugin
+  .command("publish")
+  .description("Publish domain plugins to npm")
+  .option("--domain <name>", "Publish only this domain")
+  .option("--dry-run", "Preview without publishing")
+  .option("--json", "Output as structured JSON")
+  .action(async (opts: { domain?: string; dryRun?: boolean; json?: boolean }) => {
+    const start = Date.now();
+    const json = isJsonMode(opts);
+
+    try {
+      const { publishAllPlugins } = await import("../lib/plugin/publisher.js");
+
+      if (opts.dryRun) {
+        const data = { action: "publish", domain: opts.domain ?? "all" };
+        if (json) { emit(success("plugin publish", data, start), true); }
+        else {
+          console.log("Would publish plugins:");
+          console.log(`  Domain: ${opts.domain ?? "all"}`);
+        }
+        return;
+      }
+
+      await publishAllPlugins(false, opts.domain);
+
+      const data = { domain: opts.domain ?? "all" };
+      if (json) {
+        emit(success("plugin publish", data, start), true);
+      } else {
+        console.log(`Plugin publish complete.`);
+        console.log(`  Domain: ${opts.domain ?? "all"}`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (json) { emit(failure("plugin publish", "PUBLISH_FAILED", msg, start), true); }
+      else { console.error(`Plugin publish failed: ${msg}`); process.exitCode = 1; }
     }
   });
 
