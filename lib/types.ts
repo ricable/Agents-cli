@@ -17,7 +17,12 @@ export type InstallStatus =
   | "failed"
   | "outdated";
 
-/** Analysis method used to discover tool capabilities */
+/** Analysis method used to discover tool capabilities.
+ *  - "help-probe": only ran --help, no structured parsing succeeded
+ *  - "flag-parse": parsed commands/flags from --help output
+ *  - "verified": commands individually confirmed via smokeTest (set by forge stages.ts)
+ *  - "llm": LLM-assisted analysis
+ *  - "manual": manually specified */
 export type AnalysisMethod =
   | "help-probe"
   | "flag-parse"
@@ -79,7 +84,9 @@ export interface ToolCapabilities {
   readonly globalFlags: readonly ToolFlag[];
   readonly analysisMethod: AnalysisMethod;
   readonly rawHelp?: string;
-  /** Detected interaction mode: repl (interactive shell), subcommand (git-style), or single (one-shot). Always set by createAnalyzer(). */
+  /** Detected interaction mode: repl (interactive shell), subcommand (git-style), or single (one-shot).
+   *  Set by createAnalyzer() on all code paths, but optional in the type since
+   *  test fixtures and manually-constructed Tool objects may omit it. */
   readonly interactionMode?: InteractionMode;
 }
 

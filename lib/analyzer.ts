@@ -454,8 +454,11 @@ export function probeFlag(binPath: string, flag: string, timeout: number): boole
     });
     return out.length > 20;
   } catch (e: unknown) {
-    const err = e as { stdout?: string; stderr?: string };
-    return `${err.stdout ?? ""}${err.stderr ?? ""}`.length > 20;
+    if (typeof e === "object" && e !== null) {
+      const err = e as { stdout?: string; stderr?: string };
+      return `${err.stdout ?? ""}${err.stderr ?? ""}`.length > 20;
+    }
+    return false;
   }
 }
 

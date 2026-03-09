@@ -258,21 +258,15 @@ export function smokeTest(tool: Tool, installDir: string, cachedBin?: string | n
   // --version: direct call without appending help flags
   result.versionOk = probeFlag(bin, "--version", TIMEOUT);
 
-  // Commands discovered by the analyzer were already verified via probeWithArgs
-  // during analysis (the shallow path probes each command's --help for flag enrichment).
-  // Mark them as verified without re-probing.
+  // Probe top-level commands individually to verify they respond.
+  // The shallow analysis path only enriches flags for commands when count < 30,
+  // so we always probe here rather than trusting analysisMethod alone.
   const topLevelCmds = tool.capabilities.commands.filter(c => !c.name.includes(" ")).slice(0, 5);
-  if (tool.capabilities.analysisMethod === "flag-parse" && topLevelCmds.length > 0) {
-    result.commandsVerified = topLevelCmds.length;
-  } else if (topLevelCmds.length > 0) {
-    // Fallback: probe commands that weren't verified during analysis
-    for (const cmd of tool.capabilities.commands.slice(0, 5)) {
-      if (cmd.name.includes(" ")) continue;
-      if (probeWithArgs(bin, [cmd.name], TIMEOUT) !== null) {
-        result.commandsVerified++;
-      } else {
-        result.commandsFailed++;
-      }
+  for (const cmd of topLevelCmds) {
+    if (probeWithArgs(bin, [cmd.name], TIMEOUT) !== null) {
+      result.commandsVerified++;
+    } else {
+      result.commandsFailed++;
     }
   }
 

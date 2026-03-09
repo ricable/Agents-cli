@@ -14,12 +14,17 @@ import { processBatch, buildIndexes } from "./stages.js";
 
 /** Format a curated tool's source into a prefixed source string for the resolver. */
 function formatSource(meta: CliTool): string {
-  if (meta.sourceType === "local") return meta.source;
-  if (meta.sourceType === "npm") {
-    return meta.source.startsWith("@") ? meta.source : `npm:${meta.source}`;
+  switch (meta.sourceType) {
+    case "local": return meta.source;
+    case "npm": return meta.source.startsWith("@") ? meta.source : `npm:${meta.source}`;
+    case "pypi": return `pypi:${meta.source}`;
+    case "github": return meta.source;
+    default: {
+      // Exhaustiveness check — compile error if a new sourceType is added without handling
+      meta.sourceType satisfies never;
+      return meta.source;
+    }
   }
-  if (meta.sourceType === "pypi") return `pypi:${meta.source}`;
-  return meta.source;
 }
 
 export async function curatedMode(args: CliArgs, startTime: number): Promise<void> {

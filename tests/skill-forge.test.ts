@@ -9,6 +9,7 @@ import {
 
 } from "../examples/skill-forge.js";
 import { smokeTest } from "../examples/forge/stages.js";
+import { discoverPathBinaries } from "../examples/forge/mode-system.js";
 import { generateInstallScript, shellQuote } from "../lib/skills.js";
 import { GENERAL_TOOLS } from "../lib/curated-tools.js";
 import type { Tool, ToolCommand } from "../lib/types.js";
@@ -297,9 +298,9 @@ echo "help"
 // ── Curated tools: PyPI sourceType ─────────────────────────────────────
 
 describe("curated tools: gui-wrapper sourceTypes", () => {
-  it("gui-wrapper entries use sourceType 'pypi' or 'local'", () => {
+  it("gui-wrapper entries are local (aspirational pypi entries are commented out)", () => {
     const guiWrappers = GENERAL_TOOLS.filter(t => t.category === "gui-wrappers");
-    expect(guiWrappers.length).toBeGreaterThanOrEqual(8);
+    expect(guiWrappers.length).toBeGreaterThanOrEqual(1);
     for (const t of guiWrappers) {
       expect(["pypi", "local"]).toContain(t.sourceType);
     }
@@ -312,15 +313,10 @@ describe("curated tools: gui-wrapper sourceTypes", () => {
     }
   });
 
-  it("pypi gui-wrappers produce valid pypi: source string, local ones pass through", () => {
+  it("local gui-wrappers pass source through as-is", () => {
     const guiWrappers = GENERAL_TOOLS.filter(t => t.category === "gui-wrappers");
     for (const t of guiWrappers) {
-      if (t.sourceType === "pypi") {
-        const formatted = `pypi:${t.source}`;
-        expect(formatted).toMatch(/^pypi:cli-anything-/);
-        expect(formatted).not.toMatch(/^npm:/);
-      } else if (t.sourceType === "local") {
-        // Local tools use path as source
+      if (t.sourceType === "local") {
         expect(t.source).toMatch(/^\.\//);
       }
     }
@@ -359,5 +355,76 @@ describe("parseArgs --system", () => {
     process.argv = ["node", "script"];
     const args = parseArgs();
     expect(args.system).toBe(false);
+  });
+});
+
+// ── discoverPathBinaries (mode-system.ts) ──────────────────────────────
+
+describe("discoverPathBinaries", () => {
+  let tmpDir: string;
+  let originalPath: string | undefined;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "agents-cli-path-"));
+    originalPath = process.env["PATH"];
+  });
+
+  afterEach(() => {
+    process.env["PATH"] = originalPath;
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("discovers executables from a temp PATH dir", () => {
+    const script = join(tmpDir, "my-cli-tool");
+    writeFileSync(script, "#!/bin/bash\necho hello");
+    chmodSync(script, 0o755);
+    process.env["PATH"] = tmpDir;
+
+    const results = discoverPathBinaries(10);
+    expect(results.some(r => r.name === "my-cli-tool")).toBe(true);
+  });
+
+  it("skips known system builtins", () => {
+    for (const name of ["bash", "ls", "grep", "cat"]) {
+      const script = join(tmpDir, name);
+      writeFileSync(script, "#!/bin/bash\necho hello");
+      chmodSync(script, 0o755);
+    }
+    process.env["PATH"] = tmpDir;
+
+    const results = discoverPathBinaries(100);
+    const names = results.map(r => r.name);
+    expect(names).not.toContain("bash");
+    expect(names).not.toContain("ls");
+    expect(names).not.toContain("grep");
+    expect(names).not.toContain("cat");
+  });
+
+  it("skips dotfiles and script extensions", () => {
+    writeFileSync(join(tmpDir, ".hidden"), "#!/bin/bash\necho"); chmodSync(join(tmpDir, ".hidden"), 0o755);
+    writeFileSync(join(tmpDir, "helper.sh"), "#!/bin/bash\necho"); chmodSync(join(tmpDir, "helper.sh"), 0o755);
+    writeFileSync(join(tmpDir, "tool.py"), "#!/usr/bin/env python3"); chmodSync(join(tmpDir, "tool.py"), 0o755);
+    process.env["PATH"] = tmpDir;
+
+    const results = discoverPathBinaries(100);
+    const names = results.map(r => r.name);
+    expect(names).not.toContain(".hidden");
+    expect(names).not.toContain("helper.sh");
+    expect(names).not.toContain("tool.py");
+  });
+
+  it("respects limit cap", () => {
+    for (let i = 0; i < 20; i++) {
+      const script = join(tmpDir, `tool-${String(i).padStart(2, "0")}`);
+      writeFileSync(script, "#!/bin/bash\necho hello");
+      chmodSync(script, 0o755);
+    }
+    process.env["PATH"] = tmpDir;
+
+    // limit=3 → cap=15, but only 20 binaries exist, and we check responsive count later
+    const results = discoverPathBinaries(3);
+    // discoverPathBinaries collects up to limit*5 candidates
+    expect(results.length).toBeLessThanOrEqual(15);
+    expect(results.length).toBeGreaterThan(0);
   });
 });

@@ -33,7 +33,7 @@ const SKIP_NAMES = new Set([
   "ls", "cp", "mv", "rm", "mkdir", "rmdir", "chmod", "chown", "chgrp",
   "cat", "head", "tail", "wc", "sort", "uniq", "cut", "tr", "tee",
   "grep", "sed", "awk", "find", "xargs", "env", "printenv",
-  "echo", "printf", "test", "[", "true", "false", "yes",
+  "echo", "printf", "test", "[", /* "[" is the test builtin */ "true", "false", "yes",
   "cd", "pwd", "which", "whoami", "hostname", "uname", "date",
   "kill", "sleep", "wait", "time", "su", "sudo", "passwd",
   "ssh", "scp", "sftp", "login", "logout", "exit",
@@ -53,7 +53,7 @@ const SKIP_NAMES = new Set([
 ]);
 
 /** Collect unique executable names from PATH directories. */
-function discoverPathBinaries(limit: number): Array<{ name: string; path: string }> {
+export function discoverPathBinaries(limit: number): Array<{ name: string; path: string }> {
   const pathDirs = (process.env["PATH"] ?? "").split(delimiter);
   const seen = new Set<string>();
   const results: Array<{ name: string; path: string }> = [];
