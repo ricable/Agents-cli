@@ -196,6 +196,11 @@ npx tsx examples/skill-forge.ts --verify
 # MCP server — expose forged skills as MCP tools
 npx tsx examples/skill-forge.ts --mcp
 
+# System PATH discovery — scan local executables and forge skills
+npx tsx examples/skill-forge.ts --system --dry-run              # preview
+npx tsx examples/skill-forge.ts --system --limit 20             # forge top 20
+npx tsx examples/skill-forge.ts --system --limit 50 --deep      # deep probe
+
 # Factory mode — use skill-factory pipeline with AI enhancement
 npx tsx examples/skill-forge.ts --tool pypi:ruff --factory
 npx tsx examples/skill-forge.ts --tool pypi:ruff --factory --ai
@@ -292,6 +297,7 @@ examples/
     mode-index.ts          — --index mode (rebuild search DB)
     mode-plugin.ts         — --plugin, --agent-defs, --marketplace modes
     mode-lockfile.ts       — --freeze, --verify modes
+    mode-system.ts         — --system mode (PATH discovery)
     mode-mcp.ts            — --mcp mode (MCP server)
   regenerate-skills.ts     — batch regeneration of existing skills
   chunker-demo.ts          — AST chunking demonstration
@@ -358,6 +364,7 @@ The forge dispatcher delegates to mode modules in `examples/forge/`:
 | Index | `--index` | `mode-index.ts` | Rebuild search DB from generated skills |
 | Plugin | `--plugin` | `mode-plugin.ts` | Build domain plugins, agent defs, marketplace |
 | Lockfile | `--freeze`/`--verify` | `mode-lockfile.ts` | Freeze/verify skill integrity |
+| System | `--system` | `mode-system.ts` | Scan PATH for executables → probe → forge |
 | MCP | `--mcp` | `mode-mcp.ts` | Expose forged skills as MCP tools |
 
 ## Classifier API conventions
@@ -405,6 +412,10 @@ rejectPathTraversal(path: string, label: string): void  // blocks ../ in paths
 
 // Deep probing (lib/analyzer.ts)
 deepProbe(binPath: string, opts: { maxDepth: number }): { tree: ToolCommand[], totalCommands: number }
+detectInteractionMode(commands, globalFlags, rawHelp?): InteractionMode  // "repl" | "subcommand" | "single"
+
+// Smoke test (examples/forge/stages.ts)
+smokeTest(tool: Tool, installDir: string): SmokeTestResult  // { versionOk, helpOk, commandsVerified, commandsFailed }
 
 // Skills (lib/skills.ts)
 parseFrontmatter(content: string): SkillFrontmatter | null  // returns { name, version, description, ingredients, tags, compatibility, domain }

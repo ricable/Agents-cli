@@ -22,7 +22,8 @@ export type AnalysisMethod =
   | "help-probe"
   | "flag-parse"
   | "llm"
-  | "manual";
+  | "manual"
+  | "verified";
 
 /** Guard types for security validation */
 export type GuardType =
@@ -69,12 +70,17 @@ export interface ToolCommand {
   readonly flags: readonly ToolFlag[];
 }
 
+/** Interaction mode for a CLI tool */
+export type InteractionMode = "repl" | "subcommand" | "single";
+
 /** Capabilities discovered by the analyzer */
 export interface ToolCapabilities {
   readonly commands: readonly ToolCommand[];
   readonly globalFlags: readonly ToolFlag[];
   readonly analysisMethod: AnalysisMethod;
   readonly rawHelp?: string;
+  /** Detected interaction mode: repl (interactive shell), subcommand (git-style), or single (one-shot) */
+  readonly interactionMode?: InteractionMode;
 }
 
 /** Metadata describing a tool */

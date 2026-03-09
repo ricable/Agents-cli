@@ -361,12 +361,14 @@ export function createAnalyzer(): ToolAnalyzer {
           const { tree } = deepProbe(binPath, { maxDepth, timeout });
           // Flatten for backward-compatible commands array
           const flatCommands = flattenSubcommands(tree);
+          const interactionMode = detectInteractionMode(flatCommands, globalFlags, helpText);
 
           return {
             commands: flatCommands,
             globalFlags,
             analysisMethod: flatCommands.length > 0 || globalFlags.length > 0 ? "flag-parse" : "help-probe",
             rawHelp: helpText,
+            interactionMode,
           };
         }
 
@@ -385,11 +387,14 @@ export function createAnalyzer(): ToolAnalyzer {
           });
         }
 
+        const interactionMode = detectInteractionMode(enrichedCommands, globalFlags, helpText);
+
         return {
           commands: enrichedCommands,
           globalFlags,
           analysisMethod: enrichedCommands.length > 0 || globalFlags.length > 0 ? "flag-parse" : "help-probe",
           rawHelp: helpText,
+          interactionMode,
         };
       }
 
@@ -398,9 +403,48 @@ export function createAnalyzer(): ToolAnalyzer {
         commands: [],
         globalFlags: [],
         analysisMethod: "help-probe",
+        interactionMode: "single",
       };
     },
   };
+}
+
+// ── Interaction mode detection ────────────────────────────────────────────────
+
+import type { InteractionMode } from "./types.js";
+
+/** REPL-indicating subcommand names */
+const REPL_COMMANDS = new Set(["shell", "repl", "interactive", "console", "prompt"]);
+
+/** REPL-indicating flags */
+const REPL_FLAGS = /^--(interactive|repl|shell|console)$|^-i$/;
+
+/** Detect whether a tool operates as repl, subcommand, or single-shot */
+export function detectInteractionMode(
+  commands: readonly ToolCommand[],
+  globalFlags: readonly ToolFlag[],
+  rawHelp?: string,
+): InteractionMode {
+  // Check for REPL-indicating subcommands
+  for (const cmd of commands) {
+    if (REPL_COMMANDS.has(cmd.name.toLowerCase())) return "repl";
+  }
+  // Check for REPL-indicating flags
+  for (const flag of globalFlags) {
+    if (REPL_FLAGS.test(flag.name)) return "repl";
+    if (flag.alias && REPL_FLAGS.test(flag.alias)) return "repl";
+  }
+  // Check raw help text for REPL indicators
+  if (rawHelp) {
+    const lower = rawHelp.toLowerCase();
+    if (/\brepl\b/.test(lower) || /\binteractive\s+(mode|shell|session)\b/.test(lower)) {
+      return "repl";
+    }
+  }
+  // Subcommand mode if commands were found
+  if (commands.length > 0) return "subcommand";
+  // Otherwise single-shot
+  return "single";
 }
 
 export { parseExamples, parseFlags, parseCommands, countSubcommands, flattenSubcommands };

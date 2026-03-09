@@ -196,9 +196,10 @@ export async function resolveInstallAnalyze(
   const tool = await installTool(source, DATA_DIR, { store, verbose: false });
   log(`  → ${tool.meta.name}@${tool.meta.version} (${tool.source.format})`);
 
+  const installDir = getToolInstallDir(DATA_DIR, tool.meta.name);
+
   if (deep && tool.capabilities.commands.length > 0) {
     log(`  [3/3] Deep probing subcommands...`);
-    const installDir = getToolInstallDir(DATA_DIR, tool.meta.name);
     const bin = findMainBinary(installDir);
     if (bin) {
       const probed = deepProbe(bin, { maxDepth: 3 });
@@ -212,7 +213,74 @@ export async function resolveInstallAnalyze(
     log(`  [3/3] Analysis: ${tool.capabilities.commands.length} commands, ${tool.capabilities.globalFlags.length} flags`);
   }
 
+  // Smoke test: verify --version, --help, and sample commands respond
+  const smoke = smokeTest(tool, installDir);
+  if (smoke.helpOk || smoke.versionOk) {
+    const parts: string[] = [];
+    if (smoke.versionOk) parts.push("--version");
+    if (smoke.helpOk) parts.push("--help");
+    if (smoke.commandsVerified > 0) parts.push(`${smoke.commandsVerified} cmds`);
+    log(`  → Smoke test: ${parts.join(", ")} OK`);
+    // Upgrade analysisMethod to "verified" if commands pass
+    if (smoke.commandsVerified > 0 && smoke.commandsFailed === 0) {
+      (tool as { capabilities: typeof tool.capabilities }).capabilities = {
+        ...tool.capabilities,
+        analysisMethod: "verified",
+      };
+    }
+  }
+
   return tool;
+}
+
+// ── Stage 2b: Smoke Test (verify commands respond) ─────────────────────
+
+import { execFileSync } from "node:child_process";
+
+export interface SmokeTestResult {
+  versionOk: boolean;
+  helpOk: boolean;
+  commandsVerified: number;
+  commandsFailed: number;
+}
+
+/** Run a quick smoke test on a tool after install: --version, --help, and per-command --help. */
+export function smokeTest(tool: Tool, installDir: string): SmokeTestResult {
+  const result: SmokeTestResult = { versionOk: false, helpOk: false, commandsVerified: 0, commandsFailed: 0 };
+  const bin = findMainBinary(installDir);
+  if (!bin) return result;
+
+  const tryExec = (args: string[]): boolean => {
+    try {
+      const out = execFileSync(bin, args, {
+        timeout: 5000,
+        stdio: ["pipe", "pipe", "pipe"],
+        encoding: "utf-8",
+      });
+      return out.length > 0;
+    } catch (e: unknown) {
+      const err = e as { stdout?: string; stderr?: string };
+      const combined = `${err.stdout ?? ""}${err.stderr ?? ""}`;
+      return combined.length > 0;
+    }
+  };
+
+  result.versionOk = tryExec(["--version"]);
+  result.helpOk = tryExec(["--help"]);
+
+  // Verify a sample of discovered commands respond to --help
+  const cmdsToCheck = tool.capabilities.commands.slice(0, 10);
+  for (const cmd of cmdsToCheck) {
+    // Only check top-level command names (no spaces = not nested)
+    if (cmd.name.includes(" ")) continue;
+    if (tryExec([cmd.name, "--help"])) {
+      result.commandsVerified++;
+    } else {
+      result.commandsFailed++;
+    }
+  }
+
+  return result;
 }
 
 // ── Stage 5: Chunking (AST-aware) ─────────────────────────────────────
