@@ -11,6 +11,7 @@
 
 import path from "node:path";
 import { ensureSqlite } from "./db/sqlite.js";
+import { isPrivateUrl } from "./resolver.js";
 
 // ── Public types ───────────────────────────────────────────────────────
 
@@ -66,7 +67,27 @@ function cosine(a: Float32Array, b: Float32Array): number {
   return denom === 0 ? 0 : dot / denom;
 }
 
+/** Validate that OLLAMA_URL points to localhost or a public host (not private network). */
+function validateOllamaUrl(url: string): void {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname;
+    // Allow localhost — the expected Ollama host
+    if (host === "localhost" || host === "127.0.0.1" || host === "[::1]") return;
+    // Block private/internal network IPs (e.g. 10.x, 172.16.x, 192.168.x)
+    if (isPrivateUrl(url)) {
+      throw new Error(
+        `Ollama URL "${url}" points to a private network — only localhost or public hosts allowed`
+      );
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes("private network")) throw e;
+    throw new Error(`Invalid Ollama URL: ${url}`);
+  }
+}
+
 async function embedViaOllama(text: string): Promise<Float32Array> {
+  validateOllamaUrl(OLLAMA_URL);
   const res = await fetch(`${OLLAMA_URL}/api/embed`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

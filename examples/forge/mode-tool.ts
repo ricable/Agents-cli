@@ -3,7 +3,7 @@
  */
 
 import { existsSync } from "node:fs";
-import { success, emit, toErrorMessage } from "../../lib/output.js";
+import { success, failure, emit, toErrorMessage } from "../../lib/output.js";
 import { getToolInstallDir } from "../../lib/store.js";
 import { walkPackageDirs } from "../../lib/pkg-utils.js";
 import type { Tool } from "../../lib/types.js";
@@ -93,6 +93,9 @@ async function factoryMode(tool: Tool, args: CliArgs, startTime: number): Promis
   const entry = toolToManifestEntry(tool);
   if (!entry) {
     log("  ERROR: Could not create manifest entry for tool");
+    if (args.json) {
+      emit(failure("skill-forge:factory", "INVALID_ENTRY", "Could not create manifest entry for tool", startTime), true);
+    }
     process.exitCode = 1;
     return;
   }
@@ -143,6 +146,9 @@ async function monorepoMode(tool: Tool, args: CliArgs, startTime: number): Promi
   const installDir = getToolInstallDir(DATA_DIR, tool.meta.name);
   if (!existsSync(installDir)) {
     log("  ERROR: Install directory not found for monorepo discovery");
+    if (args.json) {
+      emit(failure("skill-forge:monorepo", "NO_INSTALL_DIR", "Install directory not found for monorepo discovery", startTime), true);
+    }
     process.exitCode = 1;
     return;
   }

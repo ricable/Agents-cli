@@ -378,7 +378,7 @@ export async function removeSkill(
 // =============================================================================
 
 /** Compute integrity hash for a lock entry */
-function computeIntegrity(sourceUri: string, version: string): string {
+export function computeIntegrity(sourceUri: string, version: string): string {
   return createHash("sha256")
     .update(`${sourceUri}@${version}`)
     .digest("hex");
@@ -638,7 +638,7 @@ function buildDescription(tool: Tool): string {
   const commands = tool.capabilities.commands;
 
   // Check for curated metadata attached by the forge pipeline
-  const curated = (tool as Tool & { _curatedMeta?: { description: string; agentValue: string; category: string } })._curatedMeta;
+  const curated = tool._curatedMeta;
 
   // Use curated description if the resolved one is just the tool name
   const effectiveDesc = (curated && desc.length < 30 && desc.toLowerCase().replace(/[^a-z0-9]/g, "") === name.toLowerCase().replace(/[^a-z0-9]/g, ""))
@@ -1375,8 +1375,7 @@ function inferDomain(tool: Tool): InferredDomain {
   return DEFAULT_DOMAIN;
 }
 
-/** Curated metadata shape (attached by forge pipeline) */
-interface CuratedMetaShape { description: string; agentValue: string; category: string }
+// CuratedMeta is now defined in lib/types.ts on the Tool interface
 
 /** Detected language for a tool */
 type ToolLanguage = "rust" | "go" | "python" | "node" | "c" | "unknown";
@@ -1406,7 +1405,7 @@ function detectToolLanguage(tool: Tool): ToolLanguage {
   }
 
   // 4. Curated category hints
-  const curated = (tool as Tool & { _curatedMeta?: CuratedMetaShape })._curatedMeta;
+  const curated = tool._curatedMeta;
   if (curated) {
     const cat = curated.category.toLowerCase();
     if (cat.includes("ml") || cat.includes("nlp") || cat.includes("data") || cat.includes("vision") ||
@@ -1426,7 +1425,7 @@ function isLikelyCli(tool: Tool): boolean {
   const tags = (tool.meta.tags as string[]).map(t => t.toLowerCase());
   if (tags.some(t => ["cli", "command-line", "terminal", "shell"].includes(t))) return true;
   // Check description/agentValue for CLI indicators
-  const curated = (tool as Tool & { _curatedMeta?: CuratedMetaShape })._curatedMeta;
+  const curated = tool._curatedMeta;
   const searchText = [tool.meta.description, curated?.agentValue ?? ""].join(" ").toLowerCase();
   if (/\b(cli|command.line|terminal|flags?|subcommands?|--\w+)\b/.test(searchText)) return true;
   // Check if binary files were found during install
@@ -1436,7 +1435,7 @@ function isLikelyCli(tool: Tool): boolean {
 }
 
 /** Infer the install command based on detected language and source format */
-function inferInstallCommand(tool: Tool, _curated?: CuratedMetaShape): string {
+function inferInstallCommand(tool: Tool, _curated?: Tool["_curatedMeta"]): string {
   const uri = tool.source.uri;
   if (tool.source.format === "npm") {
     return `npm install ${uri.startsWith("npm:") ? uri.slice(4) : uri}`;
@@ -1460,19 +1459,14 @@ function inferInstallCommand(tool: Tool, _curated?: CuratedMetaShape): string {
 }
 
 /** Infer the primary language hint (for code examples) */
-function inferLanguageHint(tool: Tool, _curated: CuratedMetaShape): "python" | "javascript" | "other" {
+function inferLanguageHint(tool: Tool, _curated: NonNullable<Tool["_curatedMeta"]>): "python" | "javascript" | "other" {
   const lang = detectToolLanguage(tool);
   if (lang === "python") return "python";
   if (lang === "node") return "javascript";
   return "other";
 }
 
-/** Shape of README sections extracted by forge pipeline */
-interface ReadmeSectionsShape {
-  codeBlocks: Array<{ lang: string; code: string }>;
-  sections: Record<string, string>;
-  raw: string;
-}
+// ReadmeSections is now defined in lib/types.ts on the Tool interface
 
 export function generateRichSkillMd(tool: Tool): string {
   const commands = tool.capabilities.commands;
@@ -1486,10 +1480,10 @@ export function generateRichSkillMd(tool: Tool): string {
   const helpLines = rawHelp.trim() ? rawHelp.trim().split("\n") : [];
 
   // README sections (attached by forge pipeline)
-  const readmeSections = (tool as Tool & { _readmeSections?: ReadmeSectionsShape })._readmeSections;
+  const readmeSections = tool._readmeSections;
 
   // Check for curated metadata
-  const curated = (tool as Tool & { _curatedMeta?: { description: string; agentValue: string; category: string } })._curatedMeta;
+  const curated = tool._curatedMeta;
   const isCli = isLikelyCli(tool);
   const isLibrary = !isCli && commands.length === 0;
 
@@ -1766,8 +1760,8 @@ export function generateSkillDirectory(tool: Tool): SkillDirectory {
   const desc = normalizeDesc(tool);
   const domain = inferDomain(tool);
   const refs = computeRefDecisions(tool);
-  const curated = (tool as Tool & { _curatedMeta?: CuratedMetaShape })._curatedMeta;
-  const readmeSections = (tool as Tool & { _readmeSections?: ReadmeSectionsShape })._readmeSections;
+  const curated = tool._curatedMeta;
+  const readmeSections = tool._readmeSections;
   const isLibrary = commands.length === 0;
   // Use curated description for guide/examples if available and desc is generic
   const richDesc = (curated && desc.length < 30) ? curated.description : desc;

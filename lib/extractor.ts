@@ -7,7 +7,8 @@
 
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import type { ManifestEntry, PackageAnalysis, ExportGroup } from "./types.js";
+import type { ManifestEntry, PackageAnalysis, ExportGroup, ReadmeSections } from "./types.js";
+export type { ReadmeSections } from "./types.js";
 
 /** Regex that matches common package manager install commands */
 export const INSTALL_CMD_RE = /^\$?\s*(pip|npm|brew|cargo|go|apt|yum|dnf|scoop|choco|winget|port|snap|flatpak|pacman|emerge|nix-env|conda|zypper|apk|pkg|sudo\s+\w+)\s+(install|add|get|--install|-S)\b/;
@@ -47,15 +48,7 @@ export function extractReadmeExcerpt(readme: string, maxChars = 400): string {
   return prose.join(" ").slice(0, maxChars);
 }
 
-/** Extracted README sections keyed by normalized heading */
-export interface ReadmeSections {
-  /** All code blocks (any language) from the README, capped at 10 */
-  codeBlocks: Array<{ lang: string; code: string }>;
-  /** Sections by heading (lowercase, e.g. "quick start", "installation", "usage") */
-  sections: Record<string, string>;
-  /** Full README text (capped) */
-  raw: string;
-}
+// ReadmeSections is defined in lib/types.ts and re-exported above
 
 /** Check if a fenced code block contains actual code (not prose or install-only commands) */
 export function isActualCode(code: string, lang: string): boolean {

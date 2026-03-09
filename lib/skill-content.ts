@@ -11,6 +11,11 @@
 import { ManifestEntry, PackageAnalysis, skillDirName } from "./types.js";
 import { DOMAIN_TRIGGERS } from "./domains.js";
 
+// Local shellQuote to avoid circular dependency with skills.ts
+function shellQuote(s: string): string {
+  return "'" + s.replace(/'/g, "'\\''") + "'";
+}
+
 // ── Name + description builders ────────────────────────────────────────
 
 /**
@@ -323,14 +328,16 @@ export function generateApiFile(entry: ManifestEntry, analysis: PackageAnalysis)
 
 /** Generates scripts/search.sh */
 export function generateSearchScript(entry: ManifestEntry): string {
+  const quotedName = shellQuote(entry.name);
+  const quotedRepo = shellQuote(entry.repo);
   return `#!/usr/bin/env bash
-# Search ${entry.repo} source chunks in the local FTS index.
+# Search ${quotedRepo} source chunks in the local FTS index.
 # Usage: ./scripts/search.sh "<query>" [limit]
 set -euo pipefail
 
 QUERY="\${1:?Usage: $0 <query> [limit]}"
 LIMIT="\${2:-20}"
-PKG="${entry.name}"
+PKG=${quotedName}
 
 SCRIPT_DIR="$(cd "$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
 
@@ -356,13 +363,15 @@ npm run search "\$QUERY" -- --pkg="\$PKG" --limit="\$LIMIT"
 
 /** Generates scripts/grep.sh -- grep the cloned repo source for a pattern. */
 export function generateGrepScript(entry: ManifestEntry): string {
+  const quotedRepo = shellQuote(entry.repo);
   return `#!/usr/bin/env bash
-# Grep ${entry.repo} source for a regex pattern.
+# Grep ${quotedRepo} source for a regex pattern.
 # Usage: ./scripts/grep.sh <pattern> [--include=*.ts]
 set -euo pipefail
 
 PATTERN="\${1:?Usage: $0 <pattern> [--include=*.ts]}"
 INCLUDE="\${2:---include=*.ts}"
+REPO_SUBPATH=${quotedRepo}
 
 SCRIPT_DIR="$(cd "$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
 
@@ -371,13 +380,13 @@ for CANDIDATE in \\
   "\${SCRIPT_DIR}/../../../../opensrc-to-skill" \\
   "opensrc-to-skill"; do
   if [[ -d "\$CANDIDATE" ]]; then
-    REPO_DIR="\$CANDIDATE/opensrc/repos/github.com/${entry.repo}"
+    REPO_DIR="\$CANDIDATE/opensrc/repos/github.com/\$REPO_SUBPATH"
     break
   fi
 done
 
 if [[ -z "\${REPO_DIR:-}" ]] || [[ ! -d "\$REPO_DIR" ]]; then
-  echo "ERROR: could not find repo at opensrc/repos/github.com/${entry.repo}" >&2
+  echo "ERROR: could not find repo at opensrc/repos/github.com/\$REPO_SUBPATH" >&2
   exit 1
 fi
 

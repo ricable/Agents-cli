@@ -74,6 +74,7 @@ import { SkillCache, manifestHash, getRepoHeadSha } from "../../lib/cache.js";
 // Types
 import type {
   Tool,
+  CuratedMeta,
   SkillDirectory,
   Manifest,
   ManifestEntry,
@@ -332,7 +333,7 @@ export function forgeSkill(tool: Tool, opts: ForgeSkillOptions): ForgedSkill {
       readme = readReadme(installDir);
       if (readme.length > 50) {
         const sections = extractReadmeSections(readme);
-        (tool as Tool & { _readmeSections?: typeof sections })._readmeSections = sections;
+        (tool as { _readmeSections?: typeof sections })._readmeSections = sections;
 
         // If analyzer found 0 commands, try extracting from README code blocks
         // Try both the tool name and inferred binary names (e.g. "rg" for ripgrep)
@@ -547,7 +548,7 @@ interface ProcessBatchOptions {
 }
 
 /** Enrich a Tool's metadata with curated info (description, tags, domain). */
-function enrichToolWithCuratedMeta(tool: Tool, curated: import("./types.js").CuratedMeta): Tool {
+function enrichToolWithCuratedMeta(tool: Tool, curated: CuratedMeta): Tool {
   const enrichedMeta = {
     ...tool.meta,
     // Use curated description if resolver returned a generic/empty one
@@ -566,7 +567,7 @@ function enrichToolWithCuratedMeta(tool: Tool, curated: import("./types.js").Cur
     ...tool,
     meta: enrichedMeta,
     _curatedMeta: curated,
-  } as Tool & { _curatedMeta: import("./types.js").CuratedMeta };
+  } as Tool;
 }
 
 export async function processBatch(items: BatchItem[], opts: ProcessBatchOptions): Promise<BatchOutcome> {

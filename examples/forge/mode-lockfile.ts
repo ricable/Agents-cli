@@ -6,7 +6,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { success, failure, emit } from "../../lib/output.js";
-import { writeLockfile, readLockfile } from "../../lib/skills.js";
+import { writeLockfile, readLockfile, computeIntegrity } from "../../lib/skills.js";
 import type { Tool } from "../../lib/types.js";
 import type { CliArgs } from "./types.js";
 import { OUTPUT_DIR } from "./types.js";
@@ -19,6 +19,9 @@ export function freezeMode(args: CliArgs, startTime: number): void {
 
   if (!existsSync(OUTPUT_DIR)) {
     log("  Output directory not found. Generate skills first.");
+    if (args.json) {
+      emit(failure("skill-forge:freeze", "NO_OUTPUT_DIR", "Output directory not found", startTime), true);
+    }
     process.exitCode = 1;
     return;
   }
@@ -43,6 +46,9 @@ export function freezeMode(args: CliArgs, startTime: number): void {
 
   if (tools.length === 0) {
     log("  No skills found to freeze.");
+    if (args.json) {
+      emit(failure("skill-forge:freeze", "NO_SKILLS", "No skills found to freeze", startTime), true);
+    }
     return;
   }
 
@@ -81,6 +87,9 @@ export function verifyMode(args: CliArgs, startTime: number): void {
   const lockfile = readLockfile(lockPath);
   if (!lockfile || !lockfile.entries || !Array.isArray(lockfile.entries)) {
     log("  ERROR: Invalid lockfile format");
+    if (args.json) {
+      emit(failure("skill-forge:verify", "INVALID_LOCKFILE", "Invalid lockfile format", startTime), true);
+    }
     process.exitCode = 1;
     return;
   }
@@ -99,13 +108,18 @@ export function verifyMode(args: CliArgs, startTime: number): void {
       continue;
     }
 
-    // The integrity field is a hash of source URI + version from writeLockfile.
-    // We verify it exists and matches the same computation.
-    if (entry.integrity) {
-      passed++;
-    } else {
+    // Recompute the integrity hash and compare against the stored value.
+    if (!entry.integrity) {
       mismatches.push(`${entry.id}: missing integrity hash`);
       failed++;
+    } else {
+      const expected = computeIntegrity(entry.source.uri, entry.version);
+      if (entry.integrity !== expected) {
+        mismatches.push(`${entry.id}: integrity mismatch (expected ${expected.slice(0, 12)}..., got ${entry.integrity.slice(0, 12)}...)`);
+        failed++;
+      } else {
+        passed++;
+      }
     }
   }
 

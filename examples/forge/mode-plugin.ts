@@ -5,7 +5,7 @@
 
 import { resolve } from "node:path";
 import { mkdirSync } from "node:fs";
-import { success, emit } from "../../lib/output.js";
+import { success, failure, emit } from "../../lib/output.js";
 import { groupByDomain } from "../../lib/indexes.js";
 import type { CliArgs } from "./types.js";
 import { OUTPUT_DIR } from "./types.js";
@@ -23,6 +23,9 @@ export async function pluginMode(args: CliArgs, startTime: number): Promise<void
   const entries = scanSkillEntries(OUTPUT_DIR);
   if (entries.length === 0) {
     log("  No skills found. Generate skills first.");
+    if (args.json) {
+      emit(failure("skill-forge:plugin", "NO_SKILLS", "No skills found", startTime), true);
+    }
     return;
   }
 
@@ -68,6 +71,9 @@ export async function agentDefsMode(args: CliArgs, startTime: number): Promise<v
   const entries = scanSkillEntries(OUTPUT_DIR);
   if (entries.length === 0) {
     log("  No skills found.");
+    if (args.json) {
+      emit(failure("skill-forge:agent-defs", "NO_SKILLS", "No skills found", startTime), true);
+    }
     return;
   }
 

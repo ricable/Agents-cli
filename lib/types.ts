@@ -87,6 +87,20 @@ export interface ToolMeta {
   readonly tags: readonly string[];
 }
 
+/** Curated metadata from registry or manual curation */
+export interface CuratedMeta {
+  readonly description: string;
+  readonly agentValue: string;
+  readonly category: string;
+}
+
+/** README sections extracted by the forge pipeline */
+export interface ReadmeSections {
+  codeBlocks: Array<{ lang: string; code: string }>;
+  sections: Record<string, string>;
+  raw: string;
+}
+
 /** A fully resolved and analyzed tool */
 export interface Tool {
   readonly id: string;
@@ -97,6 +111,10 @@ export interface Tool {
   readonly status: InstallStatus;
   readonly installedAt: string;
   readonly updatedAt: string;
+  /** Curated metadata attached by forge pipeline (optional) */
+  readonly _curatedMeta?: CuratedMeta;
+  /** README sections attached by forge pipeline (optional) */
+  readonly _readmeSections?: ReadmeSections;
 }
 
 // =============================================================================
