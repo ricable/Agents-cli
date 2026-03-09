@@ -58,3 +58,8 @@ export function emit<T>(result: CliOutput<T>, json: boolean): void {
   }
   // When json=false and ok=true, the command handles its own human output
 }
+
+/** Extract error message from unknown catch value */
+export function toErrorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}

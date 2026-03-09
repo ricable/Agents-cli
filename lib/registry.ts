@@ -136,11 +136,46 @@ async function searchPypi(
   }
 }
 
-/** Create a registry with 5-layer cascade */
+/** Search crates.io for crates matching a query */
+async function searchCrates(
+  query: string,
+  limit: number,
+): Promise<RegistryEntry[]> {
+  try {
+    const data = await fetchJson(
+      `https://crates.io/api/v1/crates?q=${encodeURIComponent(query)}&per_page=${limit}`,
+    ) as { crates?: Array<Record<string, unknown>> };
+
+    if (!data.crates) return [];
+
+    return data.crates.map((crate) => ({
+      id: (crate.name as string) ?? "",
+      meta: {
+        name: (crate.name as string) ?? "",
+        version: (crate.max_version as string) ?? "0.0.0",
+        description: (crate.description as string) ?? "",
+        homepage: (crate.homepage as string) || (crate.repository as string) || undefined,
+        tags: [],
+      },
+      source: {
+        format: "crates" as const,
+        uri: `crates:${(crate.name as string) ?? ""}`,
+        ref: (crate.max_version as string) ?? undefined,
+      },
+      layer: "crates" as RegistryLayer,
+      verified: false,
+      downloads: (crate.downloads as number) ?? 0,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/** Create a registry with 6-layer cascade */
 export function createRegistry(store?: ToolStore): ToolRegistry {
   return {
     async search(options: RegistrySearchOptions): Promise<readonly RegistryEntry[]> {
-      const layers = options.layers ?? ["local", "community", "github", "npm", "pypi"];
+      const layers = options.layers ?? ["local", "community", "github", "npm", "pypi", "crates"];
       const limit = options.limit ?? 20;
       const perLayer = Math.ceil(limit / layers.length);
       const results: RegistryEntry[] = [];
@@ -165,6 +200,9 @@ export function createRegistry(store?: ToolStore): ToolRegistry {
             break;
           case "pypi":
             results.push(...await searchPypi(options.query, perLayer));
+            break;
+          case "crates":
+            results.push(...await searchCrates(options.query, perLayer));
             break;
         }
       }
@@ -199,6 +237,10 @@ export function createRegistry(store?: ToolStore): ToolRegistry {
       // Try PyPI
       const pypiResults = await searchPypi(id, 1);
       if (pypiResults[0]) return pypiResults[0];
+
+      // Try crates.io
+      const cratesResults = await searchCrates(id, 1);
+      if (cratesResults[0]) return cratesResults[0];
 
       return null;
     },

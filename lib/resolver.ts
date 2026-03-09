@@ -121,6 +121,26 @@ export function parseGithubOwnerRepo(input: string): { owner: string; repo: stri
   return null;
 }
 
+/** Try to get latest version from GitHub releases or tags */
+async function fetchGithubVersion(owner: string, repo: string): Promise<string | undefined> {
+  try {
+    // Try latest release first
+    const release = await fetchJson(`https://api.github.com/repos/${owner}/${repo}/releases/latest`) as Record<string, unknown>;
+    const tag = (release.tag_name as string) ?? "";
+    if (tag) return tag.replace(/^v/, "");
+  } catch {
+    // No releases — try tags
+    try {
+      const tags = await fetchJson(`https://api.github.com/repos/${owner}/${repo}/tags?per_page=1`) as unknown[];
+      if (Array.isArray(tags) && tags.length > 0) {
+        const tagName = (tags[0] as Record<string, unknown>).name as string;
+        if (tagName) return tagName.replace(/^v/, "");
+      }
+    } catch { /* no tags either */ }
+  }
+  return undefined;
+}
+
 /** Fetch metadata from GitHub API */
 async function resolveGithub(input: string): Promise<{ meta: Partial<ToolMeta>; ref?: string }> {
   const parsed = parseGithubOwnerRepo(input);
@@ -128,9 +148,12 @@ async function resolveGithub(input: string): Promise<{ meta: Partial<ToolMeta>; 
 
   try {
     const data = await fetchJson(`https://api.github.com/repos/${parsed.owner}/${parsed.repo}`) as Record<string, unknown>;
+    // Fetch version from releases/tags (best-effort, non-blocking on failure)
+    const version = await fetchGithubVersion(parsed.owner, parsed.repo);
     return {
       meta: {
         name: (data.name as string) ?? parsed.repo,
+        version: version ?? undefined,
         description: (data.description as string) ?? "",
         homepage: (data.homepage as string) || (data.html_url as string) || undefined,
         license: (data.license as Record<string, unknown>)?.spdx_id as string | undefined,

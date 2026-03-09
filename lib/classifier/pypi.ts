@@ -81,7 +81,7 @@ function scoreRelevance(pkg: typeof CURATED_PACKAGES[0], terms: string[]): numbe
 /**
  * Validate a package exists on PyPI via the JSON API.
  */
-async function validatePyPIPackage(name: string): Promise<{ name: string; description: string } | null> {
+export async function validatePyPIPackage(name: string): Promise<{ name: string; description: string } | null> {
   try {
     const res = await fetch(`https://pypi.org/pypi/${encodeURIComponent(name)}/json`, {
       signal: AbortSignal.timeout(10_000),

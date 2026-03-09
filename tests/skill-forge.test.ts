@@ -4,12 +4,11 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   parseArgs,
-  shellQuote,
   fmtTable,
   toolToManifestEntry,
-  inferDomainFromTool,
-  generateInstallScript,
+
 } from "../examples/skill-forge.js";
+import { generateInstallScript, shellQuote } from "../lib/skills.js";
 import type { Tool } from "../lib/types.js";
 
 // ── parseArgs ──────────────────────────────────────────────────────────

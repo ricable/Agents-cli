@@ -130,7 +130,7 @@ export type {
 } from "./types.js";
 
 // Agent-first output layer
-export { success, failure, emit } from "./output.js";
+export { success, failure, emit, toErrorMessage } from "./output.js";
 
 // Input hardening guards
 export {
