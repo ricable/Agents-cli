@@ -164,6 +164,146 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+// ── Binary name + version inference ──────────────────────────────────────
+
+/**
+ * Extract a TOML section by header name. Returns the text between
+ * [name] and the next [header] (or EOF), excluding nested arrays.
+ */
+function extractTomlSection(toml: string, section: string): string | null {
+  const re = new RegExp(`^\\[${section}\\]\\s*\\n`, "m");
+  const match = re.exec(toml);
+  if (!match) return null;
+  const start = match.index + match[0].length;
+  // Find next top-level section header (not [[array]])
+  const rest = toml.slice(start);
+  const nextSection = rest.search(/^\[(?!\[)/m);
+  return nextSection === -1 ? rest : rest.slice(0, nextSection);
+}
+
+/** Extract [[bin]] names and package name from a Cargo.toml string. */
+function extractCargoBinNames(cargo: string, names: Set<string>): void {
+  const binRe = /\[\[bin\]\]\s*\n((?:(?!\[).*\n)*)/g;
+  let m: RegExpExecArray | null;
+  while ((m = binRe.exec(cargo)) !== null) {
+    const nameMatch = m[1]!.match(/name\s*=\s*"([^"]+)"/);
+    if (nameMatch) names.add(nameMatch[1]!);
+  }
+  // Single-binary crate: package name is the binary
+  const pkgSection = extractTomlSection(cargo, "package");
+  if (pkgSection && names.size === 0) {
+    const pkgName = pkgSection.match(/^name\s*=\s*"([^"]+)"/m);
+    if (pkgName) names.add(pkgName[1]!);
+  }
+}
+
+/**
+ * Infer binary names from a cloned repo's build files.
+ * Checks Cargo.toml [[bin]] entries, Go cmd/ dirs, Makefile targets.
+ * Returns unique names (excluding the repo name itself if different).
+ */
+export function inferBinaryNames(repoDir: string): string[] {
+  const names = new Set<string>();
+
+  // Rust: parse Cargo.toml for [[bin]] name entries and package name
+  try {
+    const cargo = readFileSync(join(repoDir, "Cargo.toml"), "utf-8");
+    extractCargoBinNames(cargo, names);
+    // For workspaces, also check member crates
+    const wsSection = extractTomlSection(cargo, "workspace");
+    if (wsSection && names.size === 0) {
+      // Parse members = ["crates/*", ...] and scan each
+      const membersMatch = wsSection.match(/members\s*=\s*\[([\s\S]*?)\]/);
+      if (membersMatch) {
+        const patterns = membersMatch[1]!.match(/"([^"]+)"/g) ?? [];
+        for (const p of patterns) {
+          const pattern = p.replace(/"/g, "");
+          if (pattern.includes("*")) {
+            // Glob pattern like "crates/*" — expand
+            const base = pattern.replace("/*", "");
+            const baseDir = join(repoDir, base);
+            try {
+              for (const sub of readdirSync(baseDir)) {
+                const memberCargo = join(baseDir, sub, "Cargo.toml");
+                try {
+                  const mc = readFileSync(memberCargo, "utf-8");
+                  extractCargoBinNames(mc, names);
+                } catch { /* skip */ }
+              }
+            } catch { /* skip */ }
+          } else {
+            const memberCargo = join(repoDir, pattern, "Cargo.toml");
+            try {
+              const mc = readFileSync(memberCargo, "utf-8");
+              extractCargoBinNames(mc, names);
+            } catch { /* skip */ }
+          }
+        }
+      }
+    }
+  } catch { /* no Cargo.toml */ }
+
+  // Go: check cmd/*/main.go directories, or main.go at root + go.mod module name
+  try {
+    const cmdDir = join(repoDir, "cmd");
+    if (existsSync(cmdDir)) {
+      for (const entry of readdirSync(cmdDir)) {
+        const mainGo = join(cmdDir, entry, "main.go");
+        if (existsSync(mainGo)) names.add(entry);
+      }
+    }
+    // Single-binary Go project: main.go at root, infer name from go.mod module
+    if (names.size === 0 && existsSync(join(repoDir, "main.go"))) {
+      try {
+        const gomod = readFileSync(join(repoDir, "go.mod"), "utf-8");
+        const modMatch = gomod.match(/^module\s+\S+\/([^/\s]+)/m);
+        if (modMatch) names.add(modMatch[1]!);
+      } catch { /* no go.mod */ }
+    }
+  } catch { /* no cmd/ */ }
+
+  return [...names];
+}
+
+/**
+ * Read version from Cargo.toml, setup.cfg, pyproject.toml, or CMakeLists.txt.
+ * Used as fallback when GitHub API rate-limited and no package.json exists.
+ */
+export function readSourceVersion(repoDir: string): string | undefined {
+  // Rust: Cargo.toml
+  try {
+    const cargo = readFileSync(join(repoDir, "Cargo.toml"), "utf-8");
+    const pkgSection = extractTomlSection(cargo, "package");
+    if (pkgSection) {
+      const ver = pkgSection.match(/^version\s*=\s*"([^"]+)"/m);
+      if (ver) return ver[1];
+    }
+  } catch { /* no Cargo.toml */ }
+
+  // Python: pyproject.toml
+  try {
+    const pyproj = readFileSync(join(repoDir, "pyproject.toml"), "utf-8");
+    const ver = pyproj.match(/version\s*=\s*"([^"]+)"/);
+    if (ver) return ver[1];
+  } catch { /* no pyproject.toml */ }
+
+  // Python: setup.cfg
+  try {
+    const cfg = readFileSync(join(repoDir, "setup.cfg"), "utf-8");
+    const ver = cfg.match(/version\s*=\s*(\S+)/);
+    if (ver) return ver[1];
+  } catch { /* no setup.cfg */ }
+
+  // C/C++: CMakeLists.txt
+  try {
+    const cmake = readFileSync(join(repoDir, "CMakeLists.txt"), "utf-8");
+    const ver = cmake.match(/project\s*\([^)]*VERSION\s+([0-9.]+)/i);
+    if (ver) return ver[1];
+  } catch { /* no CMakeLists.txt */ }
+
+  return undefined;
+}
+
 /**
  * Extract structured sections from a README.
  * Returns code blocks and heading-keyed sections for enriching skill content.

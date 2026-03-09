@@ -5,7 +5,7 @@
 
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { success, emit } from "../../lib/output.js";
+import { success, emit, toErrorMessage } from "../../lib/output.js";
 import type { CliArgs } from "./types.js";
 import { OUTPUT_DIR } from "./types.js";
 import { log } from "./helpers.js";
@@ -39,7 +39,7 @@ export async function indexMode(args: CliArgs, startTime: number): Promise<void>
       } catch { /* skip */ }
     }
   } catch (err) {
-    log(`  ERROR: Failed to read output directory: ${(err as Error).message}`);
+    log(`  ERROR: Failed to read output directory: ${toErrorMessage(err)}`);
     process.exitCode = 1;
     return;
   }
@@ -70,7 +70,7 @@ export async function indexMode(args: CliArgs, startTime: number): Promise<void>
       }, startTime), true);
     }
   } catch (err) {
-    log(`  Indexing failed: ${(err as Error).message}`);
+    log(`  Indexing failed: ${toErrorMessage(err)}`);
     process.exitCode = 1;
   } finally {
     closeAllDomainDbs();

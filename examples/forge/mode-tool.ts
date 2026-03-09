@@ -3,7 +3,7 @@
  */
 
 import { existsSync } from "node:fs";
-import { success, emit } from "../../lib/output.js";
+import { success, emit, toErrorMessage } from "../../lib/output.js";
 import { getToolInstallDir } from "../../lib/store.js";
 import { walkPackageDirs } from "../../lib/pkg-utils.js";
 import type { Tool } from "../../lib/types.js";
@@ -57,7 +57,7 @@ export async function toolMode(args: CliArgs, startTime: number): Promise<void> 
         log(`  Persisted ${persisted} chunks to ${domain} DB`);
       }
     } catch (err) {
-      log(`  WARN: DB persistence failed (non-fatal): ${(err as Error).message}`);
+      log(`  WARN: DB persistence failed (non-fatal): ${toErrorMessage(err)}`);
     }
   }
 

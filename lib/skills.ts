@@ -13,6 +13,7 @@ import type {
 } from "./types.js";
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from "node:fs";
+import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { createResolver } from "./resolver.js";
 import { createInstaller } from "./installer.js";
@@ -20,7 +21,7 @@ import { createAnalyzer, findMainBinary } from "./analyzer.js";
 import { createStore, getToolInstallDir } from "./store.js";
 import { readPkgVersion } from "./pkg-utils.js";
 import { validateToolName } from "./guards.js";
-import { INSTALL_CMD_RE } from "./extractor.js";
+import { INSTALL_CMD_RE, readSourceVersion, inferBinaryNames } from "./extractor.js";
 
 // =============================================================================
 // YAML Frontmatter Parsing
@@ -213,8 +214,10 @@ export async function installTool(
     }
   }
 
-  // Determine version
-  const version = readPkgVersion(installDir, resolved.meta.version ?? "0.0.0");
+  // Determine version: package.json → resolved meta → source files (Cargo.toml, etc.)
+  const apiVersion = resolved.meta.version;
+  const sourceVersion = readSourceVersion(installDir);
+  const version = readPkgVersion(installDir, apiVersion ?? sourceVersion ?? "0.0.0");
 
   const now = new Date().toISOString();
   const tool: Tool = {
@@ -1335,6 +1338,17 @@ const DEFAULT_DOMAIN: InferredDomain = {
   troubleshooting: [],
 };
 
+/** Infer the binary name for a tool (prefers Cargo/Go binary name over repo name). */
+function inferBinName(tool: Tool): string {
+  const installDir = getToolInstallDir(
+    join(homedir(), ".agents-cli"),
+    tool.meta.name,
+  );
+  const bins = inferBinaryNames(installDir);
+  // Prefer the first binary name that differs from the tool name
+  return bins[0] ?? tool.meta.name;
+}
+
 /** Infer domain-specific usage from tool metadata */
 function inferDomain(tool: Tool): InferredDomain {
   const searchText = [
@@ -1345,13 +1359,15 @@ function inferDomain(tool: Tool): InferredDomain {
     tool.meta.homepage || "",
   ].join(" ");
 
+  const binName = inferBinName(tool);
+
   for (const pattern of DOMAIN_PATTERNS) {
     if (pattern.match.test(searchText)) {
       return {
         category: pattern.category,
-        quickStart: pattern.quickStart(tool.meta.name),
-        patterns: pattern.patterns(tool.meta.name),
-        troubleshooting: pattern.troubleshooting(tool.meta.name),
+        quickStart: pattern.quickStart(binName),
+        patterns: pattern.patterns(binName),
+        troubleshooting: pattern.troubleshooting(binName),
       };
     }
   }
@@ -1559,35 +1575,47 @@ export function generateRichSkillMd(tool: Tool): string {
   const readmeQuickStart = readmeSections?.sections["quick start"]
     ?? readmeSections?.sections["quickstart"]
     ?? readmeSections?.sections["getting started"];
-  const readmeInstall = readmeSections?.sections["installation"]
-    ?? readmeSections?.sections["install"];
   const readmeUsage = readmeSections?.sections["usage"]
     ?? readmeSections?.sections["basic usage"];
 
+  // Determine binary name for Quick Start examples
+  const binName = inferBinName(tool);
+  if (binName !== name) {
+    s.push(`The binary name for ${name} is \`${binName}\`.`);
+    s.push("");
+  }
+
+  /** Check if a text section is mostly install instructions (not usage) */
+  const isMostlyInstall = (text: string): boolean => {
+    const lines = text.split("\n").filter(l => l.trim().length > 0);
+    if (lines.length === 0) return true;
+    const installLines = lines.filter(l => INSTALL_CMD_RE.test(l.trim()) || /\b(install|homebrew|brew|cargo install|pip install|npm install|apt|download|binary|release)\b/i.test(l));
+    return installLines.length / lines.length > 0.4;
+  };
+
   if (commands.length > 0) {
-    // Real CLI commands discovered — use them
+    // Real CLI commands discovered — use them (prefer binary name)
     s.push("```bash");
     for (const cmd of commands.slice(0, MAX_QUICK_START_EXAMPLES)) {
       s.push(`# ${cmd.description || cmd.name}`);
-      s.push(concreteArgs(cmd, name));
+      s.push(concreteArgs(cmd, binName));
       s.push("");
     }
     s.push("```");
-  } else if (readmeQuickStart && readmeQuickStart.replace(/\s/g, "").length > 20) {
-    // Use actual README Quick Start content (skip if it's just whitespace/noise)
+  } else if (domain && domain.quickStart.length > 0) {
+    // Domain-specific Quick Start (uses binary name via inferDomain)
+    s.push("```bash");
+    for (const line of domain.quickStart) s.push(line);
+    if (domain.quickStart[domain.quickStart.length - 1] !== "") s.push("");
+    s.push("```");
+  } else if (readmeUsage && !isMostlyInstall(readmeUsage)) {
+    // README usage section (skip if mostly install instructions)
+    const usageLines = readmeUsage.split("\n").slice(0, 15);
+    for (const line of usageLines) s.push(line);
+  } else if (readmeQuickStart && !isMostlyInstall(readmeQuickStart)) {
+    // README Quick Start (skip if mostly install instructions)
     const qsLines = readmeQuickStart.split("\n").slice(0, 30);
     for (const line of qsLines) s.push(line);
-  } else if (readmeInstall || readmeUsage) {
-    // Fallback: use install + usage sections from README
-    if (readmeInstall) {
-      const installLines = readmeInstall.split("\n").slice(0, 10);
-      for (const line of installLines) s.push(line);
-      s.push("");
-    }
-    if (readmeUsage) {
-      const usageLines = readmeUsage.split("\n").slice(0, 15);
-      for (const line of usageLines) s.push(line);
-    }
   } else if (readmeSections && readmeSections.codeBlocks.length > 0) {
     // Fallback: use first code blocks from README
     for (const block of readmeSections.codeBlocks.slice(0, 2)) {
@@ -1636,15 +1664,10 @@ export function generateRichSkillMd(tool: Tool): string {
       s.push(`# ${curated.description}`);
       s.push("```");
     }
-  } else if (domain && domain.quickStart.length > 0) {
-    s.push("```bash");
-    for (const line of domain.quickStart) s.push(line);
-    if (domain.quickStart[domain.quickStart.length - 1] !== "") s.push("");
-    s.push("```");
   } else {
     s.push("```bash");
     s.push(`# Show help and available options`);
-    s.push(`${name} --help`);
+    s.push(`${binName} --help`);
     s.push("");
     s.push(`# Check version`);
     s.push(`${name} --version`);

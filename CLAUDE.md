@@ -18,6 +18,7 @@ Built on the "Rewrite Your CLI for AI Agents" philosophy — every command outpu
 - **Shell safety**: When interpolating tool names or URIs into generated shell scripts, always call `validateToolName()` first and shell-quote all values (`shellQuote()` from `lib/skills.ts`). Never pass unsanitized user input into shell commands.
 - **Path containment**: When writing files based on user/tool-provided paths, always verify the resolved path stays within the intended output directory: `resolve(fullPath).startsWith(resolve(baseDir) + "/")`. Use `rejectPathTraversal()` on all user-provided path arguments (e.g. `--out`).
 - **Promise safety**: When wrapping Node.js streams in Promises, use a `settled` flag to prevent double-resolve/reject (see `fetchHtml` pattern). `res.destroy()` can trigger both error and close events.
+- **Error messages**: Always use `toErrorMessage(err)` from `lib/output.ts` in catch blocks — never `(err as Error).message` (unsafe if not an Error) or `err instanceof Error ? err.message : String(err)` (verbose duplicate).
 - **No interactive prompts** — the CLI must work non-interactively (CI/agent-friendly).
 - **Tests**: Run `npm test` (vitest). Tests are in `tests/`. Write tests for new functionality.
 - **Atomic writes**: Store uses temp-file + rename for crash safety. Maintain this pattern.
@@ -27,6 +28,8 @@ Built on the "Rewrite Your CLI for AI Agents" philosophy — every command outpu
 - **Skill description quality**: Generated descriptions must include "Use when" + action verbs recognized by `scoreTrigger()` (e.g. "running", "building", "deploying", "configuring", "managing", "processing"). Trigger score must be ≥ 0.80. Use `CATEGORY_ACTION_MAP` (module-level constant) in `buildDescription()` for curated tools — triggers use `%` placeholder templated with tool name for uniqueness (e.g. "searching code with %").
 - **Ecosystem-aware content**: Generated troubleshooting, install scripts, and guides must match the tool's actual ecosystem. Use `detectToolLanguage(tool)` which checks source format → GitHub topics → installed files (Cargo.toml/go.mod/etc.) → curated category. Never suggest `pip install` for a Rust binary or `npm update` for a Python tool.
 - **No fabricated commands**: Never generate CLI subcommands that don't exist. Only emit commands extracted from actual `--help` output or README code blocks. Libraries with 0 commands get API usage, not fake CLI commands.
+- **Version resolution fallbacks**: GitHub tools may get 0.0.0 when API is rate-limited. The pipeline uses: GitHub releases API → GitHub tags API → `readSourceVersion()` (Cargo.toml/pyproject.toml/CMakeLists.txt) → package.json → "0.0.0". Set `GITHUB_TOKEN` env var to increase rate limit from 60 to 5000 requests/hour.
+- **Binary name inference**: For compiled tools (Rust/Go/C), the repo name often differs from the binary name (e.g., "ripgrep" → "rg"). Use `inferBinaryNames()` which checks Cargo.toml `[[bin]]` entries (including workspace members), Go `cmd/` dirs, and `go.mod` module names. Quick Start templates and README command extraction must use binary names.
 - **Frontmatter fields**: `ALLOWED_FIELDS` in `lib/guards.ts` must include all fields used by the forge: `name`, `description`, `version`, `ingredients`, `tags`, `domain`, `allowed-tools`, `compatibility`, `license`, `metadata`.
 
 ## Key commands
@@ -242,7 +245,7 @@ lib/
   mcp.ts               — MCP bridge for exposing tools to AI agents
   mcp-skill.ts         — opensrc MCP skill bridge (callOpensrc, opensrc)
   chunker.ts           — AST-aware semantic chunking of source files
-  extractor.ts         — README excerpts, code blocks, export groups, repo analysis, section extraction
+  extractor.ts         — README excerpts, code blocks, export groups, repo analysis, binary name + version inference
   curated-tools.ts     — 91 general + AI/ML tool registry for --curated mode
   cache.ts             — SkillCache, file hashing, incremental generation
   search.ts            — hybrid FTS + vector search (lazy better-sqlite3)
@@ -328,12 +331,12 @@ Bare names without `/` or prefix (e.g. `httpie`) fall back to `pypi:` then error
 
 ## Pipeline flow
 
-1. **Resolve** — `createResolver()` detects format (github/npm/pypi/crates/local), fetches metadata from API. GitHub resolver also fetches version from releases/tags API via `fetchGithubVersion()`.
+1. **Resolve** — `createResolver()` detects format (github/npm/pypi/crates/local), fetches metadata from API. GitHub resolver also fetches version from releases/tags API via `fetchGithubVersion()`. When API is rate-limited, `readSourceVersion()` extracts version from Cargo.toml/pyproject.toml/CMakeLists.txt as fallback.
 2. **Install** — `createInstaller()` downloads tarball (with branch fallback: main→master→develop), extracts, runs `npm install` / `uv pip install` / `cargo binstall`. Huge repos (bun, pytorch, etc.) are skipped via `HUGE_REPOS` set in `stages.ts`.
 3. **Analyze** — `createAnalyzer()` runs `--help`/`-h`/`help`, parses commands and flags (recursive mode available)
 4. **Deep probe** — `deepProbe(binPath, { maxDepth })` recursively probes subcommand trees; returns `{ tree, totalCommands }`
 5. **Store** — `createStore()` persists tool JSON + generates CONTEXT.md
-6. **Generate** — `generateRichSkillMd()` / `generateSkillDirectory()` produces SKILL.md + references/ + scripts/. Uses curated metadata (`_curatedMeta`) for category-specific triggers (via `CATEGORY_ACTION_MAP` with `%` tool-name templates) and README sections (`_readmeSections`) for real content. `detectToolLanguage()` inspects source format, GitHub topics, and installed files (Cargo.toml/go.mod/etc.) to produce ecosystem-correct troubleshooting, install scripts, and guides. `isLikelyCli()` determines if a tool is a CLI (→ `cli-tool` tag) vs library. When analyzer finds 0 commands, `extractCommandsFromReadme()` provides fallback subcommands from README code blocks. Install-only code blocks are filtered via `INSTALL_CMD_RE`.
+6. **Generate** — `generateRichSkillMd()` / `generateSkillDirectory()` produces SKILL.md + references/ + scripts/. Uses curated metadata (`_curatedMeta`) for category-specific triggers (via `CATEGORY_ACTION_MAP` with `%` tool-name templates) and README sections (`_readmeSections`) for real content. `detectToolLanguage()` inspects source format, GitHub topics, and installed files (Cargo.toml/go.mod/etc.) to produce ecosystem-correct troubleshooting, install scripts, and guides. `isLikelyCli()` determines if a tool is a CLI (→ `cli-tool` tag) vs library. `inferBinName()` uses `inferBinaryNames()` to detect actual binary names from Cargo.toml `[[bin]]` (including workspace members), Go `cmd/` dirs, and `go.mod` module names — Quick Start templates and command extraction use binary names (e.g., `rg` not `ripgrep`). When analyzer finds 0 commands, `extractCommandsFromReadme()` tries both repo name and inferred binary names. Domain-specific Quick Start templates are preferred over README sections that are mostly install instructions. Install-only code blocks are filtered via `INSTALL_CMD_RE`.
 7. **Quality** — `testSkillSync()` / `assessQuality()` trigger scoring + structural quality gate
 8. **Index** — `groupByDomain()` / `generateMasterIndex()` domain grouping + index skills
 9. **Factory** — `runSkillFactory()` optional 3-layer pipeline (structural → AI-enhanced)
@@ -393,6 +396,7 @@ Quality gate thresholds (from `testSkillSync`):
 success<T>(command: string, data: T, startTime: number): CliOutput<T>
 failure(command: string, code: string, message: string, startTime: number): CliOutput<never>
 emit<T>(result: CliOutput<T>, json: boolean): void
+toErrorMessage(err: unknown): string  // safe error extraction for catch blocks
 
 // Guards (lib/guards.ts) — call before using user input
 validateSource(source: string): void      // validates tool URI format
@@ -436,13 +440,15 @@ loadAiMlTools(projectRoot: string): CliTool[]   // AI/ML tools only
 getCategories(tools: CliTool[]): string[]       // unique sorted categories
 GENERAL_TOOLS: CliTool[]                        // 91 general-purpose CLI tools
 
-// Extractor (lib/extractor.ts) — README content extraction for skill generation
+// Extractor (lib/extractor.ts) — README content extraction + binary/version inference
 extractReadmeSections(readme: string, maxSectionChars?: number): ReadmeSections  // code-block-aware section splitting, cleans badges/HTML
 extractReadmeExcerpt(readme: string, maxChars?: number): string
 extractCodeBlocks(markdown: string, maxBlocks?: number, maxChars?: number): string[]
 extractCommandsFromReadme(readme: string, toolName: string): Array<{ name: string; description: string }>  // fallback command extraction
 isActualCode(code: string, lang: string): boolean   // filters prose wrapped in code fences
 cleanMarkdownSection(text: string): string           // strips badges, HTML comments, noise
+inferBinaryNames(repoDir: string): string[]          // detects binary names from Cargo.toml [[bin]], Go cmd/, go.mod
+readSourceVersion(repoDir: string): string | undefined  // reads version from Cargo.toml, pyproject.toml, CMakeLists.txt
 INSTALL_CMD_RE: RegExp                               // shared install-command detection regex
 
 // Skill factory (lib/skill-factory.ts)

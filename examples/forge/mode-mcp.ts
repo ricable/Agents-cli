@@ -5,7 +5,7 @@
 
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { success, emit } from "../../lib/output.js";
+import { success, emit, toErrorMessage } from "../../lib/output.js";
 import { McpBridge, createMcpConfig } from "../../lib/mcp.js";
 import type { CliArgs } from "./types.js";
 import { OUTPUT_DIR } from "./types.js";
@@ -76,7 +76,7 @@ export async function mcpMode(args: CliArgs, startTime: number): Promise<void> {
       process.on("SIGTERM", handler);
     });
   } catch (err) {
-    log(`  MCP server failed: ${(err as Error).message}`);
+    log(`  MCP server failed: ${toErrorMessage(err)}`);
     bridge.stopServer();
     process.exitCode = 1;
   }

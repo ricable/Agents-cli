@@ -24,7 +24,7 @@ import { createStore, getToolInstallDir, generateContextMd } from "../lib/store.
 import { createRegistry } from "../lib/registry.js";
 import { McpBridge, createMcpConfig } from "../lib/mcp.js";
 import { runTool } from "./agent-run.js";
-import { success, failure, emit } from "../lib/output.js";
+import { success, failure, emit, toErrorMessage } from "../lib/output.js";
 import { validateSource, validateToolName, validateRunArgs, InputValidationError } from "../lib/guards.js";
 import {
   parseFrontmatter,
@@ -166,7 +166,7 @@ program
         if (tool.capabilities.rawHelp) console.log("  CONTEXT.md generated with help output");
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = toErrorMessage(err);
       const result = failure("add", "INSTALL_FAILED", msg, start);
       emit(result, json);
       if (!json) { console.error(`Install failed: ${msg}`); process.exitCode = 1; }
@@ -505,7 +505,7 @@ skills
         console.log(`  Context: ${skill.contextPath}`);
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = toErrorMessage(err);
       const result = failure("skills install", "SKILL_INSTALL_FAILED", msg, start);
       emit(result, json);
       if (!json) { console.error(`Skill install failed: ${msg}`); process.exitCode = 1; }
@@ -783,7 +783,7 @@ program
         if (!json) console.log(`    Done`);
       } catch (err) {
         failed.push(entry.id);
-        if (!json) console.error(`    Failed: ${err instanceof Error ? err.message : String(err)}`);
+        if (!json) console.error(`    Failed: ${toErrorMessage(err)}`);
       }
     }
 
@@ -976,7 +976,7 @@ program
           }
         } catch (err) {
           failed.push(tool.id);
-          if (!json) console.error(`    Failed: ${err instanceof Error ? err.message : String(err)}`);
+          if (!json) console.error(`    Failed: ${toErrorMessage(err)}`);
         }
       }
       if (json) { emit(success("update", { updated, failed }, start), true); }
@@ -1196,7 +1196,7 @@ skills
         }
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = toErrorMessage(err);
       if (json) { emit(failure("skills test", "TEST_FAILED", msg, start), true); }
       else { console.error(`Skill test failed: ${msg}`); process.exitCode = 1; }
     }
@@ -1234,6 +1234,7 @@ skills
 
       for (const item of items) {
         if (!item.isDirectory()) continue;
+        if (item.name.startsWith("_") || item.name.startsWith(".")) continue;
         const skillPath = join(dir, item.name, "SKILL.md");
         if (!existsSync(skillPath)) continue;
         const content = readFileSync(skillPath, "utf-8");
@@ -1242,7 +1243,7 @@ skills
           entries.push({
             name: fm.name,
             repo: "",
-            domain: (fm as unknown as Record<string, unknown>).domain as string ?? "uncategorized",
+            domain: fm.domain ?? "uncategorized",
             description: fm.description ?? "",
           });
         }
@@ -1265,7 +1266,7 @@ skills
         console.log();
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = toErrorMessage(err);
       if (json) { emit(failure("skills group", "GROUP_FAILED", msg, start), true); }
       else { console.error(`Skills grouping failed: ${msg}`); process.exitCode = 1; }
     }
@@ -1318,7 +1319,7 @@ skills
         }
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = toErrorMessage(err);
       if (json) { emit(failure("skills factory", "FACTORY_FAILED", msg, start), true); }
       else { console.error(`Skill factory failed: ${msg}`); process.exitCode = 1; }
     }
@@ -1428,7 +1429,7 @@ program
         console.log();
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = toErrorMessage(err);
       if (json) { emit(failure("pipeline", "PIPELINE_FAILED", msg, start), true); }
       else { console.error(`Pipeline failed: ${msg}`); process.exitCode = 1; }
     }
@@ -1478,7 +1479,7 @@ program
         console.log(`  Chunks: ${result.totalChunks}`);
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = toErrorMessage(err);
       if (json) { emit(failure("index", "INDEX_FAILED", msg, start), true); }
       else { console.error(`Indexing failed: ${msg}`); process.exitCode = 1; }
     }
@@ -1528,7 +1529,7 @@ plugin
         console.log(`  Domain: ${opts.domain ?? "all"}`);
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = toErrorMessage(err);
       if (json) { emit(failure("plugin build", "BUILD_FAILED", msg, start), true); }
       else { console.error(`Plugin build failed: ${msg}`); process.exitCode = 1; }
     }
@@ -1567,7 +1568,7 @@ plugin
         console.log(`  Domain: ${opts.domain ?? "all"}`);
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = toErrorMessage(err);
       if (json) { emit(failure("plugin publish", "PUBLISH_FAILED", msg, start), true); }
       else { console.error(`Plugin publish failed: ${msg}`); process.exitCode = 1; }
     }

@@ -16,7 +16,7 @@ export async function curatedMode(args: CliArgs, startTime: number): Promise<voi
   const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
   const allTools = loadAllTools(projectRoot);
 
-  if (allTools.length < 100) {
+  if (!existsSync(join(projectRoot, "ai-ml-tools.json"))) {
     log("  Warning: ai-ml-tools.json not found — only general tools loaded.");
   }
 

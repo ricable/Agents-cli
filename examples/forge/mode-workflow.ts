@@ -4,7 +4,7 @@
 
 import { join, resolve } from "node:path";
 import { mkdirSync } from "node:fs";
-import { success, emit } from "../../lib/output.js";
+import { success, emit, toErrorMessage } from "../../lib/output.js";
 import { rejectPathTraversal } from "../../lib/guards.js";
 import { classifyIntent } from "../../lib/pipeline/intent.js";
 import { extractEntities } from "../../lib/pipeline/entity-extractor.js";
@@ -129,7 +129,7 @@ export function workflowMode(args: CliArgs, startTime: number): void {
       atomicWrite(join(outPath, "SKILL.md"), skillContent);
       log(`  Skill:    ${outPath}/SKILL.md`);
     } catch (err) {
-      log(`  WARN: skill generation from workflow failed: ${(err as Error).message}`);
+      log(`  WARN: skill generation from workflow failed: ${toErrorMessage(err)}`);
     }
   }
 

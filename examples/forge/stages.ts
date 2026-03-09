@@ -56,7 +56,7 @@ import { discoverPyPIPackages } from "../../lib/classifier/pypi.js";
 
 // Chunking + extraction
 import { chunkFileAST, shouldSkipFile, extractMetadataChunks } from "../../lib/chunker.js";
-import { analyzeRepo, extractExportGroups, findEntryPoints, extractCodeBlocks, readReadme, extractReadmeSections, extractCommandsFromReadme } from "../../lib/extractor.js";
+import { analyzeRepo, extractExportGroups, findEntryPoints, extractCodeBlocks, readReadme, extractReadmeSections, extractCommandsFromReadme, inferBinaryNames } from "../../lib/extractor.js";
 
 // Indexing
 import { groupByDomain, generateDomainIndex, generateMasterIndex } from "../../lib/indexes.js";
@@ -66,7 +66,7 @@ import { DOMAIN_TRIGGERS } from "../../lib/domains.js";
 
 // Guards
 import { validateSource, validateToolName } from "../../lib/guards.js";
-import { validateSkillContent, validateFullFrontmatter } from "../../lib/guards.js";
+import { validateFullFrontmatter } from "../../lib/guards.js";
 
 // Cache
 import { SkillCache, manifestHash, getRepoHeadSha } from "../../lib/cache.js";
@@ -91,6 +91,15 @@ import type {
 import { DATA_DIR, OUTPUT_DIR } from "./types.js";
 import { log, atomicWrite, toolToManifestEntry } from "./helpers.js";
 import { toErrorMessage } from "../../lib/output.js";
+
+/** Repos too large (>200MB tarball) to download — skip in batch mode. */
+const HUGE_REPOS = new Set([
+  "oven-sh/bun", "NVIDIA/TensorRT-LLM", "pytorch/pytorch", "tensorflow/tensorflow",
+  "huggingface/transformers", "microsoft/DeepSpeed", "ray-project/ray",
+  "PaddlePaddle/PaddleOCR", "PaddlePaddle/Paddle", "apache/spark",
+  "apache/airflow", "kubernetes/kubernetes", "rust-lang/rust",
+  "llvm/llvm-project", "chromium/chromium", "nicbarker/clay",
+]);
 
 // ── Stage 1: Discovery (NL prompt → multi-registry search) ────────────
 
@@ -175,14 +184,6 @@ export async function resolveInstallAnalyze(
     throw new Error(`Unsupported source format: ${source}. Use owner/repo, @scope/pkg, pypi:name, or crates:name`);
   }
 
-  // Skip known huge repos (>200MB tarball) that take too long to download
-  const HUGE_REPOS = new Set([
-    "oven-sh/bun", "NVIDIA/TensorRT-LLM", "pytorch/pytorch", "tensorflow/tensorflow",
-    "huggingface/transformers", "microsoft/DeepSpeed", "ray-project/ray",
-    "PaddlePaddle/PaddleOCR", "PaddlePaddle/Paddle", "apache/spark",
-    "apache/airflow", "kubernetes/kubernetes", "rust-lang/rust",
-    "llvm/llvm-project", "chromium/chromium", "nicbarker/clay",
-  ]);
   const repoId = source.replace(/^github:/, "");
   if (HUGE_REPOS.has(repoId)) {
     throw new Error(`Skipping oversized repo ${repoId} (>200MB tarball)`);
@@ -306,11 +307,11 @@ export function forgeSkill(tool: Tool, opts: ForgeSkillOptions): ForgedSkill {
   const installDir = getToolInstallDir(DATA_DIR, tool.meta.name);
   const manifestEntry = toolToManifestEntry(tool);
   const cache = (!opts.noCache && !opts.dryRun) ? new SkillCache(OUTPUT_DIR) : null;
+  const mHash = manifestEntry ? manifestHash(manifestEntry) : "";
+  const rSha = getRepoHeadSha(installDir);
 
   // Cache check (Gap 1)
   if (cache && !opts.force && manifestEntry) {
-    const mHash = manifestHash(manifestEntry);
-    const rSha = getRepoHeadSha(installDir);
     const cached = cache.get(tool.meta.name);
     if (cached && cached.manifestHash === mHash && cached.repoSha === rSha) {
       log(`  → Cache hit: ${tool.meta.name} (skipping regeneration)`);
@@ -325,18 +326,30 @@ export function forgeSkill(tool: Tool, opts: ForgeSkillOptions): ForgedSkill {
   }
 
   // Extract README sections and attach to tool for richer skill generation
+  let readme = "";
   if (existsSync(installDir)) {
     try {
-      const readme = readReadme(installDir);
+      readme = readReadme(installDir);
       if (readme.length > 50) {
         const sections = extractReadmeSections(readme);
         (tool as Tool & { _readmeSections?: typeof sections })._readmeSections = sections;
 
         // If analyzer found 0 commands, try extracting from README code blocks
+        // Try both the tool name and inferred binary names (e.g. "rg" for ripgrep)
         if (tool.capabilities.commands.length === 0) {
-          const readmeCommands = extractCommandsFromReadme(readme, tool.meta.name);
-          if (readmeCommands.length > 0) {
-            const synthCommands = readmeCommands.map(c => ({
+          const namesToTry = [tool.meta.name, ...inferBinaryNames(installDir)];
+          const seen = new Set<string>();
+          const allCommands: Array<{ name: string; description: string }> = [];
+          for (const name of namesToTry) {
+            if (seen.has(name)) continue;
+            seen.add(name);
+            const cmds = extractCommandsFromReadme(readme, name);
+            for (const c of cmds) {
+              if (!allCommands.some(x => x.name === c.name)) allCommands.push(c);
+            }
+          }
+          if (allCommands.length > 0) {
+            const synthCommands = allCommands.map(c => ({
               name: c.name,
               description: c.description,
               flags: [] as readonly import("../../lib/types.js").ToolFlag[],
@@ -359,7 +372,7 @@ export function forgeSkill(tool: Tool, opts: ForgeSkillOptions): ForgedSkill {
   try {
     directory = generateSkillDirectory(tool);
   } catch (err) {
-    log(`  WARN: generateSkillDirectory failed: ${(err as Error).message}`);
+    log(`  WARN: generateSkillDirectory failed: ${toErrorMessage(err)}`);
     directory = { skillMd: generateRichSkillMd(tool), files: {} };
   }
 
@@ -371,7 +384,7 @@ export function forgeSkill(tool: Tool, opts: ForgeSkillOptions): ForgedSkill {
     try {
       chunkStats = chunkToolSource(tool);
     } catch (err) {
-      log(`  WARN: chunking failed: ${(err as Error).message}`);
+      log(`  WARN: chunking failed: ${toErrorMessage(err)}`);
       chunkStats = { files: 0, chunks: 0, byType: {} };
     }
   }
@@ -390,7 +403,6 @@ export function forgeSkill(tool: Tool, opts: ForgeSkillOptions): ForgedSkill {
         const analysis = analyzeRepo(manifestEntry, installDir);
 
         // Enrich references/patterns.md with code blocks from README (Gap 12)
-        const readme = readReadme(installDir);
         const codeBlocks = extractCodeBlocks(readme);
         const patterns = generatePatternsFile(manifestEntry, analysis);
         if (patterns) {
@@ -425,7 +437,7 @@ export function forgeSkill(tool: Tool, opts: ForgeSkillOptions): ForgedSkill {
         }
         if (enrichedApi) files["references/api.md"] = enrichedApi;
       } catch (err) {
-        log(`  WARN: repo analysis failed: ${(err as Error).message}`);
+        log(`  WARN: repo analysis failed: ${toErrorMessage(err)}`);
       }
     }
   }
@@ -451,8 +463,6 @@ export function forgeSkill(tool: Tool, opts: ForgeSkillOptions): ForgedSkill {
 
     // Update cache (Gap 1)
     if (cache && manifestEntry) {
-      const mHash = manifestHash(manifestEntry);
-      const rSha = getRepoHeadSha(installDir);
       cache.set(tool.meta.name, { manifestHash: mHash, repoSha: rSha, generatedAt: Date.now() });
       cache.save();
     }
@@ -471,10 +481,8 @@ export function assessQuality(skillMd: string, name: string): QualityResult {
   const triggerQueries = generateTriggerQueries(description, name);
   const nonTriggerQueries = generateNonTriggerQueries(description);
 
-  // Validate SKILL.md content (Gap 8)
-  const contentErrors = validateSkillContent(skillMd);
-  const fmErrors = validateFullFrontmatter(skillMd);
-  const validationErrors = [...new Set([...contentErrors, ...fmErrors])];
+  // Validate SKILL.md content (Gap 8) — validateFullFrontmatter includes base validation
+  const validationErrors = validateFullFrontmatter(skillMd);
 
   const passed = result.passed && validationErrors.length === 0;
 

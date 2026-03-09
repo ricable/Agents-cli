@@ -3,7 +3,7 @@
  */
 
 import { join } from "node:path";
-import { success, emit } from "../../lib/output.js";
+import { success, emit, toErrorMessage } from "../../lib/output.js";
 import { writeLockfile } from "../../lib/skills.js";
 import type { Tool } from "../../lib/types.js";
 import type { CliArgs, QualityResult, ForgedSkill } from "./types.js";
@@ -64,7 +64,7 @@ export async function discoveryMode(args: CliArgs, startTime: number): Promise<v
       forged.push({ tool, result, quality });
       log(`  → ${quality.passed ? "PASS" : "FAIL"} (trigger: ${quality.triggerScore.toFixed(2)}, quality: ${quality.qualityScore}/10)`);
     } catch (err) {
-      log(`  → SKIP: ${err instanceof Error ? err.message : String(err)}`);
+      log(`  → SKIP: ${toErrorMessage(err)}`);
     }
   }
 
@@ -81,7 +81,7 @@ export async function discoveryMode(args: CliArgs, startTime: number): Promise<v
       writeLockfile(lockPath, tools);
       log(`  Lockfile: ${lockPath}`);
     } catch (err) {
-      log(`  WARN: lockfile generation failed: ${(err as Error).message}`);
+      log(`  WARN: lockfile generation failed: ${toErrorMessage(err)}`);
     }
   }
 

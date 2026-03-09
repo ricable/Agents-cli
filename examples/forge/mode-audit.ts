@@ -2,7 +2,7 @@
  * forge/mode-audit.ts — Audit existing skills for quality.
  */
 
-import { success, emit } from "../../lib/output.js";
+import { success, emit, toErrorMessage } from "../../lib/output.js";
 import {
   testAllSkillsSync,
   printQualityReport,
@@ -75,7 +75,7 @@ export async function auditMode(args: CliArgs, startTime: number): Promise<void>
         log("");
       }
     } catch (err) {
-      log(`  AI scoring failed: ${(err as Error).message}`);
+      log(`  AI scoring failed: ${toErrorMessage(err)}`);
     }
   }
 

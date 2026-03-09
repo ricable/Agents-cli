@@ -3,14 +3,14 @@
  * (Gap 15: --freeze, --verify)
  */
 
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { success, failure, emit } from "../../lib/output.js";
-import { parseFrontmatter, writeLockfile, readLockfile } from "../../lib/skills.js";
-import type { Tool, Lockfile } from "../../lib/types.js";
+import { writeLockfile, readLockfile } from "../../lib/skills.js";
+import type { Tool } from "../../lib/types.js";
 import type { CliArgs } from "./types.js";
 import { OUTPUT_DIR } from "./types.js";
-import { log } from "./helpers.js";
+import { log, scanSkillEntries } from "./helpers.js";
 
 export function freezeMode(args: CliArgs, startTime: number): void {
   log(`  Mode:   freeze`);
@@ -24,37 +24,22 @@ export function freezeMode(args: CliArgs, startTime: number): void {
   }
 
   // Scan all skills and build pseudo-Tool objects for lockfile
-  const tools: Tool[] = [];
-
-  for (const dir of readdirSync(OUTPUT_DIR)) {
-    if (dir.startsWith("_") || dir.startsWith(".")) continue;
-    const skillPath = join(OUTPUT_DIR, dir, "SKILL.md");
-    if (!existsSync(skillPath)) continue;
-
-    try {
-      const content = readFileSync(skillPath, "utf-8");
-      const fm = parseFrontmatter(content);
-      if (fm) {
-        tools.push({
-          id: fm.name,
-          meta: {
-            name: fm.name,
-            version: "1.0.0",
-            description: fm.description ?? "",
-            tags: [],
-          },
-          source: { format: "local", uri: dir },
-          capabilities: { commands: [], globalFlags: [], analysisMethod: "manual" },
-          installPath: join(OUTPUT_DIR, dir),
-          status: "installed",
-          installedAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-      }
-    } catch {
-      log(`  WARN: Failed to parse ${skillPath}`);
-    }
-  }
+  const entries = scanSkillEntries(OUTPUT_DIR);
+  const tools: Tool[] = entries.map(e => ({
+    id: e.name,
+    meta: {
+      name: e.name,
+      version: "1.0.0",
+      description: e.description ?? "",
+      tags: [],
+    },
+    source: { format: "local", uri: e.name },
+    capabilities: { commands: [], globalFlags: [], analysisMethod: "manual" as const },
+    installPath: join(OUTPUT_DIR, e.name),
+    status: "installed" as const,
+    installedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }));
 
   if (tools.length === 0) {
     log("  No skills found to freeze.");
