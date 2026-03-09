@@ -791,7 +791,10 @@ function buildDescription(tool: Tool): string {
  */
 function concreteArgs(cmd: ToolCommand, toolName: string): string {
   const parts = [toolName, cmd.name];
-  for (const f of cmd.flags.slice(0, 2)) {
+  // Only include flags that have real descriptions (from --help parsing),
+  // not flags with empty or placeholder descriptions which may be inferred/fabricated
+  const realFlags = cmd.flags.filter(f => f.description && f.description.length > 3);
+  for (const f of realFlags.slice(0, 2)) {
     if (f.type === "boolean") {
       parts.push(f.alias || f.name);
     } else if (f.type === "string") {
@@ -1496,6 +1499,90 @@ function inferLanguageHint(tool: Tool, _curated: NonNullable<Tool["_curatedMeta"
 
 // ReadmeSections is now defined in lib/types.ts on the Tool interface
 
+/**
+ * Generate Quick Start for a library/SDK (not a CLI tool).
+ * Extracts real API examples from README code blocks when available,
+ * otherwise generates language-appropriate import + usage stubs.
+ * Never generates fake CLI subcommands like train/predict/eval.
+ */
+function generateLibraryQuickStart(
+  s: string[],
+  tool: Tool,
+  name: string,
+  uri: string,
+  curated?: { description: string; agentValue: string; category: string },
+  readmeSections?: Tool["_readmeSections"],
+): void {
+  const lang = detectToolLanguage(tool);
+  const installCmd = inferInstallCommand(tool, curated);
+  const desc = curated?.description ?? tool.meta.description ?? name;
+
+  // Try to extract real code examples from README
+  const codeBlocks = readmeSections?.codeBlocks ?? [];
+  // Filter for API usage code blocks (not install commands, not config)
+  const apiBlocks = codeBlocks.filter(b => {
+    const code = b.code.toLowerCase();
+    // Skip install-only blocks
+    if (INSTALL_CMD_RE.test(code) && code.split("\n").length < 3) return false;
+    // Prefer blocks that import/require the tool
+    const safeName = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (code.includes("import ") || code.includes("require(") || code.includes("from ")) return true;
+    if (code.includes(safeName)) return true;
+    // Skip pure bash/shell blocks for libraries
+    if (b.lang === "bash" || b.lang === "sh" || b.lang === "shell") return false;
+    return b.lang === "python" || b.lang === "javascript" || b.lang === "typescript" || b.lang === "js" || b.lang === "ts";
+  });
+
+  // Install step
+  s.push("```bash");
+  s.push(`# Install`);
+  s.push(installCmd);
+  s.push("```");
+  s.push("");
+
+  if (apiBlocks.length > 0) {
+    // Use real code from README (first 2 blocks, max 20 lines each)
+    for (const block of apiBlocks.slice(0, 2)) {
+      const lines = block.code.split("\n").slice(0, 20);
+      s.push(`\`\`\`${block.lang || (lang === "python" ? "python" : "typescript")}`);
+      for (const line of lines) s.push(line);
+      s.push("```");
+      s.push("");
+    }
+  } else if (lang === "python") {
+    // Python library stub
+    const modName = name.toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_");
+    s.push("```python");
+    s.push(`# ${desc}`);
+    s.push(`import ${modName}`);
+    s.push("");
+    s.push(`# Initialize client/module`);
+    s.push(`client = ${modName}.Client()`);
+    s.push("");
+    s.push(`# See project documentation for full API reference`);
+    s.push("```");
+  } else if (lang === "node") {
+    // JavaScript/TypeScript SDK stub
+    const importName = name.replace(/[^a-zA-Z0-9]/g, "");
+    const pkgName = uri.startsWith("npm:") ? uri.slice(4) : uri;
+    s.push("```typescript");
+    s.push(`// ${desc}`);
+    s.push(`import ${importName} from "${pkgName}";`);
+    s.push("");
+    s.push(`// Initialize client`);
+    s.push(`const client = new ${importName}();`);
+    s.push("");
+    s.push(`// See project documentation for full API reference`);
+    s.push("```");
+  } else {
+    // Generic library
+    s.push("```bash");
+    s.push(`# See project README for API usage examples`);
+    s.push(`# ${desc}`);
+    s.push("```");
+  }
+}
+
 export function generateRichSkillMd(tool: Tool): string {
   const commands = tool.capabilities.commands;
   const flags = tool.capabilities.globalFlags;
@@ -1630,8 +1717,11 @@ export function generateRichSkillMd(tool: Tool): string {
       s.push("");
     }
     s.push("```");
-  } else if (domain && domain.quickStart.length > 0) {
-    // Domain-specific Quick Start (uses binary name via inferDomain)
+  } else if (isLibrary) {
+    // Library/SDK — generate language-appropriate API examples, never fake CLI commands
+    generateLibraryQuickStart(s, tool, name, uri, curated ?? undefined, readmeSections);
+  } else if (domain && domain.quickStart.length > 0 && isCli) {
+    // Domain-specific Quick Start — only for actual CLI tools
     s.push("```bash");
     for (const line of domain.quickStart) s.push(line);
     if (domain.quickStart[domain.quickStart.length - 1] !== "") s.push("");
@@ -1662,36 +1752,6 @@ export function generateRichSkillMd(tool: Tool): string {
     s.push(`# Show help`);
     s.push(`${name} --help`);
     s.push("```");
-  } else if (isLibrary && curated) {
-    // Library/SDK with curated metadata — generate install + API usage
-    const installCmd = inferInstallCommand(tool, curated);
-    s.push("```bash");
-    s.push(`# Install`);
-    s.push(installCmd);
-    s.push("```");
-    s.push("");
-    const langHint = inferLanguageHint(tool, curated);
-    if (langHint === "python") {
-      s.push("```python");
-      s.push(`# ${curated.description}`);
-      s.push(`import ${name.toLowerCase().replace(/[^a-z0-9_]/g, "_")}`);
-      s.push("");
-      s.push(`# See project README for API usage`);
-      s.push("```");
-    } else if (langHint === "javascript") {
-      s.push("```javascript");
-      s.push(`// ${curated.description}`);
-      const importName = name.replace(/[^a-zA-Z0-9]/g, "");
-      s.push(`import ${importName} from "${uri.startsWith("npm:") ? uri.slice(4) : uri}";`);
-      s.push("");
-      s.push(`// See project README for API usage`);
-      s.push("```");
-    } else {
-      s.push("```bash");
-      s.push(`# See project README for installation and usage`);
-      s.push(`# ${curated.description}`);
-      s.push("```");
-    }
   } else {
     s.push("```bash");
     s.push(`# Show help and available options`);
