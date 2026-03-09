@@ -620,14 +620,15 @@ export interface ProcessBatchOptions {
   onProgress?: (label: string, completed: number, total: number, result: BatchResult | null) => void;
 }
 
-/** Race a promise against a timeout. */
+/** Race a promise against a timeout. Clears timer on resolve to prevent leaks. */
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`Timeout after ${ms}ms: ${label}`)), ms)
-    ),
-  ]);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Timeout after ${ms}ms: ${label}`)), ms);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer);
+  });
 }
 
 /** Simple concurrency limiter. */
@@ -675,18 +676,21 @@ export async function processBatch(items: BatchItem[], opts: ProcessBatchOptions
   const timeout = opts.timeout ?? 300_000;
   const concurrency = opts.concurrency ?? 1;
 
-  // Resume: load completed labels from checkpoint
+  // Resume: load completed labels from checkpoint (only skip ok/cached, retry failed)
   let doneLabels = new Set<string>();
   if (opts.resumeFrom && existsSync(opts.resumeFrom)) {
     try {
       const lines = readFileSync(opts.resumeFrom, "utf-8").split("\n").filter(Boolean);
       for (const line of lines) {
         try {
-          const entry = JSON.parse(line) as { label: string };
-          doneLabels.add(entry.label);
+          const entry = JSON.parse(line) as { label: string; status?: string };
+          // Only skip items that succeeded or were cached — retry failed items
+          if (entry.status === "ok" || entry.status === "cached") {
+            doneLabels.add(entry.label);
+          }
         } catch { /* skip malformed lines */ }
       }
-      log(`  Resuming: ${doneLabels.size} tools already completed`);
+      log(`  Resuming: ${doneLabels.size} tools already completed (failed items will be retried)`);
     } catch { /* ignore read errors */ }
   }
 

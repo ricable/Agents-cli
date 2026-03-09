@@ -179,7 +179,7 @@ export type { SkillFactoryOptions, SkillFactoryResult } from "./skill-factory.js
 
 // Plugin system
 export { buildPlugins } from "./plugin/builder.js";
-export type { PluginManifest, BuildPluginsOptions } from "./plugin/builder.js";
+export type { PluginManifest, PluginJson, BuildPluginsOptions, BuildPluginsResult } from "./plugin/builder.js";
 export { publishPlugin, publishAllPlugins } from "./plugin/publisher.js";
 export { generateAgentDefs, defaultAgentDef, generateAgentMarkdown, defaultAgentMarkdown } from "./plugin/ai-generator.js";
 export type { AgentDef, AgentMarkdownFile } from "./plugin/ai-generator.js";

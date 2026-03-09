@@ -12,6 +12,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import { readPluginManifest, countPluginSkills } from "./shared.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -25,44 +26,11 @@ interface RegistryEntry {
 
 // ── Internal helpers ───────────────────────────────────────────────────
 
-/**
- * Read the plugin manifest from .claude-plugin/plugin.json.
- */
-function readPluginManifest(pluginDir: string): {
-  name: string;
-  version: string;
-  description: string;
-  keywords: string[];
-} {
-  const manifestPath = path.join(pluginDir, ".claude-plugin", "plugin.json");
-  if (!fs.existsSync(manifestPath)) {
-    throw new Error(`No .claude-plugin/plugin.json found in ${pluginDir}`);
-  }
-  const raw = JSON.parse(fs.readFileSync(manifestPath, "utf-8")) as Record<string, unknown>;
-  return {
-    name: String(raw.name ?? ""),
-    version: String(raw.version ?? "1.0.0"),
-    description: String(raw.description ?? ""),
-    keywords: Array.isArray(raw.keywords) ? (raw.keywords as unknown[]).map(String) : [],
-  };
-}
-
-/**
- * Count SKILL.md files in skills/ directory.
- */
-function countSkills(pluginDir: string): number {
-  const skillsDir = path.join(pluginDir, "skills");
-  if (!fs.existsSync(skillsDir)) return 0;
-
-  let count = 0;
-  for (const name of fs.readdirSync(skillsDir)) {
-    if (fs.existsSync(path.join(skillsDir, name, "SKILL.md"))) count++;
-  }
-  return count;
-}
-
 function createPackageJson(domain: string, pluginDir: string): void {
   const manifest = readPluginManifest(pluginDir);
+  if (!manifest) {
+    throw new Error(`No .claude-plugin/plugin.json found in ${pluginDir}`);
+  }
 
   const pkgJson = {
     name: `@opensrc-skills/${domain}`,
@@ -74,7 +42,7 @@ function createPackageJson(domain: string, pluginDir: string): void {
       "plugin",
       ...manifest.keywords,
     ].filter((v, i, a) => a.indexOf(v) === i),
-    license: "MIT",
+    license: manifest.license,
     files: [
       ".claude-plugin/",
       "skills/",
@@ -114,9 +82,9 @@ function updateRegistry(
   const entry: RegistryEntry = {
     domain,
     package: `@opensrc-skills/${domain}`,
-    version: manifest.version,
+    version: manifest?.version ?? "1.0.0",
     publishedAt: new Date().toISOString(),
-    skillCount: countSkills(pluginDir),
+    skillCount: countPluginSkills(pluginDir),
   };
 
   if (existing >= 0) {

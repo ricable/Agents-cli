@@ -214,6 +214,7 @@ npx tsx examples/skill-forge.ts --tool pypi:ruff --no-cache  # skip cache
 npx tsx examples/skill-forge.ts --tool pypi:ruff --force     # force regeneration
 
 # Common flags: --deep, --dry-run, --json, --strict, --limit N, --no-cache, --force
+# Batch flags:  --timeout <ms>, --concurrency <1-16>, --resume <checkpoint-path>
 ```
 
 ## Agent-first design principles
@@ -423,6 +424,7 @@ claude --plugin-dir ./examples/plugins/database
 - **Commands are markdown files**: `commands/<name>.md` with YAML frontmatter (`description`) + instructions
 - **Domains are flattened**: `ai-ml/llm-inference` → `ai-ml-llm-inference` (no nested plugin dirs)
 - **Plugins cannot reference external paths**: no `.claude/skills/...` — everything must be within the plugin dir
+- **`$ARGUMENTS` in commands**: standard Claude Code placeholder that captures user text after the slash command name (e.g. `/plugin:search my query` → `$ARGUMENTS` = `"my query"`)
 
 ### Key plugin functions
 

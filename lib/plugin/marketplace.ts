@@ -18,6 +18,8 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { readPluginManifest, countPluginSkills, copyDirSafe } from "./shared.js";
+import { toErrorMessage } from "../output.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -65,46 +67,6 @@ interface MarketplaceManifest {
   plugins: MarketplaceEntry[];
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────
-
-/**
- * Read a plugin.json from a .claude-plugin directory and extract metadata.
- */
-function readPluginManifest(pluginDir: string): MarketplaceEntry | null {
-  const manifestPath = path.join(pluginDir, ".claude-plugin", "plugin.json");
-  if (!fs.existsSync(manifestPath)) return null;
-
-  try {
-    const raw = JSON.parse(fs.readFileSync(manifestPath, "utf-8")) as Record<string, unknown>;
-    return {
-      name: String(raw.name ?? path.basename(pluginDir)),
-      version: String(raw.version ?? "1.0.0"),
-      description: String(raw.description ?? ""),
-      source: `./plugins/${path.basename(pluginDir)}`,
-      keywords: Array.isArray(raw.keywords)
-        ? (raw.keywords as unknown[]).map(String)
-        : undefined,
-    };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Count SKILL.md files within a plugin directory.
- */
-function countSkills(pluginDir: string): number {
-  const skillsDir = path.join(pluginDir, "skills");
-  if (!fs.existsSync(skillsDir)) return 0;
-
-  let count = 0;
-  for (const name of fs.readdirSync(skillsDir)) {
-    const skillMd = path.join(skillsDir, name, "SKILL.md");
-    if (fs.existsSync(skillMd)) count++;
-  }
-  return count;
-}
-
 // ── Public API ─────────────────────────────────────────────────────────
 
 /**
@@ -144,10 +106,17 @@ export async function generateMarketplace(
   let totalSkills = 0;
 
   for (const pluginDir of pluginDirs) {
-    const entry = readPluginManifest(pluginDir);
-    if (!entry) continue;
-    entries.push(entry);
-    totalSkills += countSkills(pluginDir);
+    const manifest = readPluginManifest(pluginDir);
+    if (!manifest) continue;
+
+    entries.push({
+      name: manifest.name,
+      version: manifest.version,
+      description: manifest.description,
+      source: `./plugins/${path.basename(pluginDir)}`,
+      keywords: manifest.keywords.length > 0 ? manifest.keywords : undefined,
+    });
+    totalSkills += countPluginSkills(pluginDir);
   }
 
   // Build marketplace manifest
@@ -183,13 +152,19 @@ export async function generateMarketplace(
     "utf-8"
   );
 
-  // Copy plugins into marketplace/plugins/
+  // Copy plugins into marketplace/plugins/ with path containment
   const mktPluginsDir = path.join(outputDir, "plugins");
   fs.mkdirSync(mktPluginsDir, { recursive: true });
 
   for (const pluginDir of pluginDirs) {
     const destDir = path.join(mktPluginsDir, path.basename(pluginDir));
-    copyDirRecursive(pluginDir, destDir);
+    try {
+      // P0: Use safe copy that validates path containment and skips symlinks
+      copyDirSafe(pluginDir, destDir, mktPluginsDir);
+    } catch (err) {
+      // Log but don't abort — skip corrupt plugins
+      console.error(`WARN: skipping plugin ${path.basename(pluginDir)}: ${toErrorMessage(err)}`);
+    }
   }
 
   return {
@@ -197,20 +172,4 @@ export async function generateMarketplace(
     skillCount: totalSkills,
     marketplacePath,
   };
-}
-
-/**
- * Recursively copy a directory.
- */
-function copyDirRecursive(src: string, dest: string): void {
-  fs.mkdirSync(dest, { recursive: true });
-  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
-    const srcPath = path.join(src, entry.name);
-    const destPath = path.join(dest, entry.name);
-    if (entry.isDirectory()) {
-      copyDirRecursive(srcPath, destPath);
-    } else if (entry.isFile()) {
-      fs.copyFileSync(srcPath, destPath);
-    }
-  }
 }

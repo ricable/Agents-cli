@@ -103,7 +103,14 @@ export function parseArgs(): CliArgs {
       }
       opts.concurrency = parsed;
     }
-    else if (a === "--resume" && argv[i+1])   { opts.resume = argv[++i]!; }
+    else if (a === "--resume" && argv[i+1])   {
+      const resumePath = argv[++i]!;
+      // P0: Validate resume path to prevent path traversal
+      if (resumePath.includes("..") || resumePath.includes("\0")) {
+        throw new Error(`Invalid --resume path: "${resumePath}" — must not contain ".." or null bytes`);
+      }
+      opts.resume = resumePath;
+    }
     // Positional → prompt
     else if (!a.startsWith("--"))             { opts.prompt += (opts.prompt ? " " : "") + a; }
   }
