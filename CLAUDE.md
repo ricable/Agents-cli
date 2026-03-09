@@ -493,6 +493,7 @@ Quality gate thresholds (from `testSkillSync`):
 - +0.2: contains "Do NOT use for" negative trigger (from `DOMAIN_NEGATIVE_TRIGGERS` map)
 - +0.1: multiple comma-separated triggers after "Use when" (≥ 2 clauses)
 - +0.1: 2+ TechNames — capitalized words ≥ 3 chars (e.g. `Python`, `Docker`, `BentoML`)
+- Components sum to 1.1 but `Math.min(1, score)` clamps to 1.0 — not all five required
 
 `buildDescription()` auto-generates all five components:
 - `CATEGORY_ACTION_MAP` provides domain-specific action verbs with `%` tool-name templates
