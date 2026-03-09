@@ -276,7 +276,7 @@ program
       return;
     }
 
-    const mainBin = findMainBinary(tool.installPath);
+    const mainBin = findMainBinary(tool.installPath, tool.meta.name);
     if (!mainBin) {
       const result = failure("schema", "NO_BINARY", `No executable found in: ${tool.installPath}`, start);
       emit(result, json);
@@ -407,7 +407,7 @@ program
         emit(failure("run", "NOT_FOUND", `Tool not found: ${tool}`, start), json);
         return;
       }
-      const mainBin = findMainBinary(toolObj.installPath);
+      const mainBin = findMainBinary(toolObj.installPath, toolObj.meta.name);
       const data = {
         action: "run",
         tool,
@@ -762,7 +762,7 @@ program
         }
 
         let capabilities: ToolCapabilities = { commands: [], globalFlags: [], analysisMethod: "help-probe" };
-        const mainBin = findMainBinary(installDir);
+        const mainBin = findMainBinary(installDir, entry.id);
         if (mainBin) {
           try { capabilities = await analyzer.analyze(mainBin); } catch { /* use defaults */ }
         }
@@ -939,7 +939,7 @@ program
       await installer.install(resolved.source, installDir, { force: true });
 
       let capabilities = tool.capabilities;
-      const mainBin = findMainBinary(installDir);
+      const mainBin = findMainBinary(installDir, name);
       if (mainBin) {
         try { capabilities = await analyzer.analyze(mainBin); } catch { /* keep existing */ }
       }
@@ -966,7 +966,7 @@ program
             const installDir = getToolInstallDir(DATA_DIR, tool.id);
             await installer.install(resolved.source, installDir, { force: true });
             let capabilities = tool.capabilities;
-            const mainBin = findMainBinary(installDir);
+            const mainBin = findMainBinary(installDir, tool.meta.name);
             if (mainBin) { try { capabilities = await analyzer.analyze(mainBin); } catch { /* keep existing */ } }
             const version = readPkgVersion(installDir, resolved.meta.version ?? tool.meta.version);
             const now = new Date().toISOString();

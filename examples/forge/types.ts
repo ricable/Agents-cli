@@ -63,6 +63,12 @@ export interface CliArgs {
   mcp: boolean;
   // System PATH discovery
   system: boolean;
+  // Batch processing
+  timeout: number;
+  concurrency: number;
+  resume: string;
+  // Skip index/chunk persistence during batch
+  noIndex: boolean;
 }
 
 export interface ChunkStats {

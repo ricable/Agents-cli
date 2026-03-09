@@ -81,7 +81,7 @@ export async function runTool(
   }
 
   // Find executable using the shared analyzer logic (supports monorepos)
-  const binPath = findMainBinary(installDir);
+  const binPath = findMainBinary(installDir, tool.meta.name);
   if (!binPath) {
     return {
       success: false,
@@ -93,6 +93,7 @@ export async function runTool(
   const start = Date.now();
 
   return new Promise<AgentRunResult<string>>((resolve) => {
+    let settled = false;
     const env = {
       ...process.env,
       AGENT_TOOLS_PATH: installDir,
@@ -117,6 +118,8 @@ export async function runTool(
     });
 
     const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
       child.kill("SIGTERM");
       // SIGKILL fallback after 5 seconds
       const killTimer = setTimeout(() => {
@@ -132,6 +135,8 @@ export async function runTool(
     }, timeout);
 
     child.on("error", (err: Error) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
       const duration = Date.now() - start;
       resolve({
@@ -142,6 +147,8 @@ export async function runTool(
     });
 
     child.on("close", (code: number | null) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
       const duration = Date.now() - start;
       if (code === 0) {

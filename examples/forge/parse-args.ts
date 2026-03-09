@@ -22,6 +22,10 @@ export function parseArgs(): CliArgs {
     freeze: false, verify: false,
     mcp: false,
     system: false,
+    timeout: 300000,
+    concurrency: 1,
+    resume: "",
+    noIndex: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -74,6 +78,7 @@ export function parseArgs(): CliArgs {
     else if (a === "--pkg" && argv[i+1])      { opts.pkg = argv[++i]!; }
     // Index
     else if (a === "--index")                 { opts.index = true; }
+    else if (a === "--no-index")              { opts.noIndex = true; }
     // Plugin
     else if (a === "--plugin")                { opts.plugin = true; }
     else if (a === "--agent-defs")            { opts.agentDefs = true; }
@@ -85,6 +90,31 @@ export function parseArgs(): CliArgs {
     else if (a === "--mcp")                   { opts.mcp = true; }
     // System PATH discovery
     else if (a === "--system")                { opts.system = true; }
+    // Batch processing
+    else if (a === "--timeout" && argv[i+1])  {
+      const val = argv[++i]!;
+      const parsed = parseInt(val, 10);
+      if (Number.isNaN(parsed) || parsed < 1000) {
+        throw new Error(`Invalid --timeout value: "${val}" (must be >= 1000ms)`);
+      }
+      opts.timeout = parsed;
+    }
+    else if (a === "--concurrency" && argv[i+1]) {
+      const val = argv[++i]!;
+      const parsed = parseInt(val, 10);
+      if (Number.isNaN(parsed) || parsed < 1 || parsed > 16) {
+        throw new Error(`Invalid --concurrency value: "${val}" (must be 1-16)`);
+      }
+      opts.concurrency = parsed;
+    }
+    else if (a === "--resume" && argv[i+1])   {
+      const resumePath = argv[++i]!;
+      // P0: Validate resume path to prevent path traversal
+      if (resumePath.includes("..") || resumePath.includes("\0")) {
+        throw new Error(`Invalid --resume path: "${resumePath}" — must not contain ".." or null bytes`);
+      }
+      opts.resume = resumePath;
+    }
     // Positional → prompt
     else if (!a.startsWith("--"))             { opts.prompt += (opts.prompt ? " " : "") + a; }
   }

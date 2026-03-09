@@ -5,11 +5,14 @@
  *   1. Creates a package.json suitable for npm publishing
  *   2. Optionally runs npm publish --access public
  *   3. Updates {pluginsDir}/registry.json with published metadata
+ *
+ * Reads plugin metadata from .claude-plugin/plugin.json (spec-compliant path).
  */
 
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import { readPluginManifest, countPluginSkills } from "./shared.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -24,30 +27,30 @@ interface RegistryEntry {
 // ── Internal helpers ───────────────────────────────────────────────────
 
 function createPackageJson(domain: string, pluginDir: string): void {
-  const pluginJson = JSON.parse(
-    fs.readFileSync(path.join(pluginDir, "plugin.json"), "utf-8")
-  ) as { name: string; version: string; description: string; skills: string[] };
+  const manifest = readPluginManifest(pluginDir);
+  if (!manifest) {
+    throw new Error(`No .claude-plugin/plugin.json found in ${pluginDir}`);
+  }
 
   const pkgJson = {
     name: `@opensrc-skills/${domain}`,
-    version: pluginJson.version,
-    description: pluginJson.description,
-    main: "plugin.json",
+    version: manifest.version,
+    description: manifest.description,
+    main: ".claude-plugin/plugin.json",
     keywords: [
       "claude-code",
-      "skill",
       "plugin",
-      domain,
-      "ai",
-      "opensrc",
+      ...manifest.keywords,
+    ].filter((v, i, a) => a.indexOf(v) === i),
+    license: manifest.license,
+    files: [
+      ".claude-plugin/",
+      "skills/",
+      "agents/",
+      "commands/",
+      "hooks/",
+      "scripts/",
     ],
-    license: "MIT",
-    author: "@ruvnet/pop-skills",
-    repository: {
-      type: "git",
-      url: "https://github.com/ruvnet/pop-skills",
-    },
-    files: ["plugin.json", "skills/", "agents/", "hooks/", "commands/"],
     engines: { node: ">=18" },
     publishConfig: { access: "public" },
   };
@@ -73,17 +76,15 @@ function updateRegistry(
     ) as RegistryEntry[];
   }
 
-  const pluginJson = JSON.parse(
-    fs.readFileSync(path.join(pluginDir, "plugin.json"), "utf-8")
-  ) as { version: string; skills: string[] };
+  const manifest = readPluginManifest(pluginDir);
 
   const existing = registry.findIndex((e) => e.domain === domain);
   const entry: RegistryEntry = {
     domain,
     package: `@opensrc-skills/${domain}`,
-    version: pluginJson.version,
+    version: manifest?.version ?? "1.0.0",
     publishedAt: new Date().toISOString(),
-    skillCount: pluginJson.skills.length,
+    skillCount: countPluginSkills(pluginDir),
   };
 
   if (existing >= 0) {
@@ -122,8 +123,8 @@ export async function publishPlugin(
     );
   }
 
-  if (!fs.existsSync(path.join(pluginDir, "plugin.json"))) {
-    throw new Error(`plugin.json not found in ${pluginDir}`);
+  if (!fs.existsSync(path.join(pluginDir, ".claude-plugin", "plugin.json"))) {
+    throw new Error(`.claude-plugin/plugin.json not found in ${pluginDir}`);
   }
 
   // Create publishable package.json

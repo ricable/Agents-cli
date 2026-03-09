@@ -78,7 +78,13 @@ export async function trendingMode(args: CliArgs, startTime: number): Promise<vo
 
   const repoMap = new Map(toProcess.map(r => [r.fullName, r]));
   const batchItems: BatchItem[] = toProcess.map(r => ({ label: r.fullName, source: r.fullName }));
-  const { results, failures } = await processBatch(batchItems, { deep: args.deep, noCache: args.noCache, force: args.force });
+  const { results, failures } = await processBatch(batchItems, {
+    deep: args.deep,
+    noCache: args.noCache,
+    force: args.force,
+    timeout: args.timeout,
+    concurrency: args.concurrency,
+  });
 
   if (results.length > 0) {
     log("\n  Building indexes...");

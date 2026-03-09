@@ -42,6 +42,7 @@ __pycache__/
 # Generated artifacts (runtime)
 .mcp.json
 examples/plugins/
+examples/marketplace/
 examples/generated-workflows/
 examples/generated-skills/
 examples/generated-skills-old/

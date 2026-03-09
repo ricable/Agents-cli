@@ -10,8 +10,25 @@ import { join, relative } from "node:path";
 import type { ManifestEntry, PackageAnalysis, ExportGroup, ReadmeSections } from "./types.js";
 export type { ReadmeSections } from "./types.js";
 
-/** Regex that matches common package manager install commands */
-export const INSTALL_CMD_RE = /^\$?\s*(pip|npm|brew|cargo|go|apt|yum|dnf|scoop|choco|winget|port|snap|flatpak|pacman|emerge|nix-env|conda|zypper|apk|pkg|sudo\s+\w+)\s+(install|add|get|--install|-S)\b/;
+/** Regex that matches common package manager install commands and setup patterns */
+export const INSTALL_CMD_RE = /^\$?\s*(pip|npm|brew|cargo|go|apt|yum|dnf|scoop|choco|winget|port|snap|flatpak|pacman|emerge|nix-env|conda|zypper|apk|pkg|sudo\s+\w+)\s+(install|add|get|--install|-S)\b|^\$?\s*curl\s+.*\|\s*(ba)?sh|^\$?\s*(docker\s+pull|wget\s+|git\s+clone|cmake\s+|make\s+install|gem\s+install|cpan\s+install|uv\s+(pip\s+install|add))\b/;
+
+/** Classify a fenced code block by its likely purpose */
+export type CodeBlockPurpose = "install" | "config" | "usage" | "advanced" | "output";
+
+export function classifyCodeBlock(code: string, lang: string): CodeBlockPurpose {
+  if (INSTALL_CMD_RE.test(code)) return "install";
+  if (/^[\s]*[{[]/.test(code) && /^(json|yaml|yml|toml)$/i.test(lang)) return "config";
+  // Output blocks: lines starting with ">" (blockquote), or containing "output"/"expected" markers
+  // Note: "$" is a shell prompt (input, not output) so we don't match it here
+  if (/^(>(?!\s*\w+)|#.*output|expected)/m.test(code)) return "output";
+  // Usage: short (< 15 lines), has function calls or imports
+  if (code.split("\n").length < 15 && /\b(import|from|require|const|let|var)\b/.test(code)) return "usage";
+  return "advanced";
+}
+
+/** Regex that matches BibTeX/academic citation blocks */
+const CITATION_RE = /^\s*@(?:inproceedings|article|misc|book|techreport|phdthesis|mastersthesis)\s*\{/m;
 
 // ── README helpers ───────────────────────────────────────────────────────
 
@@ -57,6 +74,10 @@ export function isActualCode(code: string, lang: string): boolean {
     "typescript", "ts", "rust", "go", "ruby", "rb", "java", "c", "cpp", "yaml", "yml",
     "json", "toml", "ini", "sql", "dockerfile", "makefile", "cmake", "lua", "perl",
     "swift", "kotlin", "scala", "r", "powershell", "ps1", "fish", "elixir", "haskell"]);
+
+  // Filter out BibTeX/academic citation blocks
+  if (CITATION_RE.test(code)) return false;
+
   // Filter out trivial single-line install commands (e.g. `$ brew install foo`)
   const nonEmptyLines = code.split("\n").filter(l => l.trim().length > 0 && !l.trim().startsWith("#"));
   if (nonEmptyLines.length <= 2) {
@@ -109,9 +130,19 @@ export function cleanMarkdownSection(text: string): string {
 export function extractCommandsFromReadme(
   readme: string,
   toolName: string,
+  binaryNames?: string[],
 ): Array<{ name: string; description: string }> {
   const commands: Array<{ name: string; description: string }> = [];
   const seen = new Set<string>();
+
+  // Build list of names to search for (tool name + binary names)
+  const namesToSearch = [toolName];
+  if (binaryNames) {
+    for (const bn of binaryNames) {
+      if (!namesToSearch.includes(bn)) namesToSearch.push(bn);
+    }
+  }
+
   const lines = readme.split("\n");
 
   let insideCodeBlock = false;
@@ -133,21 +164,24 @@ export function extractCommandsFromReadme(
       prevComment = trimmed.replace(/^#+\s*/, "").trim();
       continue;
     }
-    // Match command lines: $ tool subcommand or tool subcommand
-    const cmdMatch = trimmed.match(new RegExp(`^\\$?\\s*${escapeRegex(toolName)}\\s+(\\S+)`));
-    if (cmdMatch) {
-      const subcmd = cmdMatch[1]!;
-      // Skip flags, file paths, special chars, and very short tokens
-      if (subcmd.startsWith("-") || subcmd.includes("/") || subcmd.includes(".")) continue;
-      if (subcmd.length < 2 || /^[^a-zA-Z]/.test(subcmd)) continue;
-      if (/^[…>|&]/.test(subcmd)) continue;
-      // Skip common shell redirection artifacts
-      if (["2>/dev/null", ">", ">>", "|", "&&", "||"].includes(subcmd)) continue;
-      if (!seen.has(subcmd)) {
-        seen.add(subcmd);
-        commands.push({ name: subcmd, description: prevComment || subcmd });
+    // Match command lines using any of the tool/binary names
+    for (const searchName of namesToSearch) {
+      const cmdMatch = trimmed.match(new RegExp(`^\\$?\\s*${escapeRegex(searchName)}\\s+(\\S+)`));
+      if (cmdMatch) {
+        const subcmd = cmdMatch[1]!;
+        // Skip flags, file paths, special chars, and very short tokens
+        if (subcmd.startsWith("-") || subcmd.includes("/") || subcmd.includes(".")) continue;
+        if (subcmd.length < 2 || /^[^a-zA-Z]/.test(subcmd)) continue;
+        if (/^[…>|&]/.test(subcmd)) continue;
+        // Skip common shell redirection artifacts
+        if (["2>/dev/null", ">", ">>", "|", "&&", "||"].includes(subcmd)) continue;
+        if (!seen.has(subcmd)) {
+          seen.add(subcmd);
+          commands.push({ name: subcmd, description: prevComment || subcmd });
+        }
+        prevComment = "";
+        break; // found match with this name, no need to try others
       }
-      prevComment = "";
     }
   }
   return commands.slice(0, 10);
@@ -277,7 +311,11 @@ export function readSourceVersion(repoDir: string): string | undefined {
   try {
     const pyproj = readFileSync(join(repoDir, "pyproject.toml"), "utf-8");
     const ver = pyproj.match(/version\s*=\s*"([^"]+)"/);
-    if (ver) return ver[1];
+    if (ver) {
+      const v = ver[1]!;
+      // Skip dynamic version markers like "attr:" or "{attr:" — these aren't real versions
+      if (!/^(?:\{?\s*attr:|file:)/.test(v)) return v;
+    }
   } catch { /* no pyproject.toml */ }
 
   // Python: setup.cfg
@@ -312,7 +350,7 @@ export function extractReadmeSections(readme: string, maxSectionChars = 2000): R
     const code = cm[2]!.trim();
     const lang = cm[1] || "bash";
     if (code.length >= 10 && isActualCode(code, lang)) {
-      result.codeBlocks.push({ lang, code: code.slice(0, 1500) });
+      result.codeBlocks.push({ lang, code: code.slice(0, 1500), purpose: classifyCodeBlock(code, lang) });
     }
   }
 

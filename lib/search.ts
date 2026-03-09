@@ -314,21 +314,26 @@ export async function hybridSearch(
       return toSearchResults(rows);
     }
 
-    // hybrid: FTS pre-filter -> cosine re-rank
+    // hybrid: FTS pre-filter -> cosine re-rank + FTS backfill
     const candidateRows = ftsSearch(db, query, pkg, candidates, true);
     if (!candidateRows.length) return [];
 
-    const reranked = candidateRows
-      .filter((r) => r.embedding)
-      .map((r) => ({
-        ...r,
-        score: cosine(queryVec, fromBlob(r.embedding as Buffer)),
-      }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit);
-
-    const final =
-      reranked.length > 0 ? reranked : candidateRows.slice(0, limit);
+    const withEmb = candidateRows.filter((r) => r.embedding);
+    const withoutEmb = candidateRows.filter((r) => !r.embedding);
+    let final;
+    if (withEmb.length === 0) {
+      final = candidateRows.slice(0, limit);
+    } else {
+      const reranked = withEmb
+        .map((r) => ({
+          ...r,
+          score: cosine(queryVec, fromBlob(r.embedding as Buffer)),
+        }))
+        .sort((a, b) => b.score - a.score);
+      const rerankedIds = new Set(reranked.map((r) => r.id));
+      const backfill = withoutEmb.filter((r) => !rerankedIds.has(r.id));
+      final = [...reranked, ...backfill].slice(0, limit);
+    }
     return toSearchResults(final);
   } finally {
     db.close();

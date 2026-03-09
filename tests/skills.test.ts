@@ -21,9 +21,11 @@ import {
   installSkill,
   generateRichSkillMd,
   generateSkillDirectory,
-
+  isLikelyCli,
+  inferLibraryInstallCommand,
 } from "../lib/skills.js";
-import { testSkillSync } from "../lib/skill-tester.js";
+import { testSkillSync, scoreTrigger, domainMatches, scoreContentQuality } from "../lib/skill-tester.js";
+import { extractCommandsFromReadme } from "../lib/extractor.js";
 import type { Tool, Skill } from "../lib/types.js";
 
 // =============================================================================
@@ -619,39 +621,40 @@ Just a body.
 // Spec-compliant skill generation (battle test)
 // =============================================================================
 
+/** Create a mock Tool for testing generation */
+function makeMockTool(overrides: Partial<Tool> = {}): Tool {
+  return {
+    id: "ruff",
+    meta: {
+      name: "ruff",
+      version: "0.1.0",
+      description: "An extremely fast Python linter and code formatter, written in Rust",
+      license: "MIT",
+      tags: ["python", "linter", "formatter"],
+    },
+    source: { format: "pypi", uri: "pypi:ruff" },
+    capabilities: {
+      commands: [
+        { name: "check", description: "Check files for issues", flags: [
+          { name: "--fix", description: "Auto-fix issues", type: "boolean", required: false },
+        ] },
+        { name: "format", description: "Format files", flags: [] },
+        { name: "rule", description: "Show rule details", flags: [] },
+      ],
+      globalFlags: [
+        { name: "--config", description: "Config file", type: "string", required: false },
+      ],
+      analysisMethod: "help-probe",
+    },
+    installPath: "/tmp/tools/ruff",
+    status: "installed",
+    installedAt: "2024-01-01T00:00:00.000Z",
+    updatedAt: "2024-01-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
 describe("spec-compliant skill generation", () => {
-  /** Create a mock Tool for testing generation */
-  function makeMockTool(overrides: Partial<Tool> = {}): Tool {
-    return {
-      id: "ruff",
-      meta: {
-        name: "ruff",
-        version: "0.1.0",
-        description: "An extremely fast Python linter and code formatter, written in Rust",
-        license: "MIT",
-        tags: ["python", "linter", "formatter"],
-      },
-      source: { format: "pypi", uri: "pypi:ruff" },
-      capabilities: {
-        commands: [
-          { name: "check", description: "Check files for issues", flags: [
-            { name: "--fix", description: "Auto-fix issues", type: "boolean", required: false },
-          ] },
-          { name: "format", description: "Format files", flags: [] },
-          { name: "rule", description: "Show rule details", flags: [] },
-        ],
-        globalFlags: [
-          { name: "--config", description: "Config file", type: "string", required: false },
-        ],
-        analysisMethod: "help-probe",
-      },
-      installPath: "/tmp/tools/ruff",
-      status: "installed",
-      installedAt: "2024-01-01T00:00:00.000Z",
-      updatedAt: "2024-01-01T00:00:00.000Z",
-      ...overrides,
-    };
-  }
 
   describe("buildDescription via generateRichSkillMd", () => {
     it("produces 'Use when' with action verbs, no 'CLI tool:' prefix", () => {
@@ -709,7 +712,7 @@ describe("spec-compliant skill generation", () => {
       const tool = makeMockTool();
       const dir = generateSkillDirectory(tool);
       expect(dir.files["references/guide.md"]).toBeDefined();
-      expect(dir.files["references/guide.md"]).toContain("Usage Guide");
+      expect(dir.files["references/guide.md"]).toContain("Setup & Configuration Guide");
     });
 
     it("always produces references/examples.md", () => {
@@ -832,5 +835,382 @@ describe("spec-compliant skill generation", () => {
       const unknownDir = generateSkillDirectory(unknownTool);
       expect(unknownDir.files["scripts/install.sh"]).toContain("releases");
     });
+  });
+});
+
+// =============================================================================
+// scoreTrigger
+// =============================================================================
+
+describe("scoreTrigger", () => {
+  it("gives +0.3 for 'Use when' prefix", () => {
+    const score = scoreTrigger("Use when running tests");
+    expect(score).toBeGreaterThanOrEqual(0.3);
+  });
+
+  it("gives +0.2 for 'Do NOT use for' clause", () => {
+    const score = scoreTrigger("Use when running tests. Do NOT use for deployment");
+    expect(score).toBeGreaterThanOrEqual(0.5);
+  });
+
+  it("recognizes new action verbs (fine-tuning, inferencing, vectorizing)", () => {
+    const s1 = scoreTrigger("Use when fine-tuning models, inferencing data, vectorizing embeddings");
+    expect(s1).toBeGreaterThanOrEqual(0.7); // 0.3 + 0.4 (3 verbs)
+  });
+
+  it("recognizes annotating, labeling, quantizing, serving", () => {
+    const s = scoreTrigger("Use when annotating, labeling, quantizing, serving");
+    expect(s).toBeGreaterThanOrEqual(0.7);
+  });
+
+  it("recognizes evaluating, benchmarking, augmenting, automating", () => {
+    const s = scoreTrigger("Use when evaluating, benchmarking, augmenting, automating");
+    expect(s).toBeGreaterThanOrEqual(0.7);
+  });
+
+  it("recognizes importing, integrating, invoking", () => {
+    const s = scoreTrigger("Use when importing modules, integrating APIs, invoking commands");
+    expect(s).toBeGreaterThanOrEqual(0.7);
+  });
+
+  it("gives +0.1 for comma-separated triggers", () => {
+    const withCommas = scoreTrigger("Use when running tests, building projects, deploying apps.");
+    const withoutCommas = scoreTrigger("Use when running tests.");
+    expect(withCommas).toBeGreaterThan(withoutCommas);
+  });
+
+  it("gives +0.1 for 2+ TechNames", () => {
+    const with2 = scoreTrigger("Use when running Python Docker tests");
+    const with0 = scoreTrigger("Use when running tests and doing things");
+    expect(with2).toBeGreaterThan(with0);
+  });
+
+  it("handles descriptions without trailing dot (C2 fix)", () => {
+    const score = scoreTrigger("Use when running tools, building apps Do NOT use for deployment");
+    // Should still get comma-trigger bonus
+    expect(score).toBeGreaterThanOrEqual(0.8);
+  });
+
+  it("clamps at 1.0", () => {
+    const score = scoreTrigger(
+      "Use when running tests, building projects, deploying apps. Do NOT use for database. Python Docker Kubernetes"
+    );
+    expect(score).toBeLessThanOrEqual(1.0);
+  });
+});
+
+// =============================================================================
+// domainMatches
+// =============================================================================
+
+describe("domainMatches", () => {
+  const makeContent = (domain: string) => `---\ndomain: ${domain}\n---\n# Test`;
+
+  it("matches exact domain", () => {
+    expect(domainMatches(makeContent("database"), "database")).toBe(true);
+  });
+
+  it("matches substring in domain (filter in domain)", () => {
+    expect(domainMatches(makeContent("ai-ml/ai-agents"), "agent")).toBe(true);
+  });
+
+  it("does NOT match reverse direction (C3 fix: domain substring of filter)", () => {
+    // "database-tools".includes("data") was true before fix — should be false
+    expect(domainMatches(makeContent("data"), "database-tools")).toBe(false);
+  });
+
+  it("returns false when no domain field", () => {
+    expect(domainMatches("---\nname: test\n---\n# Test", "agent")).toBe(false);
+  });
+
+  it("handles quoted domain values", () => {
+    expect(domainMatches('---\ndomain: "ai-ml/agents"\n---\n', "agent")).toBe(true);
+  });
+});
+
+// =============================================================================
+// isLikelyCli
+// =============================================================================
+
+describe("isLikelyCli", () => {
+  it("returns true for tools with commands", () => {
+    const tool = makeMockTool({
+      capabilities: { commands: [{ name: "check", description: "Run checks" }], globalFlags: [] },
+      meta: { ...makeMockTool().meta, tags: [] },
+    });
+    expect(isLikelyCli(tool)).toBe(true);
+  });
+
+  it("returns true for tools with CLI tags", () => {
+    const tool = makeMockTool({
+      meta: { ...makeMockTool().meta, tags: ["cli", "tool"] },
+    });
+    expect(isLikelyCli(tool)).toBe(true);
+  });
+
+  it("returns true for dual-purpose tools with library tag AND commands (C4 fix)", () => {
+    const tool = makeMockTool({
+      capabilities: { commands: [{ name: "check", description: "Lint check" }], globalFlags: [] },
+      meta: { ...makeMockTool().meta, tags: ["library", "python"] },
+    });
+    expect(isLikelyCli(tool)).toBe(true);
+  });
+
+  it("returns false for pure library with no commands", () => {
+    const tool = makeMockTool({
+      capabilities: { commands: [], globalFlags: [] },
+      meta: { ...makeMockTool().meta, name: "requests", tags: ["library", "python"], description: "HTTP library for Python" },
+    });
+    expect(isLikelyCli(tool)).toBe(false);
+  });
+});
+
+// =============================================================================
+// inferLibraryInstallCommand
+// =============================================================================
+
+describe("inferLibraryInstallCommand", () => {
+  it("generates npm install for npm packages", () => {
+    const tool = makeMockTool({ source: { format: "npm", uri: "npm:express" } });
+    const cmd = inferLibraryInstallCommand(tool);
+    expect(cmd).toContain("npm install");
+    expect(cmd).toContain("express");
+  });
+
+  it("generates pip install for pypi packages", () => {
+    const tool = makeMockTool({ source: { format: "pypi", uri: "pypi:requests" } });
+    const cmd = inferLibraryInstallCommand(tool);
+    expect(cmd).toContain("pip install");
+    expect(cmd).toContain("requests");
+  });
+
+  it("generates cargo add for crates", () => {
+    const tool = makeMockTool({ source: { format: "crates", uri: "crates:serde" } });
+    const cmd = inferLibraryInstallCommand(tool);
+    expect(cmd).toContain("cargo add");
+    expect(cmd).toContain("serde");
+  });
+
+  it("uses shellQuote on package names (S2 fix)", () => {
+    const tool = makeMockTool({ source: { format: "npm", uri: "npm:@scope/pkg" } });
+    const cmd = inferLibraryInstallCommand(tool);
+    // shellQuote wraps in single quotes
+    expect(cmd).toContain("'@scope/pkg'");
+  });
+});
+
+// =============================================================================
+// refineCategoryKey — template bleed prevention
+// =============================================================================
+
+describe("refineCategoryKey via buildDescription", () => {
+  it("generates testing triggers for pytest-like tools, not linting", () => {
+    const tool = makeMockTool({
+      meta: { name: "pytest", version: "7.0.0", description: "pytest: simple powerful testing with Python", tags: ["python", "testing"] },
+      source: { format: "pypi", uri: "pypi:pytest" },
+      capabilities: { commands: [], globalFlags: [], analysisMethod: "help-probe" },
+    });
+    (tool as { _curatedMeta: typeof tool._curatedMeta })._curatedMeta = {
+      description: "Python testing framework",
+      agentValue: "Run tests, fixtures, assertions",
+      category: "python",
+    };
+    const md = generateRichSkillMd(tool);
+    const desc = md.match(/^description:\s*"?(.+?)"?\s*$/m)?.[1] ?? "";
+    // Should NOT mention "linting and formatting"
+    expect(desc.toLowerCase()).not.toContain("linting and formatting");
+    // Should mention testing-related verbs
+    expect(desc.toLowerCase()).toMatch(/test|assert|fixture|running tests/);
+  });
+
+  it("generates ML triggers for gradio-like tools", () => {
+    const tool = makeMockTool({
+      meta: { name: "gradio", version: "4.0.0", description: "Build & share delightful machine learning apps", tags: ["python", "ml"] },
+      source: { format: "pypi", uri: "pypi:gradio" },
+      capabilities: { commands: [], globalFlags: [], analysisMethod: "help-probe" },
+    });
+    (tool as { _curatedMeta: typeof tool._curatedMeta })._curatedMeta = {
+      description: "Machine learning web interfaces",
+      agentValue: "Build ML model demos and interfaces",
+      category: "python",
+    };
+    const md = generateRichSkillMd(tool);
+    const desc = md.match(/^description:\s*"?(.+?)"?\s*$/m)?.[1] ?? "";
+    expect(desc.toLowerCase()).not.toContain("linting and formatting");
+  });
+});
+
+// =============================================================================
+// _toolKind in generateRichSkillMd
+// =============================================================================
+
+describe("_toolKind", () => {
+  it("library tools get library tag", () => {
+    const tool = makeMockTool({
+      meta: { name: "numpy", version: "1.0.0", description: "Fundamental package for array computing", tags: ["python"] },
+      source: { format: "pypi", uri: "pypi:numpy" },
+      capabilities: { commands: [], globalFlags: [], analysisMethod: "help-probe" },
+    });
+    (tool as { _toolKind?: string })._toolKind = "library";
+    const md = generateRichSkillMd(tool);
+    expect(md).toContain("library");
+  });
+
+  it("CLI tools get cli-tool tag", () => {
+    const tool = makeMockTool({
+      meta: { name: "ruff", version: "0.1.0", description: "An extremely fast Python linter", tags: ["python"] },
+      source: { format: "pypi", uri: "pypi:ruff" },
+      capabilities: {
+        commands: [{ name: "check", description: "Run linting checks", flags: [] }],
+        globalFlags: [],
+        analysisMethod: "flag-parse",
+      },
+    });
+    (tool as { _toolKind?: string })._toolKind = "cli";
+    const md = generateRichSkillMd(tool);
+    expect(md).toContain("cli-tool");
+  });
+});
+
+// =============================================================================
+// Command names as tags
+// =============================================================================
+
+describe("command names as tags", () => {
+  it("adds command names to tags for tools with 5+ commands", () => {
+    const commands = ["check", "format", "clean", "rule", "linter", "config", "version"].map(
+      name => ({ name, description: `${name} command`, flags: [] as readonly import("../lib/types.js").ToolFlag[] })
+    );
+    const tool = makeMockTool({
+      meta: { name: "ruff", version: "0.1.0", description: "An extremely fast Python linter", tags: ["python", "linter"] },
+      source: { format: "pypi", uri: "pypi:ruff" },
+      capabilities: { commands, globalFlags: [], analysisMethod: "flag-parse" },
+    });
+    const md = generateRichSkillMd(tool);
+    // Should contain at least some command names as tags
+    expect(md).toContain("  - check");
+    expect(md).toContain("  - format");
+  });
+
+  it("does not add command tags for tools with fewer than 5 commands", () => {
+    const commands = [{ name: "run", description: "Run stuff", flags: [] as readonly import("../lib/types.js").ToolFlag[] }];
+    const tool = makeMockTool({
+      meta: { name: "mytool", version: "1.0.0", description: "A simple tool", tags: ["tool"] },
+      source: { format: "npm", uri: "npm:mytool" },
+      capabilities: { commands, globalFlags: [], analysisMethod: "flag-parse" },
+    });
+    const md = generateRichSkillMd(tool);
+    // "run" should NOT appear as a tag since we only have 1 command
+    const tagSection = md.split("tags:")[1]?.split("---")[0] ?? "";
+    const tagLines = tagSection.split("\n").filter(l => l.trim().startsWith("- "));
+    expect(tagLines.some(l => l.trim() === "- run")).toBe(false);
+  });
+});
+
+// =============================================================================
+// scoreContentQuality
+// =============================================================================
+
+describe("scoreContentQuality", () => {
+  it("scores clean skill content high", () => {
+    const content = `---
+name: ruff
+description: "Fast Python linter. Use when linting code."
+---
+
+## Quick Start
+
+\`\`\`bash
+ruff check .
+\`\`\`
+
+## Commands
+
+\`\`\`bash
+ruff format .
+\`\`\`
+`;
+    const result = scoreContentQuality(content);
+    expect(result.score).toBeGreaterThanOrEqual(8);
+    expect(result.issues).toHaveLength(0);
+  });
+
+  it("penalizes fabricated Client() pattern", () => {
+    const content = `---
+name: mylib
+description: "A library"
+---
+
+## Quick Start
+
+\`\`\`python
+import mylib
+client = mylib.Client()
+\`\`\`
+`;
+    const result = scoreContentQuality(content);
+    expect(result.score).toBeLessThan(8);
+    expect(result.issues.some(i => i.includes("Client()"))).toBe(true);
+  });
+
+  it("penalizes few code examples", () => {
+    const content = `---
+name: bare
+description: "Minimal"
+---
+
+## About
+
+Just text, no code.
+`;
+    const result = scoreContentQuality(content);
+    expect(result.score).toBeLessThan(9);
+    expect(result.issues.some(i => i.includes("code examples"))).toBe(true);
+  });
+});
+
+// =============================================================================
+// extractCommandsFromReadme with binaryNames
+// =============================================================================
+
+describe("extractCommandsFromReadme with binaryNames", () => {
+  it("finds commands using binary name alias", () => {
+    const readme = `
+# Usage
+
+\`\`\`bash
+rg search-pattern path/
+rg --type js "import"
+\`\`\`
+`;
+    // Tool name is "ripgrep" but binary is "rg"
+    const cmds = extractCommandsFromReadme(readme, "ripgrep", ["rg"]);
+    expect(cmds.length).toBeGreaterThan(0);
+    expect(cmds[0]!.name).toBe("search-pattern");
+  });
+
+  it("finds commands with both tool name and binary names", () => {
+    const readme = `
+\`\`\`bash
+# Using full name
+ripgrep search-pattern
+# Using binary
+rg --files
+\`\`\`
+`;
+    const cmds = extractCommandsFromReadme(readme, "ripgrep", ["rg"]);
+    expect(cmds.some(c => c.name === "search-pattern")).toBe(true);
+  });
+
+  it("deduplicates commands found with different names", () => {
+    const readme = `
+\`\`\`bash
+mytool check foo
+mt check bar
+\`\`\`
+`;
+    const cmds = extractCommandsFromReadme(readme, "mytool", ["mt"]);
+    const checkCmds = cmds.filter(c => c.name === "check");
+    expect(checkCmds).toHaveLength(1);
   });
 });

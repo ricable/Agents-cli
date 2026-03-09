@@ -26,3 +26,19 @@ export const DOMAIN_TRIGGERS: Record<string, string> = {
   "ui":           "React UI components, accessible primitives, styling, component variants",
   "wasm":         "WebAssembly bindings, WASM component model, Rust->WASM compilation, WASI",
 };
+
+/**
+ * Infer a domain label for a tool based on its name, description, and tags.
+ * Returns a DOMAIN_TRIGGERS key (e.g. "agent", "ml", "build").
+ */
+export function inferDomainLabel(tool: { meta: { name: string; description: string; tags: readonly string[] } }): string {
+  const text = `${tool.meta.name} ${tool.meta.description} ${(tool.meta.tags as string[]).join(" ")}`.toLowerCase();
+  let bestDomain = "build";
+  let bestScore = 0;
+  for (const [domain, triggers] of Object.entries(DOMAIN_TRIGGERS)) {
+    const keywords = triggers.toLowerCase().split(/[,\s]+/).filter(k => k.length > 3);
+    const hits = keywords.filter(k => text.includes(k)).length;
+    if (hits > bestScore) { bestScore = hits; bestDomain = domain; }
+  }
+  return bestDomain;
+}

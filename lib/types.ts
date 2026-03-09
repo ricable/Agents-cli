@@ -109,7 +109,7 @@ export interface CuratedMeta {
 
 /** README sections extracted by the forge pipeline */
 export interface ReadmeSections {
-  codeBlocks: Array<{ lang: string; code: string }>;
+  codeBlocks: Array<{ lang: string; code: string; purpose?: "install" | "config" | "usage" | "advanced" | "output" }>;
   sections: Record<string, string>;
   raw: string;
 }
@@ -128,6 +128,8 @@ export interface Tool {
   readonly _curatedMeta?: CuratedMeta;
   /** README sections attached by forge pipeline (optional) */
   readonly _readmeSections?: ReadmeSections;
+  /** Whether the tool is a CLI or a library (set by forge pipeline) */
+  readonly _toolKind?: "cli" | "library";
 }
 
 // =============================================================================

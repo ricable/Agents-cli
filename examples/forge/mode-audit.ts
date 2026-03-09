@@ -2,10 +2,13 @@
  * forge/mode-audit.ts — Audit existing skills for quality.
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { success, emit, toErrorMessage } from "../../lib/output.js";
 import {
   testAllSkillsSync,
   printQualityReport,
+  scoreContentQuality,
 } from "../../lib/skill-tester.js";
 import { groupByDomain } from "../../lib/indexes.js";
 import { DOMAIN_TRIGGERS } from "../../lib/domains.js";
@@ -79,6 +82,29 @@ export async function auditMode(args: CliArgs, startTime: number): Promise<void>
     }
   }
 
+  // Content quality scoring (advisory)
+  const contentScores: Array<{ name: string; score: number; issues: string[] }> = [];
+  for (const r of results) {
+    const skillFile = join(OUTPUT_DIR, r.name, "SKILL.md");
+    try {
+      const content = readFileSync(skillFile, "utf-8");
+      const cq = scoreContentQuality(content);
+      contentScores.push({ name: r.name, score: cq.score, issues: cq.issues });
+    } catch { /* skip unreadable */ }
+  }
+  const contentLow = contentScores.filter(c => c.score < 7);
+  if (contentLow.length > 0) {
+    log(`  Content Quality Issues (advisory, ${contentLow.length} below 7/10):`);
+    for (const c of contentLow.slice(0, 10)) {
+      log(`    ${c.name.padEnd(30)} ${c.score}/10  ${c.issues.join(", ")}`);
+    }
+    if (contentLow.length > 10) log(`    ... and ${contentLow.length - 10} more`);
+    log("");
+  }
+  const avgContent = contentScores.length > 0
+    ? contentScores.reduce((s, c) => s + c.score, 0) / contentScores.length
+    : 0;
+
   const avgTrigger = results.reduce((s, r) => s + r.triggerScore, 0) / results.length;
   const avgQuality = results.reduce((s, r) => s + r.qualityScore, 0) / results.length;
   log(`  Summary:`);
@@ -86,6 +112,7 @@ export async function auditMode(args: CliArgs, startTime: number): Promise<void>
   log(`    Passed:      ${passed} (${((passed / results.length) * 100).toFixed(0)}%)`);
   log(`    Avg trigger: ${avgTrigger.toFixed(2)}`);
   log(`    Avg quality: ${avgQuality.toFixed(1)}/10`);
+  if (contentScores.length > 0) log(`    Avg content: ${avgContent.toFixed(1)}/10 (advisory)`);
   log(`    Domains:     ${grouped.size}`);
   log("");
 
@@ -96,18 +123,22 @@ export async function auditMode(args: CliArgs, startTime: number): Promise<void>
       domains[d] = { total: items.length, passed: items.filter(e => passingNames.has(e.name)).length };
     }
     const aiMap = aiScores ? new Map(aiScores.map(a => [a.name, a.score])) : null;
+    const contentMap = new Map(contentScores.map(c => [c.name, c]));
     emit(success("skill-forge:audit", {
       total: results.length,
       passed,
       failed,
       avgTriggerScore: avgTrigger,
       avgQualityScore: avgQuality,
+      avgContentScore: avgContent,
       domains,
       results: results.map(r => ({
         name: r.name,
         passed: r.passed,
         triggerScore: r.triggerScore,
         qualityScore: r.qualityScore,
+        contentScore: contentMap.get(r.name)?.score ?? null,
+        contentIssues: contentMap.get(r.name)?.issues ?? [],
         issues: r.issues,
         aiScore: aiMap?.get(r.name) ?? null,
       })),

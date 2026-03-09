@@ -12,6 +12,9 @@ import {
   readdirSync,
   statSync,
   chmodSync,
+  appendFileSync,
+  readFileSync,
+  unlinkSync,
 } from "node:fs";
 
 // Core pipeline
@@ -25,7 +28,7 @@ import {
   generateRichSkillMd,
   generateSkillDirectory,
   installTool,
-
+  isLikelyCli,
 } from "../../lib/skills.js";
 
 // Skill content
@@ -100,6 +103,11 @@ const HUGE_REPOS = new Set([
   "PaddlePaddle/PaddleOCR", "PaddlePaddle/Paddle", "apache/spark",
   "apache/airflow", "kubernetes/kubernetes", "rust-lang/rust",
   "llvm/llvm-project", "chromium/chromium", "nicbarker/clay",
+  "BerriAI/litellm", "langgenius/dify", "AUTOMATIC1111/stable-diffusion-webui",
+  "comfyanonymous/ComfyUI", "oobabooga/text-generation-webui", "invoke-ai/InvokeAI",
+  "vllm-project/vllm", "ggml-org/llama.cpp",
+  "elastic/elasticsearch", "apache/mxnet", "autogluon/autogluon",
+  "PygmalionAI/aphrodite-engine",
 ]);
 
 // ── Stage 1: Discovery (NL prompt → multi-registry search) ────────────
@@ -202,7 +210,7 @@ export async function resolveInstallAnalyze(
 
   if (deep && tool.capabilities.commands.length > 0) {
     log(`  [3/3] Deep probing subcommands...`);
-    cachedBin = findMainBinary(installDir);
+    cachedBin = findMainBinary(installDir, tool.meta.name);
     if (cachedBin) {
       const probed = deepProbe(cachedBin, { maxDepth: 3 });
       (tool as { capabilities: typeof tool.capabilities }).capabilities = {
@@ -232,6 +240,10 @@ export async function resolveInstallAnalyze(
     }
   }
 
+  // Set _toolKind for template selection in skill generation
+  const toolKind = (tool.capabilities.commands.length > 0 || isLikelyCli(tool)) ? "cli" : "library";
+  (tool as { _toolKind?: string })._toolKind = toolKind;
+
   return tool;
 }
 
@@ -248,7 +260,7 @@ export interface SmokeTestResult {
  *  Reuses rawHelp from analyzer when available to avoid redundant process spawns. */
 export function smokeTest(tool: Tool, installDir: string, cachedBin?: string | null): SmokeTestResult {
   const result: SmokeTestResult = { versionOk: false, helpOk: false, commandsVerified: 0, commandsFailed: 0 };
-  const bin = cachedBin ?? findMainBinary(installDir);
+  const bin = cachedBin ?? findMainBinary(installDir, tool.meta.name);
   if (!bin) return result;
 
   const TIMEOUT = 2000;
@@ -340,14 +352,28 @@ export async function persistChunks(tool: Tool, domain: string): Promise<number>
   const { upsertChunks } = await import("../../lib/db/sqlite.js");
 
   const domainDb = await getDomainDb(domain);
-  let totalPersisted = 0;
 
+  // Collect all chunks first, then upsert in batched transactions.
+  // FTS inserts are slow on large tables (68K+ rows), so cap total chunks
+  // to prevent multi-minute hangs on large repos.
+  const MAX_PERSIST_CHUNKS = 2000;
+  const allChunks: AstChunk[] = [];
   walkAndChunk(installDir, tool.meta.name, (chunks) => {
-    upsertChunks(domainDb, chunks);
-    totalPersisted += chunks.length;
+    if (allChunks.length < MAX_PERSIST_CHUNKS) {
+      allChunks.push(...chunks);
+    }
   });
 
-  return totalPersisted;
+  const toInsert = allChunks.slice(0, MAX_PERSIST_CHUNKS);
+  if (toInsert.length > 0) {
+    // Batch in groups of 200 to keep transactions manageable
+    const BATCH = 200;
+    for (let i = 0; i < toInsert.length; i += BATCH) {
+      upsertChunks(domainDb, toInsert.slice(i, i + BATCH));
+    }
+  }
+
+  return toInsert.length;
 }
 
 // ── Stage 6: Generate Compliant Skill Directory ────────────────────────
@@ -368,9 +394,12 @@ export function forgeSkill(tool: Tool, opts: ForgeSkillOptions): ForgedSkill {
   const rSha = getRepoHeadSha(installDir);
 
   // Cache check (Gap 1)
+  // Treat "unknown" repoSha as a cache miss — PyPI/npm installs always return
+  // "unknown" from getRepoHeadSha(), so "unknown" === "unknown" would falsely
+  // cache-hit and prevent regeneration of stale skills.
   if (cache && !opts.force && manifestEntry) {
     const cached = cache.get(tool.meta.name);
-    if (cached && cached.manifestHash === mHash && cached.repoSha === rSha) {
+    if (cached && cached.manifestHash === mHash && cached.repoSha === rSha && rSha !== "unknown") {
       log(`  → Cache hit: ${tool.meta.name} (skipping regeneration)`);
       return {
         dir: skillDir,
@@ -392,19 +421,10 @@ export function forgeSkill(tool: Tool, opts: ForgeSkillOptions): ForgedSkill {
         (tool as { _readmeSections?: typeof sections })._readmeSections = sections;
 
         // If analyzer found 0 commands, try extracting from README code blocks
-        // Try both the tool name and inferred binary names (e.g. "rg" for ripgrep)
+        // Pass both tool name and inferred binary names (e.g. "rg" for ripgrep)
         if (tool.capabilities.commands.length === 0) {
-          const namesToTry = [tool.meta.name, ...inferBinaryNames(installDir)];
-          const seen = new Set<string>();
-          const allCommands: Array<{ name: string; description: string }> = [];
-          for (const name of namesToTry) {
-            if (seen.has(name)) continue;
-            seen.add(name);
-            const cmds = extractCommandsFromReadme(readme, name);
-            for (const c of cmds) {
-              if (!allCommands.some(x => x.name === c.name)) allCommands.push(c);
-            }
-          }
+          const binNames = inferBinaryNames(installDir);
+          const allCommands = extractCommandsFromReadme(readme, tool.meta.name, binNames);
           if (allCommands.length > 0) {
             const synthCommands = allCommands.map(c => ({
               name: c.name,
@@ -499,8 +519,12 @@ export function forgeSkill(tool: Tool, opts: ForgeSkillOptions): ForgedSkill {
     }
   }
 
-  // Write files
+  // Write files — only create the directory if we have a valid SKILL.md
   if (!opts.dryRun) {
+    if (!directory.skillMd || directory.skillMd.trim().length < 50) {
+      log(`  SKIP: Skill generation produced empty/invalid SKILL.md for ${tool.meta.name}`);
+      return { dir: skillDir, skillMd: directory.skillMd, files, chunkStats };
+    }
     const resolvedSkillDir = resolve(skillDir);
     mkdirSync(resolvedSkillDir, { recursive: true });
     atomicWrite(join(resolvedSkillDir, "SKILL.md"), directory.skillMd);
@@ -597,10 +621,48 @@ export async function buildIndexes(tools: Tool[], dryRun: boolean): Promise<void
 
 // ── Batch processing ──────────────────────────────────────────────────
 
-interface ProcessBatchOptions {
+export interface ProcessBatchOptions {
   deep: boolean;
   noCache?: boolean;
   force?: boolean;
+  timeout?: number;
+  concurrency?: number;
+  checkpointPath?: string;
+  resumeFrom?: string;
+  onProgress?: (label: string, completed: number, total: number, result: BatchResult | null) => void;
+}
+
+/**
+ * Race a promise against a timeout. Clears timer on resolve to prevent leaks.
+ * Note: the underlying promise is NOT cancelled on timeout (JS has no promise
+ * cancellation). Timed-out operations may continue running in the background.
+ * For batch processing, this means a timed-out install/analyze may still hold
+ * resources until it completes or errors naturally.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Timeout after ${ms}ms: ${label}`)), ms);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer);
+  });
+}
+
+/** Simple concurrency limiter. */
+class Semaphore {
+  private queue: Array<() => void> = [];
+  private active = 0;
+  constructor(private max: number) {}
+  async acquire(): Promise<void> {
+    if (this.active < this.max) { this.active++; return; }
+    return new Promise(resolve => this.queue.push(resolve));
+  }
+  release(): void {
+    this.active--;
+    const next = this.queue.shift();
+    if (next) { this.active++; next(); }
+  }
 }
 
 /** Enrich a Tool's metadata with curated info (description, tags, domain). */
@@ -629,11 +691,39 @@ function enrichToolWithCuratedMeta(tool: Tool, curated: CuratedMeta): Tool {
 export async function processBatch(items: BatchItem[], opts: ProcessBatchOptions): Promise<BatchOutcome> {
   const results: BatchResult[] = [];
   const failures: Array<{ label: string; error: string }> = [];
+  const timeout = opts.timeout ?? 300_000;
+  const concurrency = opts.concurrency ?? 1;
 
-  for (const item of items) {
-    log(`\n  ── Forging: ${item.label} ──`);
+  // Resume: load completed labels from checkpoint (only skip ok/cached, retry failed)
+  const doneLabels = new Set<string>();
+  if (opts.resumeFrom && existsSync(opts.resumeFrom)) {
     try {
-      let tool = await resolveInstallAnalyze(item.source, opts.deep);
+      const lines = readFileSync(opts.resumeFrom, "utf-8").split("\n").filter(Boolean);
+      for (const line of lines) {
+        try {
+          const entry = JSON.parse(line) as { label: string; status?: string };
+          // Only skip items that succeeded or were cached — retry failed items
+          if (entry.status === "ok" || entry.status === "cached") {
+            doneLabels.add(entry.label);
+          }
+        } catch { /* skip malformed lines */ }
+      }
+      log(`  Resuming: ${doneLabels.size} tools already completed (failed items will be retried)`);
+    } catch { /* ignore read errors */ }
+  }
+
+  const toProcess = doneLabels.size > 0 ? items.filter(i => !doneLabels.has(i.label)) : items;
+  let completed = items.length - toProcess.length; // already done count
+
+  const processOne = async (item: BatchItem): Promise<void> => {
+    log(`\n  ── Forging: ${item.label} ──`);
+    let progressResult: BatchResult | null = null;
+    try {
+      let tool = await withTimeout(
+        resolveInstallAnalyze(item.source, opts.deep),
+        timeout,
+        item.label,
+      );
       // Enrich with curated metadata if available
       if (item.curatedMeta) {
         tool = enrichToolWithCuratedMeta(tool, item.curatedMeta);
@@ -641,16 +731,58 @@ export async function processBatch(items: BatchItem[], opts: ProcessBatchOptions
       const forged = forgeSkill(tool, { dryRun: false, noCache: opts.noCache, force: opts.force });
       if (forged.skipped) {
         log(`  → CACHED (skipped)`);
-        continue;
+        // Checkpoint even cached items
+        if (opts.checkpointPath) {
+          appendFileSync(opts.checkpointPath, JSON.stringify({ label: item.label, status: "cached", timestamp: new Date().toISOString() }) + "\n");
+        }
+        return;
       }
       const quality = assessQuality(forged.skillMd, tool.meta.name);
       results.push({ label: item.label, tool, forged, quality });
       log(`  → ${quality.passed ? "PASS" : "FAIL"} (trigger: ${quality.triggerScore.toFixed(2)}, quality: ${quality.qualityScore}/10)`);
+      // Checkpoint
+      if (opts.checkpointPath) {
+        appendFileSync(opts.checkpointPath, JSON.stringify({ label: item.label, status: "ok", timestamp: new Date().toISOString() }) + "\n");
+      }
+      progressResult = { label: item.label, tool, forged, quality };
     } catch (err) {
       const msg = toErrorMessage(err);
       failures.push({ label: item.label, error: msg });
       log(`  → SKIP: ${msg}`);
+      // Checkpoint failures too
+      if (opts.checkpointPath) {
+        appendFileSync(opts.checkpointPath, JSON.stringify({ label: item.label, status: "fail", error: msg, timestamp: new Date().toISOString() }) + "\n");
+      }
+    } finally {
+      completed++;
+      opts.onProgress?.(item.label, completed, items.length, progressResult);
     }
+  };
+
+  if (concurrency <= 1) {
+    // Sequential (original behavior)
+    for (const item of toProcess) {
+      await processOne(item);
+    }
+  } else {
+    // Concurrent with semaphore
+    const sem = new Semaphore(concurrency);
+    const tasks = toProcess.map(item => async () => {
+      await sem.acquire();
+      try {
+        await processOne(item);
+      } finally {
+        sem.release();
+      }
+    });
+    await Promise.all(tasks.map(fn => fn()));
+  }
+
+  // Clean up checkpoint on full completion (no unfinished items)
+  if (opts.checkpointPath && failures.length === 0 && existsSync(opts.checkpointPath)) {
+    try { unlinkSync(opts.checkpointPath); } catch { /* ignore */ }
+  } else if (opts.checkpointPath && failures.length > 0) {
+    log(`  Resume with: --resume ${opts.checkpointPath}`);
   }
 
   return { results, failures };
