@@ -451,6 +451,7 @@ inferBinaryNames(repoDir: string): string[]          // detects binary names fro
 readSourceVersion(repoDir: string): string | undefined  // reads version from Cargo.toml, pyproject.toml, CMakeLists.txt
 INSTALL_CMD_RE: RegExp                               // shared install-command detection regex
 
+
 // Skill factory (lib/skill-factory.ts)
 runSkillFactory(opts: SkillFactoryOptions): Promise<SkillFactoryResult>
 
