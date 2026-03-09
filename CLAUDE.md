@@ -415,7 +415,7 @@ deepProbe(binPath: string, opts: { maxDepth: number }): { tree: ToolCommand[], t
 detectInteractionMode(commands, globalFlags, rawHelp?): InteractionMode  // "repl" | "subcommand" | "single"
 
 // Smoke test (examples/forge/stages.ts)
-smokeTest(tool: Tool, installDir: string): SmokeTestResult  // { versionOk, helpOk, commandsVerified, commandsFailed }
+smokeTest(tool: Tool, installDir: string, cachedBin?: string | null): SmokeTestResult  // { versionOk, helpOk, commandsVerified, commandsFailed }
 
 // Skills (lib/skills.ts)
 parseFrontmatter(content: string): SkillFrontmatter | null  // returns { name, version, description, ingredients, tags, compatibility, domain }

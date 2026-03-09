@@ -8,8 +8,13 @@ import {
   toolToManifestEntry,
 
 } from "../examples/skill-forge.js";
+import { smokeTest } from "../examples/forge/stages.js";
 import { generateInstallScript, shellQuote } from "../lib/skills.js";
-import type { Tool } from "../lib/types.js";
+import { GENERAL_TOOLS } from "../lib/curated-tools.js";
+import type { Tool, ToolCommand } from "../lib/types.js";
+import { mkdtempSync, writeFileSync, chmodSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 // ── parseArgs ──────────────────────────────────────────────────────────
 
@@ -179,5 +184,157 @@ describe("generateInstallScript", () => {
       source: { format: "pypi", uri: "pypi:safe-name" },
     } as Partial<Tool>));
     expect(script).toContain("'safe-name'");
+  });
+});
+
+// ── smokeTest ──────────────────────────────────────────────────────────
+
+describe("smokeTest", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "agents-cli-smoke-"));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("detects --version and --help on responsive binary", () => {
+    const script = join(tmpDir, "good-tool");
+    // probeWithArgs/probeHelp requires output > 20 chars
+    writeFileSync(script, `#!/bin/bash
+case "$1" in
+  --version) echo "good-tool version 1.0.0 (stable release)";;
+  --help|-h|help) echo "Usage: good-tool [options] -- a useful CLI tool for testing";;
+esac
+`);
+    chmodSync(script, 0o755);
+
+    const tool = makeTool();
+    const result = smokeTest(tool, "/nonexistent", script);
+    expect(result.versionOk).toBe(true);
+    expect(result.helpOk).toBe(true);
+  });
+
+  it("verifies subcommands respond to --help", () => {
+    const script = join(tmpDir, "sub-tool");
+    // probeWithArgs calls: bin <cmd> --help, bin <cmd> -h, bin <cmd> help
+    // The script needs to respond to at least one of those combinations
+    writeFileSync(script, `#!/bin/bash
+case "$1" in
+  --version) echo "sub-tool version 1.0.0";;
+  --help|-h|help) echo "Usage: sub-tool [command] -- a sub-tool";;
+  build)
+    case "$2" in
+      --help|-h|help) echo "Build the project with sub-tool";;
+    esac;;
+  test)
+    case "$2" in
+      --help|-h|help) echo "Run the test suite for sub-tool";;
+    esac;;
+esac
+`);
+    chmodSync(script, 0o755);
+
+    const cmds: ToolCommand[] = [
+      { name: "build", description: "Build", flags: [] },
+      { name: "test", description: "Test", flags: [] },
+    ];
+    const tool = makeTool({
+      capabilities: { commands: cmds, globalFlags: [], analysisMethod: "flag-parse" },
+    } as Partial<Tool>);
+
+    const result = smokeTest(tool, "/nonexistent", script);
+    expect(result.commandsVerified).toBe(2);
+    expect(result.commandsFailed).toBe(0);
+  });
+
+  it("returns all false when binary not found", () => {
+    const tool = makeTool();
+    const result = smokeTest(tool, "/nonexistent-dir");
+    expect(result.versionOk).toBe(false);
+    expect(result.helpOk).toBe(false);
+    expect(result.commandsVerified).toBe(0);
+  });
+
+  it("skips nested commands (with spaces in name)", () => {
+    const script = join(tmpDir, "nested-tool");
+    writeFileSync(script, `#!/bin/bash
+echo "help"
+`);
+    chmodSync(script, 0o755);
+
+    const cmds: ToolCommand[] = [
+      { name: "sub cmd", description: "Nested", flags: [] },
+    ];
+    const tool = makeTool({
+      capabilities: { commands: cmds, globalFlags: [], analysisMethod: "flag-parse" },
+    } as Partial<Tool>);
+
+    const result = smokeTest(tool, "/nonexistent", script);
+    // Nested command skipped, so 0 verified and 0 failed
+    expect(result.commandsVerified).toBe(0);
+    expect(result.commandsFailed).toBe(0);
+  });
+});
+
+// ── Curated tools: PyPI sourceType ─────────────────────────────────────
+
+describe("curated tools: pypi sourceType", () => {
+  it("gui-wrapper entries use sourceType 'pypi' not 'npm'", () => {
+    const guiWrappers = GENERAL_TOOLS.filter(t => t.category === "gui-wrappers");
+    expect(guiWrappers.length).toBeGreaterThanOrEqual(8);
+    for (const t of guiWrappers) {
+      expect(t.sourceType).toBe("pypi");
+    }
+  });
+
+  it("gui-wrapper source fields do not contain pypi: prefix", () => {
+    const guiWrappers = GENERAL_TOOLS.filter(t => t.category === "gui-wrappers");
+    for (const t of guiWrappers) {
+      expect(t.source).not.toMatch(/^pypi:/);
+      // Source is the bare package name
+      expect(t.source).toMatch(/^cli-anything-/);
+    }
+  });
+
+  it("pypi source format produces valid pypi: source string", () => {
+    const guiWrappers = GENERAL_TOOLS.filter(t => t.category === "gui-wrappers");
+    for (const t of guiWrappers) {
+      // The mode-curated.ts logic: sourceType === "pypi" → `pypi:${source}`
+      const formatted = `pypi:${t.source}`;
+      expect(formatted).toMatch(/^pypi:cli-anything-/);
+      // Must NOT produce double-prefix like npm:pypi:...
+      expect(formatted).not.toMatch(/^npm:/);
+    }
+  });
+
+  it("all existing non-gui tools still use github or npm sourceType", () => {
+    const nonGui = GENERAL_TOOLS.filter(t => t.category !== "gui-wrappers");
+    for (const t of nonGui) {
+      expect(["github", "npm"]).toContain(t.sourceType);
+    }
+  });
+});
+
+// ── parseArgs: --system flag ───────────────────────────────────────────
+
+describe("parseArgs --system", () => {
+  let originalArgv: string[];
+
+  beforeEach(() => { originalArgv = process.argv; });
+  afterEach(() => { process.argv = originalArgv; });
+
+  it("parses --system flag", () => {
+    process.argv = ["node", "script", "--system"];
+    const args = parseArgs();
+    expect(args.system).toBe(true);
+  });
+
+  it("defaults system to false", () => {
+    process.argv = ["node", "script"];
+    const args = parseArgs();
+    expect(args.system).toBe(false);
   });
 });

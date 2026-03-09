@@ -237,7 +237,7 @@ export async function resolveInstallAnalyze(
 
 // ── Stage 2b: Smoke Test (verify commands respond) ─────────────────────
 
-import { probeWithArgs } from "../../lib/analyzer.js";
+import { probeWithArgs, probeHelp } from "../../lib/analyzer.js";
 
 export interface SmokeTestResult {
   versionOk: boolean;
@@ -253,15 +253,18 @@ export function smokeTest(tool: Tool, installDir: string, cachedBin?: string | n
   if (!bin) return result;
 
   const TIMEOUT = 2000;
-  const responds = (args: string[]): boolean => probeWithArgs(bin, args, TIMEOUT) !== null;
 
-  result.versionOk = responds(["--version"]);
-  result.helpOk = responds(["--help"]);
+  // probeHelp tries --help/-h/help and returns output or null
+  result.helpOk = probeHelp(bin, TIMEOUT) !== null;
+  // --version: probeWithArgs with ["--version"] will try appending help flags,
+  // but "--version" itself often produces output caught by the error handler
+  result.versionOk = probeWithArgs(bin, ["--version"], TIMEOUT) !== null;
 
-  // Verify a sample of discovered commands respond to --help
+  // Verify a sample of discovered subcommands respond to --help
+  // probeWithArgs(bin, [cmdName], timeout) probes "bin cmdName --help/-h/help"
   for (const cmd of tool.capabilities.commands.slice(0, 5)) {
     if (cmd.name.includes(" ")) continue;
-    if (responds([cmd.name, "--help"])) {
+    if (probeWithArgs(bin, [cmd.name], TIMEOUT) !== null) {
       result.commandsVerified++;
     } else {
       result.commandsFailed++;
