@@ -10,6 +10,7 @@ export type {
   ToolSource,
   ToolFlag,
   ToolCommand,
+  InteractionMode,
   ToolCapabilities,
   ToolMeta,
   Tool,
@@ -61,7 +62,7 @@ export { readPkgJson, readPkgVersion, walkPackageDirs } from "./pkg-utils.js";
 export type { PkgInfo } from "./pkg-utils.js";
 export { createResolver, detectFormat, fetchJson, parseGithubOwnerRepo, isPrivateUrl } from "./resolver.js";
 export { createInstaller } from "./installer.js";
-export { createAnalyzer, findMainBinary, deepProbe } from "./analyzer.js";
+export { createAnalyzer, findMainBinary, deepProbe, detectInteractionMode, probeHelp, probeWithArgs, probeFlag } from "./analyzer.js";
 export { createStore, generateContextMd, getToolInstallDir } from "./store.js";
 export { createRegistry } from "./registry.js";
 export {

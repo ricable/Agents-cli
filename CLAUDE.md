@@ -145,6 +145,7 @@ npx tsx examples/skill-forge.ts --tool astral-sh/uv         # GitHub
 npx tsx examples/skill-forge.ts --tool @anthropic-ai/sdk    # npm (scoped)
 npx tsx examples/skill-forge.ts --tool npm:express          # npm (bare)
 npx tsx examples/skill-forge.ts --tool httpie               # bare name → pypi fallback
+npx tsx examples/skill-forge.ts --tool ./examples/cli-anything-gimp  # local directory
 npx tsx examples/skill-forge.ts --tool pypi:ruff --deep     # deep recursive --help probing
 npx tsx examples/skill-forge.ts --tool crates:ripgrep --json # structured JSON output
 
@@ -196,6 +197,11 @@ npx tsx examples/skill-forge.ts --verify
 # MCP server — expose forged skills as MCP tools
 npx tsx examples/skill-forge.ts --mcp
 
+# System PATH discovery — scan local executables and forge skills
+npx tsx examples/skill-forge.ts --system --dry-run              # preview
+npx tsx examples/skill-forge.ts --system --limit 20             # forge top 20
+npx tsx examples/skill-forge.ts --system --limit 50 --deep      # deep probe
+
 # Factory mode — use skill-factory pipeline with AI enhancement
 npx tsx examples/skill-forge.ts --tool pypi:ruff --factory
 npx tsx examples/skill-forge.ts --tool pypi:ruff --factory --ai
@@ -233,7 +239,7 @@ lib/
   index.ts             — public SDK entry point (re-exports everything)
   output.ts            — structured output layer: success(), failure(), emit()
   guards.ts            — input hardening: validateSource, validateToolName, rejectPathTraversal
-  resolver.ts          — source format detection + metadata fetching
+  resolver.ts          — source format detection + metadata fetching (github/npm/pypi/crates/local)
   installer.ts         — download, extract, build, install deps
   analyzer.ts          — deep recursive --help probing, command/flag parsing
   store.ts             — flat-file JSON tool store + CONTEXT.md generation
@@ -246,7 +252,7 @@ lib/
   mcp-skill.ts         — opensrc MCP skill bridge (callOpensrc, opensrc)
   chunker.ts           — AST-aware semantic chunking of source files
   extractor.ts         — README excerpts, code blocks, export groups, repo analysis, binary name + version inference
-  curated-tools.ts     — 91 general + AI/ML tool registry for --curated mode
+  curated-tools.ts     — 91 general + AI/ML tool registry for --curated mode (sourceType: github|npm|pypi|local)
   cache.ts             — SkillCache, file hashing, incremental generation
   search.ts            — hybrid FTS + vector search (lazy better-sqlite3)
   indexer.ts           — source indexing pipeline (files → chunks → SQLite)
@@ -292,7 +298,9 @@ examples/
     mode-index.ts          — --index mode (rebuild search DB)
     mode-plugin.ts         — --plugin, --agent-defs, --marketplace modes
     mode-lockfile.ts       — --freeze, --verify modes
+    mode-system.ts         — --system mode (PATH discovery)
     mode-mcp.ts            — --mcp mode (MCP server)
+  cli-anything-gimp/       — local Python CLI tool (Pillow image ops, --json output, 6 subcommands)
   regenerate-skills.ts     — batch regeneration of existing skills
   chunker-demo.ts          — AST chunking demonstration
   generated-skills/        — 350+ auto-generated skill directories
@@ -331,7 +339,7 @@ Bare names without `/` or prefix (e.g. `httpie`) fall back to `pypi:` then error
 
 ## Pipeline flow
 
-1. **Resolve** — `createResolver()` detects format (github/npm/pypi/crates/local), fetches metadata from API. GitHub resolver also fetches version from releases/tags API via `fetchGithubVersion()`. When API is rate-limited, `readSourceVersion()` extracts version from Cargo.toml/pyproject.toml/CMakeLists.txt as fallback.
+1. **Resolve** — `createResolver()` detects format (github/npm/pypi/crates/local), fetches metadata from API. Local resolver reads `package.json` for name/description/version, falling back to directory basename. GitHub resolver also fetches version from releases/tags API via `fetchGithubVersion()`. When API is rate-limited, `readSourceVersion()` extracts version from Cargo.toml/pyproject.toml/CMakeLists.txt as fallback.
 2. **Install** — `createInstaller()` downloads tarball (with branch fallback: main→master→develop), extracts, runs `npm install` / `uv pip install` / `cargo binstall`. Huge repos (bun, pytorch, etc.) are skipped via `HUGE_REPOS` set in `stages.ts`.
 3. **Analyze** — `createAnalyzer()` runs `--help`/`-h`/`help`, parses commands and flags (recursive mode available)
 4. **Deep probe** — `deepProbe(binPath, { maxDepth })` recursively probes subcommand trees; returns `{ tree, totalCommands }`
@@ -358,6 +366,7 @@ The forge dispatcher delegates to mode modules in `examples/forge/`:
 | Index | `--index` | `mode-index.ts` | Rebuild search DB from generated skills |
 | Plugin | `--plugin` | `mode-plugin.ts` | Build domain plugins, agent defs, marketplace |
 | Lockfile | `--freeze`/`--verify` | `mode-lockfile.ts` | Freeze/verify skill integrity |
+| System | `--system` | `mode-system.ts` | Scan PATH for executables → probe → forge |
 | MCP | `--mcp` | `mode-mcp.ts` | Expose forged skills as MCP tools |
 
 ## Classifier API conventions
@@ -405,6 +414,10 @@ rejectPathTraversal(path: string, label: string): void  // blocks ../ in paths
 
 // Deep probing (lib/analyzer.ts)
 deepProbe(binPath: string, opts: { maxDepth: number }): { tree: ToolCommand[], totalCommands: number }
+detectInteractionMode(commands, globalFlags, rawHelp?): InteractionMode  // "repl" | "subcommand" | "single"
+
+// Smoke test (examples/forge/stages.ts)
+smokeTest(tool: Tool, installDir: string, cachedBin?: string | null): SmokeTestResult  // { versionOk, helpOk, commandsVerified, commandsFailed }
 
 // Skills (lib/skills.ts)
 parseFrontmatter(content: string): SkillFrontmatter | null  // returns { name, version, description, ingredients, tags, compatibility, domain }
@@ -433,6 +446,9 @@ fetchHtml(url: string, maxRedirects?: number): Promise<string>  // github.com on
 scrapeTrendingHtml(language: string, since: string): Promise<TrendingRepo[]>
 isLikelyCli(repo: TrendingRepo): { likely: boolean; reason: string }
 getWellKnownCliRepos(): TrendingRepo[]  // 15 fallback repos
+
+// Resolver (lib/resolver.ts) — local tool resolution
+resolveLocal(input: string): { meta: Partial<ToolMeta>; version?: string }  // reads package.json from local dir
 
 // Curated tools (lib/curated-tools.ts)
 loadAllTools(projectRoot: string): CliTool[]    // 91 general + AI/ML from ai-ml-tools.json

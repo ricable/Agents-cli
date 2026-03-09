@@ -53,6 +53,20 @@ describe("createResolver", () => {
     expect(result.source.uri).toBe("./my-tool");
   });
 
+  it("resolves a local source with package.json", async () => {
+    const result = await resolver.resolve("./examples/cli-anything-gimp");
+    expect(result.source.format).toBe("local");
+    expect(result.meta.name).toBe("cli-anything-gimp");
+    expect(result.meta.description).toMatch(/CLI wrapper/);
+    expect(result.source.ref).toBe("0.1.0");
+  });
+
+  it("resolves a local source without package.json (falls back to basename)", async () => {
+    const result = await resolver.resolve("./tests");
+    expect(result.source.format).toBe("local");
+    expect(result.meta.name).toBe("tests");
+  });
+
   it("throws on unrecognized input", async () => {
     await expect(resolver.resolve("bare-name")).rejects.toThrow(
       "Cannot resolve source format",

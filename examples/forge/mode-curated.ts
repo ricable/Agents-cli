@@ -12,6 +12,21 @@ import { OUTPUT_DIR } from "./types.js";
 import { log, fmtTable } from "./helpers.js";
 import { processBatch, buildIndexes } from "./stages.js";
 
+/** Format a curated tool's source into a prefixed source string for the resolver. */
+function formatSource(meta: CliTool): string {
+  switch (meta.sourceType) {
+    case "local": return meta.source;
+    case "npm": return meta.source.startsWith("@") ? meta.source : `npm:${meta.source}`;
+    case "pypi": return `pypi:${meta.source}`;
+    case "github": return meta.source;
+    default: {
+      // Exhaustiveness check — compile error if a new sourceType is added without handling
+      meta.sourceType satisfies never;
+      return meta.source;
+    }
+  }
+}
+
 export async function curatedMode(args: CliArgs, startTime: number): Promise<void> {
   const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
   const allTools = loadAllTools(projectRoot);
@@ -63,7 +78,7 @@ export async function curatedMode(args: CliArgs, startTime: number): Promise<voi
   for (const [cat, catTools] of categories) {
     log(`  ${cat} (${catTools.length})`);
     for (const t of catTools) {
-      const srcLabel = t.sourceType === "npm" ? `npm:${t.source}` : t.source;
+      const srcLabel = formatSource(t);
       log(`    ${t.name.padEnd(16)} ${srcLabel.padEnd(35)} ${t.description.slice(0, 50)}`);
     }
     log("");
@@ -94,9 +109,7 @@ export async function curatedMode(args: CliArgs, startTime: number): Promise<voi
   const metaMap = new Map(toProcess.map(m => [m.name, m]));
   const batchItems: BatchItem[] = toProcess.map(meta => ({
     label: meta.name,
-    source: meta.sourceType === "npm"
-      ? (meta.source.startsWith("@") ? meta.source : `npm:${meta.source}`)
-      : meta.source,
+    source: formatSource(meta),
     curatedMeta: {
       description: meta.description,
       agentValue: meta.agentValue,

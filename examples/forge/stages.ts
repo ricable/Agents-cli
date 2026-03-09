@@ -16,7 +16,7 @@ import {
 
 // Core pipeline
 import { detectFormat } from "../../lib/resolver.js";
-import { findMainBinary, deepProbe } from "../../lib/analyzer.js";
+import { findMainBinary, deepProbe, probeWithArgs, probeHelp, probeFlag } from "../../lib/analyzer.js";
 import { createStore, generateContextMd, getToolInstallDir } from "../../lib/store.js";
 
 // Skills
@@ -55,7 +55,7 @@ import { discoverCratesPackages } from "../../lib/classifier/crates.js";
 import { discoverPyPIPackages } from "../../lib/classifier/pypi.js";
 
 // Chunking + extraction
-import { chunkFileAST, shouldSkipFile, extractMetadataChunks } from "../../lib/chunker.js";
+import { chunkFileAST, shouldSkipFile, extractMetadataChunks, type AstChunk } from "../../lib/chunker.js";
 import { analyzeRepo, extractExportGroups, findEntryPoints, extractCodeBlocks, readReadme, extractReadmeSections, extractCommandsFromReadme, inferBinaryNames } from "../../lib/extractor.js";
 
 // Indexing
@@ -196,12 +196,15 @@ export async function resolveInstallAnalyze(
   const tool = await installTool(source, DATA_DIR, { store, verbose: false });
   log(`  → ${tool.meta.name}@${tool.meta.version} (${tool.source.format})`);
 
+  const installDir = getToolInstallDir(DATA_DIR, tool.meta.name);
+
+  let cachedBin: string | null = null;
+
   if (deep && tool.capabilities.commands.length > 0) {
     log(`  [3/3] Deep probing subcommands...`);
-    const installDir = getToolInstallDir(DATA_DIR, tool.meta.name);
-    const bin = findMainBinary(installDir);
-    if (bin) {
-      const probed = deepProbe(bin, { maxDepth: 3 });
+    cachedBin = findMainBinary(installDir);
+    if (cachedBin) {
+      const probed = deepProbe(cachedBin, { maxDepth: 3 });
       (tool as { capabilities: typeof tool.capabilities }).capabilities = {
         ...tool.capabilities,
         commands: probed.tree,
@@ -212,12 +215,65 @@ export async function resolveInstallAnalyze(
     log(`  [3/3] Analysis: ${tool.capabilities.commands.length} commands, ${tool.capabilities.globalFlags.length} flags`);
   }
 
+  // Smoke test: verify --version, --help, and sample commands respond
+  const smoke = smokeTest(tool, installDir, cachedBin);
+  if (smoke.helpOk || smoke.versionOk) {
+    const parts: string[] = [];
+    if (smoke.versionOk) parts.push("--version");
+    if (smoke.helpOk) parts.push("--help");
+    if (smoke.commandsVerified > 0) parts.push(`${smoke.commandsVerified} cmds`);
+    log(`  → Smoke test: ${parts.join(", ")} OK`);
+    // Upgrade analysisMethod to "verified" if commands pass
+    if (smoke.commandsVerified > 0 && smoke.commandsFailed === 0) {
+      (tool as { capabilities: typeof tool.capabilities }).capabilities = {
+        ...tool.capabilities,
+        analysisMethod: "verified",
+      };
+    }
+  }
+
   return tool;
 }
 
-// ── Stage 5: Chunking (AST-aware) ─────────────────────────────────────
+// ── Stage 2b: Smoke Test (verify commands respond) ─────────────────────
 
-import type { AstChunk } from "../../lib/chunker.js";
+export interface SmokeTestResult {
+  versionOk: boolean;
+  helpOk: boolean;
+  commandsVerified: number;
+  commandsFailed: number;
+}
+
+/** Run a quick smoke test on a tool after install: --version, --help, and per-command --help.
+ *  Reuses rawHelp from analyzer when available to avoid redundant process spawns. */
+export function smokeTest(tool: Tool, installDir: string, cachedBin?: string | null): SmokeTestResult {
+  const result: SmokeTestResult = { versionOk: false, helpOk: false, commandsVerified: 0, commandsFailed: 0 };
+  const bin = cachedBin ?? findMainBinary(installDir);
+  if (!bin) return result;
+
+  const TIMEOUT = 2000;
+
+  // Reuse rawHelp from analyzer if available (avoids re-probing --help)
+  result.helpOk = tool.capabilities.rawHelp ? true : probeHelp(bin, TIMEOUT) !== null;
+  // --version: direct call without appending help flags
+  result.versionOk = probeFlag(bin, "--version", TIMEOUT);
+
+  // Probe top-level commands individually to verify they respond.
+  // The shallow analysis path only enriches flags for commands when count < 30,
+  // so we always probe here rather than trusting analysisMethod alone.
+  const topLevelCmds = tool.capabilities.commands.filter(c => !c.name.includes(" ")).slice(0, 5);
+  for (const cmd of topLevelCmds) {
+    if (probeWithArgs(bin, [cmd.name], TIMEOUT) !== null) {
+      result.commandsVerified++;
+    } else {
+      result.commandsFailed++;
+    }
+  }
+
+  return result;
+}
+
+// ── Stage 5: Chunking (AST-aware) ─────────────────────────────────────
 
 /** Walk a tool's install dir and collect AST chunks from each file. */
 function walkAndChunk(

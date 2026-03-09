@@ -108,6 +108,12 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (args.system) {
+    const { systemMode } = await import("./forge/mode-system.js");
+    await systemMode(args, startTime);
+    return;
+  }
+
   if (args.trending) {
     const { trendingMode } = await import("./forge/mode-trending.js");
     await trendingMode(args, startTime);
@@ -161,6 +167,7 @@ async function main(): Promise<void> {
   log("    npx tsx examples/skill-forge.ts --agent-defs [--domain X] [--ai]");
   log("    npx tsx examples/skill-forge.ts --freeze");
   log("    npx tsx examples/skill-forge.ts --verify");
+  log("    npx tsx examples/skill-forge.ts --system [--limit 20] [--dry-run]");
   log("    npx tsx examples/skill-forge.ts --mcp");
   log("");
 }

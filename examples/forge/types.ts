@@ -61,6 +61,8 @@ export interface CliArgs {
   verify: boolean;
   // MCP
   mcp: boolean;
+  // System PATH discovery
+  system: boolean;
 }
 
 export interface ChunkStats {

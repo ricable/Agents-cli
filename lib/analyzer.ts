@@ -1,4 +1,4 @@
-import type { ToolAnalyzer, ToolCapabilities, ToolCommand, ToolFlag, ToolSubcommand, AnalyzeOptions } from "./types.js";
+import type { ToolAnalyzer, ToolCapabilities, ToolCommand, ToolFlag, ToolSubcommand, AnalyzeOptions, InteractionMode } from "./types.js";
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, statSync, realpathSync } from "node:fs";
 import { join, resolve as resolvePath } from "node:path";
@@ -361,12 +361,14 @@ export function createAnalyzer(): ToolAnalyzer {
           const { tree } = deepProbe(binPath, { maxDepth, timeout });
           // Flatten for backward-compatible commands array
           const flatCommands = flattenSubcommands(tree);
+          const interactionMode = detectInteractionMode(flatCommands, globalFlags, helpText);
 
           return {
             commands: flatCommands,
             globalFlags,
             analysisMethod: flatCommands.length > 0 || globalFlags.length > 0 ? "flag-parse" : "help-probe",
             rawHelp: helpText,
+            interactionMode,
           };
         }
 
@@ -385,11 +387,14 @@ export function createAnalyzer(): ToolAnalyzer {
           });
         }
 
+        const interactionMode = detectInteractionMode(enrichedCommands, globalFlags, helpText);
+
         return {
           commands: enrichedCommands,
           globalFlags,
           analysisMethod: enrichedCommands.length > 0 || globalFlags.length > 0 ? "flag-parse" : "help-probe",
           rawHelp: helpText,
+          interactionMode,
         };
       }
 
@@ -398,9 +403,63 @@ export function createAnalyzer(): ToolAnalyzer {
         commands: [],
         globalFlags: [],
         analysisMethod: "help-probe",
+        interactionMode: "single",
       };
     },
   };
 }
 
-export { parseExamples, parseFlags, parseCommands, countSubcommands, flattenSubcommands };
+// ── Interaction mode detection ────────────────────────────────────────────────
+
+/** REPL-indicating subcommand names */
+const REPL_COMMANDS = new Set(["shell", "repl", "interactive", "console", "chat"]);
+
+/** REPL-indicating long flags */
+const REPL_FLAGS = /^--(interactive|repl|shell|console)$/;
+
+/** Detect whether a tool operates as repl, subcommand, or single-shot */
+export function detectInteractionMode(
+  commands: readonly ToolCommand[],
+  globalFlags: readonly ToolFlag[],
+  rawHelp?: string,
+): InteractionMode {
+  // Check for REPL-indicating subcommands
+  for (const cmd of commands) {
+    if (REPL_COMMANDS.has(cmd.name.toLowerCase())) return "repl";
+  }
+  // Check for REPL-indicating flags (long form only — short -i is too
+  // ambiguous since grep -i, sed -i, curl -i etc. all use it)
+  for (const flag of globalFlags) {
+    if (REPL_FLAGS.test(flag.name)) return "repl";
+  }
+  // Check raw help text for REPL indicators
+  if (rawHelp) {
+    const lower = rawHelp.toLowerCase();
+    if (/\brepl\b/.test(lower) || /\binteractive\s+(mode|shell|session)\b/.test(lower)) {
+      return "repl";
+    }
+  }
+  // Subcommand mode if commands were found
+  if (commands.length > 0) return "subcommand";
+  // Otherwise single-shot
+  return "single";
+}
+
+/** Check if a binary responds to a single flag (no help-flag appending).
+ *  Returns true if the binary produces meaningful output (>20 chars). */
+export function probeFlag(binPath: string, flag: string, timeout: number): boolean {
+  try {
+    const out = execFileSync(binPath, [flag], {
+      timeout, maxBuffer: 1_048_576, stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8",
+    });
+    return out.length > 20;
+  } catch (e: unknown) {
+    if (typeof e === "object" && e !== null) {
+      const err = e as { stdout?: string; stderr?: string };
+      return `${err.stdout ?? ""}${err.stderr ?? ""}`.length > 20;
+    }
+    return false;
+  }
+}
+
+export { parseExamples, parseFlags, parseCommands, countSubcommands, flattenSubcommands, probeHelp, probeWithArgs };

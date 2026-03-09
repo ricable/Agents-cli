@@ -21,6 +21,7 @@ export function parseArgs(): CliArgs {
     plugin: false, agentDefs: false, marketplace: false,
     freeze: false, verify: false,
     mcp: false,
+    system: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -82,6 +83,8 @@ export function parseArgs(): CliArgs {
     else if (a === "--verify")                { opts.verify = true; }
     // MCP
     else if (a === "--mcp")                   { opts.mcp = true; }
+    // System PATH discovery
+    else if (a === "--system")                { opts.system = true; }
     // Positional → prompt
     else if (!a.startsWith("--"))             { opts.prompt += (opts.prompt ? " " : "") + a; }
   }

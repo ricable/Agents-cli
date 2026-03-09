@@ -1579,6 +1579,13 @@ export function generateRichSkillMd(tool: Tool): string {
     s.push("");
   }
 
+  // Note interaction mode for agents
+  const interactionMode = tool.capabilities.interactionMode;
+  if (interactionMode === "repl") {
+    s.push(`> **Mode**: This tool supports an interactive REPL/shell mode. Run \`${binName} --help\` to find the interactive subcommand or flag.`);
+    s.push("");
+  }
+
   /** Check if a text section is mostly install instructions (not usage) */
   const isMostlyInstall = (text: string): boolean => {
     const lines = text.split("\n").filter(l => l.trim().length > 0);
