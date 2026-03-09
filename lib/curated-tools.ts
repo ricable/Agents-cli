@@ -206,3 +206,28 @@ export function loadAllTools(projectRoot: string): CliTool[] {
 export function getCategories(tools: CliTool[]): string[] {
   return [...new Set(tools.map(t => t.category))].sort();
 }
+
+/**
+ * Look up curated metadata for a tool by matching its source URI or name
+ * against the curated registry. Returns null if not found.
+ */
+export function findCuratedMeta(
+  source: string,
+  toolName: string,
+  projectRoot: string,
+): { description: string; agentValue: string; category: string } | null {
+  const allTools = loadAllTools(projectRoot);
+  // Normalize source for matching: strip prefixes like pypi:, npm:, crates:
+  const bare = source.replace(/^(pypi:|npm:|crates:|github:)/, "");
+  for (const t of allTools) {
+    if (
+      t.source === source ||
+      t.source === bare ||
+      t.name === toolName ||
+      t.name.toLowerCase() === toolName.toLowerCase()
+    ) {
+      return { description: t.description, agentValue: t.agentValue, category: t.category };
+    }
+  }
+  return null;
+}

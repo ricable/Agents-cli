@@ -146,6 +146,7 @@ export function scoreTrigger(description: string): number {
     "fine-tuning", "inferencing", "vectorizing", "annotating",
     "labeling", "quantizing", "serving", "evaluating",
     "benchmarking", "augmenting", "automating",
+    "importing", "integrating", "invoking",
   ];
   const matched = actionVerbs.filter(v => description.toLowerCase().includes(v));
   score += Math.min(0.4, matched.length * 0.15);
@@ -240,6 +241,8 @@ export function testAllSkillsSync(skillsDir: string, domainFilter?: string): Ski
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
+    // Skip auto-generated index directories (e.g. _index-auth, _index-master)
+    if (entry.name.startsWith("_")) continue;
     const skillFile = join(skillsDir, entry.name, "SKILL.md");
 
     let content: string;

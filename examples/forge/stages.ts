@@ -106,6 +106,8 @@ const HUGE_REPOS = new Set([
   "BerriAI/litellm", "langgenius/dify", "AUTOMATIC1111/stable-diffusion-webui",
   "comfyanonymous/ComfyUI", "oobabooga/text-generation-webui", "invoke-ai/InvokeAI",
   "vllm-project/vllm", "ggml-org/llama.cpp",
+  "elastic/elasticsearch", "apache/mxnet", "autogluon/autogluon",
+  "PygmalionAI/aphrodite-engine",
 ]);
 
 // ── Stage 1: Discovery (NL prompt → multi-registry search) ────────────
