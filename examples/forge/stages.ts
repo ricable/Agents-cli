@@ -16,7 +16,7 @@ import {
 
 // Core pipeline
 import { detectFormat } from "../../lib/resolver.js";
-import { findMainBinary, deepProbe } from "../../lib/analyzer.js";
+import { findMainBinary, deepProbe, probeWithArgs, probeHelp, probeFlag } from "../../lib/analyzer.js";
 import { createStore, generateContextMd, getToolInstallDir } from "../../lib/store.js";
 
 // Skills
@@ -55,7 +55,7 @@ import { discoverCratesPackages } from "../../lib/classifier/crates.js";
 import { discoverPyPIPackages } from "../../lib/classifier/pypi.js";
 
 // Chunking + extraction
-import { chunkFileAST, shouldSkipFile, extractMetadataChunks } from "../../lib/chunker.js";
+import { chunkFileAST, shouldSkipFile, extractMetadataChunks, type AstChunk } from "../../lib/chunker.js";
 import { analyzeRepo, extractExportGroups, findEntryPoints, extractCodeBlocks, readReadme, extractReadmeSections, extractCommandsFromReadme, inferBinaryNames } from "../../lib/extractor.js";
 
 // Indexing
@@ -237,27 +237,11 @@ export async function resolveInstallAnalyze(
 
 // ── Stage 2b: Smoke Test (verify commands respond) ─────────────────────
 
-import { probeWithArgs, probeHelp } from "../../lib/analyzer.js";
-import { execFileSync } from "node:child_process";
-
 export interface SmokeTestResult {
   versionOk: boolean;
   helpOk: boolean;
   commandsVerified: number;
   commandsFailed: number;
-}
-
-/** Check if a binary responds to a single flag (no help-flag appending). */
-function probeFlag(binPath: string, flag: string, timeout: number): boolean {
-  try {
-    const out = execFileSync(binPath, [flag], {
-      timeout, stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8",
-    });
-    return out.length > 0;
-  } catch (e: unknown) {
-    const err = e as { stdout?: string; stderr?: string };
-    return `${err.stdout ?? ""}${err.stderr ?? ""}`.length > 0;
-  }
 }
 
 /** Run a quick smoke test on a tool after install: --version, --help, and per-command --help. */
@@ -288,8 +272,6 @@ export function smokeTest(tool: Tool, installDir: string, cachedBin?: string | n
 }
 
 // ── Stage 5: Chunking (AST-aware) ─────────────────────────────────────
-
-import type { AstChunk } from "../../lib/chunker.js";
 
 /** Walk a tool's install dir and collect AST chunks from each file. */
 function walkAndChunk(

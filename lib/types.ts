@@ -80,7 +80,7 @@ export interface ToolCapabilities {
   readonly analysisMethod: AnalysisMethod;
   readonly rawHelp?: string;
   /** Detected interaction mode: repl (interactive shell), subcommand (git-style), or single (one-shot) */
-  readonly interactionMode?: InteractionMode;
+  readonly interactionMode: InteractionMode;
 }
 
 /** Metadata describing a tool */

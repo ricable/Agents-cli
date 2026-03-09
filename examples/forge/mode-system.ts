@@ -9,7 +9,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { success, emit } from "../../lib/output.js";
-import { parseCommands, parseFlags, detectInteractionMode, probeHelp } from "../../lib/analyzer.js";
+import { createAnalyzer, probeHelp } from "../../lib/analyzer.js";
 import { validateToolName } from "../../lib/guards.js";
 import type { InteractionMode } from "../../lib/types.js";
 import type { CliArgs } from "./types.js";
@@ -63,8 +63,9 @@ function discoverPathBinaries(limit: number): Array<{ name: string; path: string
 
     for (const entry of entries) {
       if (seen.has(entry) || SKIP_NAMES.has(entry)) continue;
-      // Skip dotfiles and names with extensions (likely not CLI tools)
-      if (entry.startsWith(".") || entry.includes(".")) continue;
+      // Skip dotfiles and names with common non-CLI extensions
+      if (entry.startsWith(".")) continue;
+      if (/\.(sh|py|pl|rb|js|ts|dylib|so|a|o|dll|exe|bat|cmd|ps1)$/.test(entry)) continue;
       // Validate name is safe for use in paths/scripts
       try { validateToolName(entry); } catch { continue; }
 
@@ -98,6 +99,7 @@ export async function systemMode(args: CliArgs, startTime: number): Promise<void
 
   log("  Probing with --help...\n");
   const responsive: SystemBinary[] = [];
+  const analyzer = createAnalyzer();
 
   for (const { name, path } of candidates) {
     if (responsive.length >= args.limit) break;
@@ -105,16 +107,14 @@ export async function systemMode(args: CliArgs, startTime: number): Promise<void
     const help = probeHelp(path, 3000);
     if (!help) continue;
 
-    const commands = parseCommands(help);
-    const flags = parseFlags(help);
-    const mode = detectInteractionMode(commands, flags, help);
+    const caps = await analyzer.analyze(path, { timeout: 3000 });
 
     responsive.push({
       name,
       path,
-      commandCount: commands.length,
-      flagCount: flags.length,
-      interactionMode: mode,
+      commandCount: caps.commands.length,
+      flagCount: caps.globalFlags.length,
+      interactionMode: caps.interactionMode,
     });
   }
 

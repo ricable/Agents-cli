@@ -165,7 +165,7 @@ export const GENERAL_TOOLS: CliTool[] = [
 interface AiMlToolEntry {
   name: string;
   source: string;
-  sourceType: "github" | "npm";
+  sourceType: "github" | "npm" | "pypi";
   description: string;
   subcategory: string;
   agentValue: string;

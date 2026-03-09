@@ -414,7 +414,7 @@ export function createAnalyzer(): ToolAnalyzer {
 import type { InteractionMode } from "./types.js";
 
 /** REPL-indicating subcommand names */
-const REPL_COMMANDS = new Set(["shell", "repl", "interactive", "console", "prompt"]);
+const REPL_COMMANDS = new Set(["shell", "repl", "interactive", "console", "chat"]);
 
 /** REPL-indicating long flags */
 const REPL_FLAGS = /^--(interactive|repl|shell|console)$/;
@@ -445,6 +445,19 @@ export function detectInteractionMode(
   if (commands.length > 0) return "subcommand";
   // Otherwise single-shot
   return "single";
+}
+
+/** Check if a binary responds to a single flag (no help-flag appending). */
+export function probeFlag(binPath: string, flag: string, timeout: number): boolean {
+  try {
+    const out = execFileSync(binPath, [flag], {
+      timeout, maxBuffer: 1_048_576, stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8",
+    });
+    return out.length > 0;
+  } catch (e: unknown) {
+    const err = e as { stdout?: string; stderr?: string };
+    return `${err.stdout ?? ""}${err.stderr ?? ""}`.length > 0;
+  }
 }
 
 export { parseExamples, parseFlags, parseCommands, countSubcommands, flattenSubcommands, probeHelp, probeWithArgs };
