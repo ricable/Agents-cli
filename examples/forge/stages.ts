@@ -244,7 +244,8 @@ export interface SmokeTestResult {
   commandsFailed: number;
 }
 
-/** Run a quick smoke test on a tool after install: --version, --help, and per-command --help. */
+/** Run a quick smoke test on a tool after install: --version, --help, and per-command --help.
+ *  Reuses rawHelp from analyzer when available to avoid redundant process spawns. */
 export function smokeTest(tool: Tool, installDir: string, cachedBin?: string | null): SmokeTestResult {
   const result: SmokeTestResult = { versionOk: false, helpOk: false, commandsVerified: 0, commandsFailed: 0 };
   const bin = cachedBin ?? findMainBinary(installDir);
@@ -252,19 +253,26 @@ export function smokeTest(tool: Tool, installDir: string, cachedBin?: string | n
 
   const TIMEOUT = 2000;
 
-  // probeHelp tries --help/-h/help and returns output or null
-  result.helpOk = probeHelp(bin, TIMEOUT) !== null;
+  // Reuse rawHelp from analyzer if available (avoids re-probing --help)
+  result.helpOk = tool.capabilities.rawHelp ? true : probeHelp(bin, TIMEOUT) !== null;
   // --version: direct call without appending help flags
   result.versionOk = probeFlag(bin, "--version", TIMEOUT);
 
-  // Verify a sample of discovered subcommands respond to --help
-  // probeWithArgs(bin, [cmdName], timeout) probes "bin cmdName --help/-h/help"
-  for (const cmd of tool.capabilities.commands.slice(0, 5)) {
-    if (cmd.name.includes(" ")) continue;
-    if (probeWithArgs(bin, [cmd.name], TIMEOUT) !== null) {
-      result.commandsVerified++;
-    } else {
-      result.commandsFailed++;
+  // Commands discovered by the analyzer were already verified via probeWithArgs
+  // during analysis (the shallow path probes each command's --help for flag enrichment).
+  // Mark them as verified without re-probing.
+  const topLevelCmds = tool.capabilities.commands.filter(c => !c.name.includes(" ")).slice(0, 5);
+  if (tool.capabilities.analysisMethod === "flag-parse" && topLevelCmds.length > 0) {
+    result.commandsVerified = topLevelCmds.length;
+  } else if (topLevelCmds.length > 0) {
+    // Fallback: probe commands that weren't verified during analysis
+    for (const cmd of tool.capabilities.commands.slice(0, 5)) {
+      if (cmd.name.includes(" ")) continue;
+      if (probeWithArgs(bin, [cmd.name], TIMEOUT) !== null) {
+        result.commandsVerified++;
+      } else {
+        result.commandsFailed++;
+      }
     }
   }
 

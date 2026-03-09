@@ -446,7 +446,7 @@ export function detectInteractionMode(
 }
 
 /** Check if a binary responds to a single flag (no help-flag appending).
- *  Returns the combined stdout+stderr output, or null if no meaningful output. */
+ *  Returns true if the binary produces meaningful output (>20 chars). */
 export function probeFlag(binPath: string, flag: string, timeout: number): boolean {
   try {
     const out = execFileSync(binPath, [flag], {
