@@ -12,6 +12,9 @@ import {
   readdirSync,
   statSync,
   chmodSync,
+  appendFileSync,
+  readFileSync,
+  unlinkSync,
 } from "node:fs";
 
 // Core pipeline
@@ -100,6 +103,9 @@ const HUGE_REPOS = new Set([
   "PaddlePaddle/PaddleOCR", "PaddlePaddle/Paddle", "apache/spark",
   "apache/airflow", "kubernetes/kubernetes", "rust-lang/rust",
   "llvm/llvm-project", "chromium/chromium", "nicbarker/clay",
+  "BerriAI/litellm", "langgenius/dify", "AUTOMATIC1111/stable-diffusion-webui",
+  "comfyanonymous/ComfyUI", "oobabooga/text-generation-webui", "invoke-ai/InvokeAI",
+  "vllm-project/vllm", "ggml-org/llama.cpp",
 ]);
 
 // ── Stage 1: Discovery (NL prompt → multi-registry search) ────────────
@@ -597,10 +603,41 @@ export async function buildIndexes(tools: Tool[], dryRun: boolean): Promise<void
 
 // ── Batch processing ──────────────────────────────────────────────────
 
-interface ProcessBatchOptions {
+export interface ProcessBatchOptions {
   deep: boolean;
   noCache?: boolean;
   force?: boolean;
+  timeout?: number;
+  concurrency?: number;
+  checkpointPath?: string;
+  resumeFrom?: string;
+  onProgress?: (label: string, completed: number, total: number, result: BatchResult | null) => void;
+}
+
+/** Race a promise against a timeout. */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Timeout after ${ms}ms: ${label}`)), ms)
+    ),
+  ]);
+}
+
+/** Simple concurrency limiter. */
+class Semaphore {
+  private queue: Array<() => void> = [];
+  private active = 0;
+  constructor(private max: number) {}
+  async acquire(): Promise<void> {
+    if (this.active < this.max) { this.active++; return; }
+    return new Promise(resolve => this.queue.push(resolve));
+  }
+  release(): void {
+    this.active--;
+    const next = this.queue.shift();
+    if (next) { this.active++; next(); }
+  }
 }
 
 /** Enrich a Tool's metadata with curated info (description, tags, domain). */
@@ -629,28 +666,95 @@ function enrichToolWithCuratedMeta(tool: Tool, curated: CuratedMeta): Tool {
 export async function processBatch(items: BatchItem[], opts: ProcessBatchOptions): Promise<BatchOutcome> {
   const results: BatchResult[] = [];
   const failures: Array<{ label: string; error: string }> = [];
+  const timeout = opts.timeout ?? 300_000;
+  const concurrency = opts.concurrency ?? 1;
 
-  for (const item of items) {
+  // Resume: load completed labels from checkpoint
+  let doneLabels = new Set<string>();
+  if (opts.resumeFrom && existsSync(opts.resumeFrom)) {
+    try {
+      const lines = readFileSync(opts.resumeFrom, "utf-8").split("\n").filter(Boolean);
+      for (const line of lines) {
+        try {
+          const entry = JSON.parse(line) as { label: string };
+          doneLabels.add(entry.label);
+        } catch { /* skip malformed lines */ }
+      }
+      log(`  Resuming: ${doneLabels.size} tools already completed`);
+    } catch { /* ignore read errors */ }
+  }
+
+  const toProcess = doneLabels.size > 0 ? items.filter(i => !doneLabels.has(i.label)) : items;
+  let completed = items.length - toProcess.length; // already done count
+
+  const processOne = async (item: BatchItem): Promise<void> => {
     log(`\n  ── Forging: ${item.label} ──`);
     try {
-      let tool = await resolveInstallAnalyze(item.source, opts.deep);
+      let tool = await withTimeout(
+        resolveInstallAnalyze(item.source, opts.deep),
+        timeout,
+        item.label,
+      );
       // Enrich with curated metadata if available
       if (item.curatedMeta) {
         tool = enrichToolWithCuratedMeta(tool, item.curatedMeta);
       }
       const forged = forgeSkill(tool, { dryRun: false, noCache: opts.noCache, force: opts.force });
+      completed++;
       if (forged.skipped) {
         log(`  → CACHED (skipped)`);
-        continue;
+        // Checkpoint even cached items
+        if (opts.checkpointPath) {
+          appendFileSync(opts.checkpointPath, JSON.stringify({ label: item.label, status: "cached", timestamp: new Date().toISOString() }) + "\n");
+        }
+        opts.onProgress?.(item.label, completed, items.length, null);
+        return;
       }
       const quality = assessQuality(forged.skillMd, tool.meta.name);
       results.push({ label: item.label, tool, forged, quality });
       log(`  → ${quality.passed ? "PASS" : "FAIL"} (trigger: ${quality.triggerScore.toFixed(2)}, quality: ${quality.qualityScore}/10)`);
+      // Checkpoint
+      if (opts.checkpointPath) {
+        appendFileSync(opts.checkpointPath, JSON.stringify({ label: item.label, status: "ok", timestamp: new Date().toISOString() }) + "\n");
+      }
+      opts.onProgress?.(item.label, completed, items.length, { label: item.label, tool, forged, quality });
     } catch (err) {
+      completed++;
       const msg = toErrorMessage(err);
       failures.push({ label: item.label, error: msg });
       log(`  → SKIP: ${msg}`);
+      // Checkpoint failures too
+      if (opts.checkpointPath) {
+        appendFileSync(opts.checkpointPath, JSON.stringify({ label: item.label, status: "fail", error: msg, timestamp: new Date().toISOString() }) + "\n");
+      }
+      opts.onProgress?.(item.label, completed, items.length, null);
     }
+  };
+
+  if (concurrency <= 1) {
+    // Sequential (original behavior)
+    for (const item of toProcess) {
+      await processOne(item);
+    }
+  } else {
+    // Concurrent with semaphore
+    const sem = new Semaphore(concurrency);
+    const tasks = toProcess.map(item => async () => {
+      await sem.acquire();
+      try {
+        await processOne(item);
+      } finally {
+        sem.release();
+      }
+    });
+    await Promise.all(tasks.map(fn => fn()));
+  }
+
+  // Clean up checkpoint on full completion (no unfinished items)
+  if (opts.checkpointPath && failures.length === 0 && existsSync(opts.checkpointPath)) {
+    try { unlinkSync(opts.checkpointPath); } catch { /* ignore */ }
+  } else if (opts.checkpointPath && failures.length > 0) {
+    log(`  Resume with: --resume ${opts.checkpointPath}`);
   }
 
   return { results, failures };

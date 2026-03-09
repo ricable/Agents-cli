@@ -364,7 +364,7 @@ async function installFromPypi(
   const installArgs = version ? [`${pkg}==${version}`] : [pkg];
   execFileSync("uv", ["pip", "install", ...installArgs, "--python", join(venvDir, "bin", "python")], {
     stdio: "pipe",
-    timeout: 120000,
+    timeout: 300000,
   });
 
   // Discover binaries (exclude standard venv scripts)

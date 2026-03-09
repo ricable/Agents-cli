@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { parseFrontmatter } from "../../lib/skills.js";
 import type { Tool, ManifestEntry } from "../../lib/types.js";
-import { DOMAIN_TRIGGERS } from "../../lib/domains.js";
+import { DOMAIN_TRIGGERS, inferDomainLabel } from "../../lib/domains.js";
 
 // ── Logging ────────────────────────────────────────────────────────────
 
@@ -32,15 +32,7 @@ export function atomicWrite(filePath: string, content: string): void {
 // ── Domain inference ──────────────────────────────────────────────────
 
 export function inferDomainFromTool(tool: Tool): string {
-  const text = `${tool.meta.name} ${tool.meta.description} ${(tool.meta.tags as string[]).join(" ")}`.toLowerCase();
-  let bestDomain = "build";
-  let bestScore = 0;
-  for (const [domain, triggers] of Object.entries(DOMAIN_TRIGGERS)) {
-    const keywords = triggers.toLowerCase().split(/[,\s]+/).filter(k => k.length > 3);
-    const hits = keywords.filter(k => text.includes(k)).length;
-    if (hits > bestScore) { bestScore = hits; bestDomain = domain; }
-  }
-  return bestDomain;
+  return inferDomainLabel(tool);
 }
 
 // ── Tool → ManifestEntry ──────────────────────────────────────────────

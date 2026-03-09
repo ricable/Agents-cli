@@ -22,6 +22,7 @@ import { createStore, getToolInstallDir } from "./store.js";
 import { readPkgVersion } from "./pkg-utils.js";
 import { validateToolName } from "./guards.js";
 import { INSTALL_CMD_RE, readSourceVersion, inferBinaryNames } from "./extractor.js";
+import { scoreTrigger } from "./skill-tester.js";
 
 // =============================================================================
 // YAML Frontmatter Parsing
@@ -625,6 +626,19 @@ const CATEGORY_ACTION_MAP: Record<string, string[]> = {
   "data-processing": ["processing data with %", "converting formats using %", "transforming datasets via %"],
   "devops": ["deploying applications with %", "managing infrastructure via %", "orchestrating services using %"],
   "package-managers": ["managing dependencies with %", "installing packages via %", "running project scripts using %"],
+  "git": ["managing version control with %", "creating and reviewing pull requests via %", "searching commit history using %"],
+  "javascript": ["linting and formatting JavaScript with %", "building and bundling projects via %", "checking types using %"],
+  "python": ["linting and formatting Python code with %", "managing Python environments via %", "running and debugging scripts using %"],
+  "cloud": ["deploying applications with %", "managing cloud infrastructure via %", "configuring container orchestration using %"],
+  "http-api": ["calling HTTP APIs with %", "downloading resources via %", "testing and debugging endpoints using %"],
+  "documentation": ["generating documentation with %", "validating API specs via %", "building and publishing docs using %"],
+  "database": ["managing database migrations with %", "querying and transforming data via %", "generating schema definitions using %"],
+  "monitoring": ["monitoring system performance with %", "analyzing and debugging processes via %", "scanning resource usage using %"],
+  "browser": ["running browser audits with %", "testing web page accessibility via %", "scanning and analyzing web performance using %"],
+  "file-processing": ["converting file formats with %", "processing and transforming documents via %", "analyzing file metadata using %"],
+  "gui-wrappers": ["running batch image operations with %", "converting and processing files via %", "automating GUI application tasks using %"],
+  "network": ["analyzing network paths with %", "querying DNS records via %", "testing and monitoring connections using %"],
+  "ai-ml": ["running AI models with %", "building intelligent workflows using %", "processing and generating content via %"],
 };
 
 /**
@@ -714,7 +728,7 @@ function buildDescription(tool: Tool): string {
         .map(s => s.trim().toLowerCase())
         .filter(s => s.length > 5)
         .slice(0, 2);
-      triggers.push(`installing and configuring ${name}`);
+      triggers.push(`installing and configuring ${name}`, `running ${name} commands`, `managing ${name} workflows`);
       if (agentPhrases.length > 0) {
         triggers.push(...agentPhrases.map(p => {
           if (/^(building|running|creating|deploying|managing|processing|generating|training|testing|checking|monitoring|installing|configuring|searching|analyzing|formatting|scanning|validating|converting|embedding|streaming|querying|orchestrating|implementing|routing|scheduling|publishing|parsing|rendering|transforming|auditing|debugging|fixing|downloading|compiling|storing|retrieving)/.test(p)) {
@@ -728,27 +742,41 @@ function buildDescription(tool: Tool): string {
     // Fallback: domain-inferred triggers
     const domain = inferDomain(tool);
     const domainTriggers: Record<string, string[]> = {
-      llm: ["running LLM inference", "chatting with language models", "generating text"],
-      linter: ["linting files for issues", "auto-fixing code style", "formatting source code"],
-      testing: ["running tests", "checking test coverage", "debugging test failures"],
-      security: ["scanning for vulnerabilities", "auditing dependencies", "detecting secrets"],
-      containers: ["managing containers", "deploying applications", "orchestrating services"],
-      ml: ["training models", "running inference", "fine-tuning pretrained models"],
-      search: ["searching files and code", "finding patterns in text", "indexing content"],
-      data: ["processing structured data", "converting between formats", "transforming datasets"],
-      http: ["making HTTP requests", "interacting with APIs", "downloading resources"],
-      git: ["managing version control", "creating pull requests", "reviewing changes"],
-      agents: ["building AI agents", "orchestrating agent workflows", "running autonomous tasks"],
-      rag: ["building retrieval pipelines", "indexing documents", "querying knowledge bases"],
-      monitoring: ["monitoring performance", "collecting metrics", "viewing logs"],
-      "package-manager": ["managing dependencies", "installing packages", "running project scripts"],
-      documentation: ["generating documentation", "building API docs", "validating doc structure"],
+      llm: [`running LLM inference with ${name}`, `generating text using ${name}`, `processing prompts via ${name}`],
+      linter: [`linting files with ${name}`, `formatting code using ${name}`, `checking style via ${name}`],
+      testing: [`running tests with ${name}`, `checking test coverage via ${name}`, `debugging test failures using ${name}`],
+      security: [`scanning for vulnerabilities with ${name}`, `auditing dependencies via ${name}`, `detecting secrets using ${name}`],
+      containers: [`managing containers with ${name}`, `deploying applications via ${name}`, `orchestrating services using ${name}`],
+      ml: [`training models with ${name}`, `running inference via ${name}`, `evaluating model performance using ${name}`],
+      search: [`searching files with ${name}`, `indexing content via ${name}`, `retrieving matches using ${name}`],
+      data: [`processing data with ${name}`, `converting formats using ${name}`, `transforming datasets via ${name}`],
+      http: [`calling HTTP APIs with ${name}`, `downloading resources via ${name}`, `testing endpoints using ${name}`],
+      git: [`managing version control with ${name}`, `creating pull requests via ${name}`, `searching commits using ${name}`],
+      agents: [`building AI agents with ${name}`, `orchestrating agent workflows via ${name}`, `running autonomous tasks using ${name}`],
+      rag: [`building retrieval pipelines with ${name}`, `indexing documents via ${name}`, `querying knowledge bases using ${name}`],
+      monitoring: [`monitoring performance with ${name}`, `analyzing metrics via ${name}`, `scanning resource usage using ${name}`],
+      "package-manager": [`managing dependencies with ${name}`, `installing packages via ${name}`, `running project scripts using ${name}`],
+      documentation: [`generating documentation with ${name}`, `building API docs via ${name}`, `validating doc structure using ${name}`],
     };
     const categoryTriggers = domainTriggers[domain.category];
     if (categoryTriggers && categoryTriggers.length > 0) {
       triggers.push(...categoryTriggers);
     } else {
-      triggers.push(`working with ${name}`);
+      triggers.push(`installing and configuring ${name}`, `running ${name} commands`, `managing ${name} workflows`);
+    }
+  }
+
+  // Library-specific triggers: if tool is not a CLI and has no commands,
+  // verify trigger score would pass; if not, replace with SDK-style triggers
+  if (!isLikelyCli(tool) && commands.length === 0 && triggers.length > 0) {
+    const testScore = scoreTrigger(`Use when ${triggers.join(", ")}.`);
+    if (testScore < 0.8) {
+      triggers.length = 0;
+      triggers.push(
+        `importing ${name} SDK in application code`,
+        `building integrations with ${name}`,
+        `calling ${name} API methods`,
+      );
     }
   }
 
@@ -1523,9 +1551,8 @@ export function generateRichSkillMd(tool: Tool): string {
   s.push(`description: "${esc(description)}"`);
   s.push(`license: ${license}`);
   s.push(`compatibility: "${compatibility}"`);
-  if (curated) {
-    s.push(`domain: "${curated.category}"`);
-  }
+  const domainValue = curated ? curated.category : inferDomain(tool).category;
+  s.push(`domain: "${domainValue}"`);
   s.push(`ingredients:`);
   // Quote URIs that contain YAML-special chars (@, :, etc.)
   const uri = tool.source.uri;

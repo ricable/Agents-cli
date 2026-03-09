@@ -143,6 +143,9 @@ export function scoreTrigger(description: string): number {
     "checking", "formatting", "linting", "scanning", "monitoring",
     "installing", "running", "training", "debugging", "fixing",
     "working", "downloading", "converting", "compiling", "auditing",
+    "fine-tuning", "inferencing", "vectorizing", "annotating",
+    "labeling", "quantizing", "serving", "evaluating",
+    "benchmarking", "augmenting", "automating",
   ];
   const matched = actionVerbs.filter(v => description.toLowerCase().includes(v));
   score += Math.min(0.4, matched.length * 0.15);
@@ -215,6 +218,18 @@ export function testSkillSync(skillPath: string, preloadedContent?: string): Ski
 }
 
 /**
+ * Check if a SKILL.md content's domain field matches a filter string.
+ * Handles quoted values, substring matches (e.g. "agent" matches "ai-ml/ai-agents").
+ */
+function domainMatches(content: string, filter: string): boolean {
+  const match = content.match(/^domain:\s*["']?([^"'\n]+)["']?\s*$/m);
+  if (!match) return false;
+  const domain = match[1]!.trim().toLowerCase();
+  const f = filter.toLowerCase();
+  return domain === f || domain.includes(f) || f.includes(domain);
+}
+
+/**
  * Test all SKILL.md files synchronously. Returns results for each.
  */
 export function testAllSkillsSync(skillsDir: string, domainFilter?: string): SkillTestResult[] {
@@ -234,7 +249,7 @@ export function testAllSkillsSync(skillsDir: string, domainFilter?: string): Ski
       continue;
     }
 
-    if (domainFilter && !content.includes(`domain: ${domainFilter}`)) continue;
+    if (domainFilter && !domainMatches(content, domainFilter)) continue;
 
     results.push(testSkillSync(skillFile, content));
   }
@@ -493,7 +508,7 @@ export async function testAllSkills(
       const skillFile = join(dir, "SKILL.md");
       if (existsSync(skillFile)) {
         const content = readFileSync(skillFile, "utf-8");
-        if (!content.includes(`domain: ${domainFilter}`)) continue;
+        if (!domainMatches(content, domainFilter)) continue;
       }
     }
     results.push(await testSkill(dir, useAI));

@@ -22,6 +22,9 @@ export function parseArgs(): CliArgs {
     freeze: false, verify: false,
     mcp: false,
     system: false,
+    timeout: 300000,
+    concurrency: 1,
+    resume: "",
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -85,6 +88,22 @@ export function parseArgs(): CliArgs {
     else if (a === "--mcp")                   { opts.mcp = true; }
     // System PATH discovery
     else if (a === "--system")                { opts.system = true; }
+    // Batch processing
+    else if (a === "--timeout" && argv[i+1])  {
+      const parsed = parseInt(argv[++i]!, 10);
+      if (Number.isNaN(parsed) || parsed < 1000) {
+        throw new Error(`Invalid --timeout value: "${argv[i]}" (must be >= 1000ms)`);
+      }
+      opts.timeout = parsed;
+    }
+    else if (a === "--concurrency" && argv[i+1]) {
+      const parsed = parseInt(argv[++i]!, 10);
+      if (Number.isNaN(parsed) || parsed < 1 || parsed > 16) {
+        throw new Error(`Invalid --concurrency value: "${argv[i]}" (must be 1-16)`);
+      }
+      opts.concurrency = parsed;
+    }
+    else if (a === "--resume" && argv[i+1])   { opts.resume = argv[++i]!; }
     // Positional → prompt
     else if (!a.startsWith("--"))             { opts.prompt += (opts.prompt ? " " : "") + a; }
   }

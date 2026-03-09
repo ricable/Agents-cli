@@ -117,7 +117,24 @@ export async function curatedMode(args: CliArgs, startTime: number): Promise<voi
     },
   }));
 
-  const { results, failures } = await processBatch(batchItems, { deep: args.deep, noCache: args.noCache, force: args.force });
+  const checkpointPath = args.resume || join(OUTPUT_DIR, `.checkpoint-curated-${Date.now()}.jsonl`);
+  const onProgress = args.json ? (label: string, completed: number, total: number, result: import("./types.js").BatchResult | null) => {
+    process.stdout.write(JSON.stringify({
+      type: "progress", label, status: result ? "ok" : "fail",
+      progress: `${completed}/${total}`, timestamp: new Date().toISOString(),
+    }) + "\n");
+  } : undefined;
+
+  const { results, failures } = await processBatch(batchItems, {
+    deep: args.deep,
+    noCache: args.noCache,
+    force: args.force,
+    timeout: args.timeout,
+    concurrency: args.concurrency,
+    checkpointPath,
+    resumeFrom: args.resume || undefined,
+    onProgress,
+  });
 
   if (results.length > 0) {
     log("\n  Building indexes...");
