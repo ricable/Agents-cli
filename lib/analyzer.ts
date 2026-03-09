@@ -1,4 +1,4 @@
-import type { ToolAnalyzer, ToolCapabilities, ToolCommand, ToolFlag, ToolSubcommand, AnalyzeOptions } from "./types.js";
+import type { ToolAnalyzer, ToolCapabilities, ToolCommand, ToolFlag, ToolSubcommand, AnalyzeOptions, InteractionMode } from "./types.js";
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, statSync, realpathSync } from "node:fs";
 import { join, resolve as resolvePath } from "node:path";
@@ -411,8 +411,6 @@ export function createAnalyzer(): ToolAnalyzer {
 
 // ── Interaction mode detection ────────────────────────────────────────────────
 
-import type { InteractionMode } from "./types.js";
-
 /** REPL-indicating subcommand names */
 const REPL_COMMANDS = new Set(["shell", "repl", "interactive", "console", "chat"]);
 
@@ -447,16 +445,17 @@ export function detectInteractionMode(
   return "single";
 }
 
-/** Check if a binary responds to a single flag (no help-flag appending). */
+/** Check if a binary responds to a single flag (no help-flag appending).
+ *  Returns the combined stdout+stderr output, or null if no meaningful output. */
 export function probeFlag(binPath: string, flag: string, timeout: number): boolean {
   try {
     const out = execFileSync(binPath, [flag], {
       timeout, maxBuffer: 1_048_576, stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8",
     });
-    return out.length > 0;
+    return out.length > 20;
   } catch (e: unknown) {
     const err = e as { stdout?: string; stderr?: string };
-    return `${err.stdout ?? ""}${err.stderr ?? ""}`.length > 0;
+    return `${err.stdout ?? ""}${err.stderr ?? ""}`.length > 20;
   }
 }
 

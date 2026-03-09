@@ -7,9 +7,9 @@
  */
 
 import { existsSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, delimiter } from "node:path";
 import { success, emit } from "../../lib/output.js";
-import { createAnalyzer, probeHelp } from "../../lib/analyzer.js";
+import { createAnalyzer } from "../../lib/analyzer.js";
 import { validateToolName } from "../../lib/guards.js";
 import type { InteractionMode } from "../../lib/types.js";
 import type { CliArgs } from "./types.js";
@@ -46,11 +46,15 @@ const SKIP_NAMES = new Set([
   "ln", "readlink", "realpath", "basename", "dirname",
   "id", "groups", "w", "who", "last", "finger",
   "stty", "tput", "reset", "clear",
+  "open", "xdg-open", "osascript",
+  "dd", "mkfs", "fdisk", "diskutil",
+  "launchctl", "systemctl", "journalctl",
+  "dbus-daemon", "dbus-send", "dbus-monitor",
 ]);
 
 /** Collect unique executable names from PATH directories. */
 function discoverPathBinaries(limit: number): Array<{ name: string; path: string }> {
-  const pathDirs = (process.env["PATH"] ?? "").split(":");
+  const pathDirs = (process.env["PATH"] ?? "").split(delimiter);
   const seen = new Set<string>();
   const results: Array<{ name: string; path: string }> = [];
   // Over-collect by 5x since most binaries won't respond to --help
@@ -104,17 +108,16 @@ export async function systemMode(args: CliArgs, startTime: number): Promise<void
   for (const { name, path } of candidates) {
     if (responsive.length >= args.limit) break;
 
-    const help = probeHelp(path, 3000);
-    if (!help) continue;
-
+    // Single analyze call handles probeHelp internally — no double-probing
     const caps = await analyzer.analyze(path, { timeout: 3000 });
+    if (!caps.rawHelp) continue;
 
     responsive.push({
       name,
       path,
       commandCount: caps.commands.length,
       flagCount: caps.globalFlags.length,
-      interactionMode: caps.interactionMode,
+      interactionMode: caps.interactionMode ?? "single",
     });
   }
 

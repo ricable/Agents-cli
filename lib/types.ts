@@ -79,8 +79,8 @@ export interface ToolCapabilities {
   readonly globalFlags: readonly ToolFlag[];
   readonly analysisMethod: AnalysisMethod;
   readonly rawHelp?: string;
-  /** Detected interaction mode: repl (interactive shell), subcommand (git-style), or single (one-shot) */
-  readonly interactionMode: InteractionMode;
+  /** Detected interaction mode: repl (interactive shell), subcommand (git-style), or single (one-shot). Always set by createAnalyzer(). */
+  readonly interactionMode?: InteractionMode;
 }
 
 /** Metadata describing a tool */

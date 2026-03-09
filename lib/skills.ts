@@ -204,7 +204,7 @@ export async function installTool(
   }
 
   // Analyze — deep probe if requested, otherwise shallow
-  let capabilities: ToolCapabilities = { commands: [], globalFlags: [], analysisMethod: "help-probe", interactionMode: "single" };
+  let capabilities: ToolCapabilities = { commands: [], globalFlags: [], analysisMethod: "help-probe" };
   const mainBin = findMainBinary(installDir);
   if (mainBin) {
     try {
