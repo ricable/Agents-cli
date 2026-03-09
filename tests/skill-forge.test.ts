@@ -250,6 +250,21 @@ esac
     expect(result.commandsFailed).toBe(0);
   });
 
+  it("returns helpOk=true but versionOk=false when binary lacks --version", () => {
+    const script = join(tmpDir, "help-only");
+    writeFileSync(script, `#!/bin/bash
+case "$1" in
+  --help|-h|help) echo "Usage: help-only [options] -- a CLI with no version flag";;
+esac
+`);
+    chmodSync(script, 0o755);
+
+    const tool = makeTool();
+    const result = smokeTest(tool, "/nonexistent", script);
+    expect(result.helpOk).toBe(true);
+    expect(result.versionOk).toBe(false);
+  });
+
   it("returns all false when binary not found", () => {
     const tool = makeTool();
     const result = smokeTest(tool, "/nonexistent-dir");
