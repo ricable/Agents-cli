@@ -447,4 +447,4 @@ export function detectInteractionMode(
   return "single";
 }
 
-export { parseExamples, parseFlags, parseCommands, countSubcommands, flattenSubcommands };
+export { parseExamples, parseFlags, parseCommands, countSubcommands, flattenSubcommands, probeHelp, probeWithArgs };

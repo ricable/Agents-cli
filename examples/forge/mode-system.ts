@@ -6,11 +6,11 @@
  * Enables "forge skills for everything already on my machine" workflow.
  */
 
-import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { success, emit } from "../../lib/output.js";
-import { parseCommands, parseFlags, detectInteractionMode } from "../../lib/analyzer.js";
+import { parseCommands, parseFlags, detectInteractionMode, probeHelp } from "../../lib/analyzer.js";
+import type { InteractionMode } from "../../lib/types.js";
 import type { CliArgs } from "./types.js";
 import { log, fmtTable } from "./helpers.js";
 
@@ -19,10 +19,9 @@ import { log, fmtTable } from "./helpers.js";
 interface SystemBinary {
   name: string;
   path: string;
-  helpOutput: string;
   commandCount: number;
   flagCount: number;
-  interactionMode: string;
+  interactionMode: InteractionMode;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -48,30 +47,12 @@ const SKIP_NAMES = new Set([
   "stty", "tput", "reset", "clear",
 ]);
 
-/** Probe a binary with --help and return output (or null if unresponsive). */
-function probeHelp(binPath: string): string | null {
-  for (const flag of ["--help", "-h"]) {
-    try {
-      const out = execFileSync(binPath, [flag], {
-        timeout: 3000,
-        stdio: ["pipe", "pipe", "pipe"],
-        encoding: "utf-8",
-      });
-      if (out && out.length > 30) return out;
-    } catch (e: unknown) {
-      const err = e as { stdout?: string; stderr?: string };
-      const combined = `${err.stdout ?? ""}${err.stderr ?? ""}`;
-      if (combined.length > 30) return combined;
-    }
-  }
-  return null;
-}
-
 /** Collect unique executable names from PATH directories. */
 function discoverPathBinaries(limit: number): Array<{ name: string; path: string }> {
   const pathDirs = (process.env["PATH"] ?? "").split(":");
   const seen = new Set<string>();
   const results: Array<{ name: string; path: string }> = [];
+  const cap = limit * 5;
 
   for (const dir of pathDirs) {
     if (!dir || !existsSync(dir)) continue;
@@ -91,9 +72,9 @@ function discoverPathBinaries(limit: number): Array<{ name: string; path: string
 
       seen.add(entry);
       results.push({ name: entry, path: full });
-      if (results.length >= limit * 5) break; // probe more than limit to find responsive ones
+      if (results.length >= cap) break;
     }
-    if (results.length >= limit * 5) break;
+    if (results.length >= cap) break;
   }
 
   return results;
@@ -117,7 +98,7 @@ export async function systemMode(args: CliArgs, startTime: number): Promise<void
   for (const { name, path } of candidates) {
     if (responsive.length >= args.limit) break;
 
-    const help = probeHelp(path);
+    const help = probeHelp(path, 3000);
     if (!help) continue;
 
     const commands = parseCommands(help);
@@ -127,7 +108,6 @@ export async function systemMode(args: CliArgs, startTime: number): Promise<void
     responsive.push({
       name,
       path,
-      helpOutput: help.slice(0, 500),
       commandCount: commands.length,
       flagCount: flags.length,
       interactionMode: mode,
@@ -165,18 +145,9 @@ export async function systemMode(args: CliArgs, startTime: number): Promise<void
     return;
   }
 
-  // Forge skills for responsive CLIs by treating them as local paths
-  // (they're already installed on the system)
   const { processBatch, buildIndexes } = await import("./stages.js");
-  const batchItems = responsive.map(b => ({
-    label: b.name,
-    source: b.path,
-  }));
-
-  // Note: processBatch expects installable sources — for system binaries,
-  // we handle them differently by using local path resolution
   const { results, failures } = await processBatch(
-    batchItems.map(b => ({ label: b.label, source: `local:${b.source}` })),
+    responsive.map(b => ({ label: b.name, source: `local:${b.path}` })),
     { deep: args.deep, noCache: args.noCache, force: args.force },
   );
 

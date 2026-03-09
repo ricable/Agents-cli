@@ -63,7 +63,7 @@ export async function curatedMode(args: CliArgs, startTime: number): Promise<voi
   for (const [cat, catTools] of categories) {
     log(`  ${cat} (${catTools.length})`);
     for (const t of catTools) {
-      const srcLabel = t.sourceType === "npm" ? `npm:${t.source}` : t.source;
+      const srcLabel = t.sourceType === "npm" ? `npm:${t.source}` : t.sourceType === "pypi" ? `pypi:${t.source}` : t.source;
       log(`    ${t.name.padEnd(16)} ${srcLabel.padEnd(35)} ${t.description.slice(0, 50)}`);
     }
     log("");
@@ -96,7 +96,9 @@ export async function curatedMode(args: CliArgs, startTime: number): Promise<voi
     label: meta.name,
     source: meta.sourceType === "npm"
       ? (meta.source.startsWith("@") ? meta.source : `npm:${meta.source}`)
-      : meta.source,
+      : meta.sourceType === "pypi"
+        ? `pypi:${meta.source}`
+        : meta.source,
     curatedMeta: {
       description: meta.description,
       agentValue: meta.agentValue,

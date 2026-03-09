@@ -198,11 +198,13 @@ export async function resolveInstallAnalyze(
 
   const installDir = getToolInstallDir(DATA_DIR, tool.meta.name);
 
+  let cachedBin: string | null = null;
+
   if (deep && tool.capabilities.commands.length > 0) {
     log(`  [3/3] Deep probing subcommands...`);
-    const bin = findMainBinary(installDir);
-    if (bin) {
-      const probed = deepProbe(bin, { maxDepth: 3 });
+    cachedBin = findMainBinary(installDir);
+    if (cachedBin) {
+      const probed = deepProbe(cachedBin, { maxDepth: 3 });
       (tool as { capabilities: typeof tool.capabilities }).capabilities = {
         ...tool.capabilities,
         commands: probed.tree,
@@ -214,7 +216,7 @@ export async function resolveInstallAnalyze(
   }
 
   // Smoke test: verify --version, --help, and sample commands respond
-  const smoke = smokeTest(tool, installDir);
+  const smoke = smokeTest(tool, installDir, cachedBin);
   if (smoke.helpOk || smoke.versionOk) {
     const parts: string[] = [];
     if (smoke.versionOk) parts.push("--version");
@@ -235,7 +237,7 @@ export async function resolveInstallAnalyze(
 
 // ── Stage 2b: Smoke Test (verify commands respond) ─────────────────────
 
-import { execFileSync } from "node:child_process";
+import { probeWithArgs } from "../../lib/analyzer.js";
 
 export interface SmokeTestResult {
   versionOk: boolean;
@@ -245,35 +247,21 @@ export interface SmokeTestResult {
 }
 
 /** Run a quick smoke test on a tool after install: --version, --help, and per-command --help. */
-export function smokeTest(tool: Tool, installDir: string): SmokeTestResult {
+export function smokeTest(tool: Tool, installDir: string, cachedBin?: string | null): SmokeTestResult {
   const result: SmokeTestResult = { versionOk: false, helpOk: false, commandsVerified: 0, commandsFailed: 0 };
-  const bin = findMainBinary(installDir);
+  const bin = cachedBin ?? findMainBinary(installDir);
   if (!bin) return result;
 
-  const tryExec = (args: string[]): boolean => {
-    try {
-      const out = execFileSync(bin, args, {
-        timeout: 5000,
-        stdio: ["pipe", "pipe", "pipe"],
-        encoding: "utf-8",
-      });
-      return out.length > 0;
-    } catch (e: unknown) {
-      const err = e as { stdout?: string; stderr?: string };
-      const combined = `${err.stdout ?? ""}${err.stderr ?? ""}`;
-      return combined.length > 0;
-    }
-  };
+  const TIMEOUT = 2000;
+  const responds = (args: string[]): boolean => probeWithArgs(bin, args, TIMEOUT) !== null;
 
-  result.versionOk = tryExec(["--version"]);
-  result.helpOk = tryExec(["--help"]);
+  result.versionOk = responds(["--version"]);
+  result.helpOk = responds(["--help"]);
 
   // Verify a sample of discovered commands respond to --help
-  const cmdsToCheck = tool.capabilities.commands.slice(0, 10);
-  for (const cmd of cmdsToCheck) {
-    // Only check top-level command names (no spaces = not nested)
+  for (const cmd of tool.capabilities.commands.slice(0, 5)) {
     if (cmd.name.includes(" ")) continue;
-    if (tryExec([cmd.name, "--help"])) {
+    if (responds([cmd.name, "--help"])) {
       result.commandsVerified++;
     } else {
       result.commandsFailed++;
