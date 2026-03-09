@@ -13,6 +13,18 @@ export type { ReadmeSections } from "./types.js";
 /** Regex that matches common package manager install commands and setup patterns */
 export const INSTALL_CMD_RE = /^\$?\s*(pip|npm|brew|cargo|go|apt|yum|dnf|scoop|choco|winget|port|snap|flatpak|pacman|emerge|nix-env|conda|zypper|apk|pkg|sudo\s+\w+)\s+(install|add|get|--install|-S)\b|^\$?\s*curl\s+.*\|\s*(ba)?sh|^\$?\s*(docker\s+pull|wget\s+|git\s+clone|cmake\s+|make\s+install|gem\s+install|cpan\s+install|uv\s+(pip\s+install|add))\b/;
 
+/** Classify a fenced code block by its likely purpose */
+export type CodeBlockPurpose = "install" | "config" | "usage" | "advanced" | "output";
+
+export function classifyCodeBlock(code: string, lang: string): CodeBlockPurpose {
+  if (INSTALL_CMD_RE.test(code)) return "install";
+  if (/^[\s]*[{[]/.test(code) && /^(json|yaml|yml|toml)$/i.test(lang)) return "config";
+  if (/^(\$|>|#.*output|expected)/m.test(code)) return "output";
+  // Usage: short (< 15 lines), has function calls or imports
+  if (code.split("\n").length < 15 && /\b(import|from|require|const|let|var)\b/.test(code)) return "usage";
+  return "advanced";
+}
+
 /** Regex that matches BibTeX/academic citation blocks */
 const CITATION_RE = /^\s*@(?:inproceedings|article|misc|book|techreport|phdthesis|mastersthesis)\s*\{/m;
 
@@ -336,7 +348,7 @@ export function extractReadmeSections(readme: string, maxSectionChars = 2000): R
     const code = cm[2]!.trim();
     const lang = cm[1] || "bash";
     if (code.length >= 10 && isActualCode(code, lang)) {
-      result.codeBlocks.push({ lang, code: code.slice(0, 1500) });
+      result.codeBlocks.push({ lang, code: code.slice(0, 1500), purpose: classifyCodeBlock(code, lang) });
     }
   }
 

@@ -802,6 +802,31 @@ function buildDescription(tool: Tool): string {
     ? curated.description
     : desc;
 
+  // When no curated metadata, try enriching generic descriptions with README first paragraph
+  let enrichedDesc = effectiveDesc;
+  if (!curated && tool._readmeSections?.raw) {
+    const rawReadme = tool._readmeSections.raw;
+    // Extract first meaningful paragraph from raw README (skip title, badges, images)
+    const lines = rawReadme.split("\n");
+    const proseLines: string[] = [];
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) continue;
+      if (t.startsWith("#")) continue;
+      if (t.startsWith("!") || t.startsWith("[!")) continue; // images, badges
+      if (t.startsWith("<")) continue; // HTML
+      if (t.startsWith("|")) continue; // tables
+      if (t.startsWith("```")) break; // stop at first code block
+      proseLines.push(t);
+      if (proseLines.join(" ").length >= 200) break;
+    }
+    const firstParagraph = proseLines.join(" ").slice(0, 200).trim();
+    // Only use if it's more specific than the current description
+    if (firstParagraph.length > effectiveDesc.length && firstParagraph.length > 40) {
+      enrichedDesc = firstParagraph.replace(/\.$/, "");
+    }
+  }
+
   let cachedDomain: InferredDomain | null = null;
   const triggers: string[] = [];
   if (commands.length > 0) {
@@ -948,7 +973,7 @@ function buildDescription(tool: Tool): string {
 
   // Ensure 2+ TechNames (capitalized words) for +0.1 score boost
   let techSuffix = "";
-  const baseParts = `${effectiveDesc}. Use when ${triggerPhrase}.${negativeTrigger}`;
+  const baseParts = `${enrichedDesc}. Use when ${triggerPhrase}.${negativeTrigger}`;
   const techNames = baseParts.match(/\b[A-Z][a-zA-Z]{2,}\b/g) ?? [];
   if (techNames.length < 2) {
     const extra = LANG_TO_TECH[detectToolLanguage(tool)];
@@ -1759,8 +1784,11 @@ function generateLibraryQuickStart(
 
   // Try to extract real code examples from README
   const codeBlocks = readmeSections?.codeBlocks ?? [];
-  // Filter for API usage code blocks (not install commands, not config)
-  const apiBlocks = codeBlocks.filter(b => {
+  // Prefer blocks classified as "usage", fall back to "advanced" — never "install"/"output"
+  const usageBlocks = codeBlocks.filter(b => b.purpose === "usage");
+  const advancedBlocks = codeBlocks.filter(b => b.purpose === "advanced");
+  // If we have purpose-classified usage blocks, prefer those; otherwise fall back to old heuristic
+  const apiBlocks = usageBlocks.length > 0 ? usageBlocks : advancedBlocks.length > 0 ? advancedBlocks : codeBlocks.filter(b => {
     const code = b.code.toLowerCase();
     // Skip install-only blocks
     if (INSTALL_CMD_RE.test(code) && code.split("\n").length < 3) return false;
@@ -2370,8 +2398,9 @@ export function generateSkillDirectory(tool: Tool): SkillDirectory {
           if (isApi) { quickStartCodes.add(b.code); apiCount++; }
         }
       }
-      // Use actual code blocks from the README (exclude install-only blocks and blocks already in Quick Start)
+      // Use actual code blocks from the README (exclude install/output blocks and blocks already in Quick Start)
       const usageBlocks = readmeSections.codeBlocks.filter(b => {
+        if (b.purpose === "install" || b.purpose === "output") return false;
         if (quickStartCodes.has(b.code)) return false;
         const bLines = b.code.split("\n").filter(l => l.trim().length > 0);
         return !bLines.every(l => INSTALL_CMD_RE.test(l.trim())

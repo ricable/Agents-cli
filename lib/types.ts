@@ -109,7 +109,7 @@ export interface CuratedMeta {
 
 /** README sections extracted by the forge pipeline */
 export interface ReadmeSections {
-  codeBlocks: Array<{ lang: string; code: string }>;
+  codeBlocks: Array<{ lang: string; code: string; purpose?: "install" | "config" | "usage" | "advanced" | "output" }>;
   sections: Record<string, string>;
   raw: string;
 }

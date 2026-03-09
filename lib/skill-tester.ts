@@ -35,6 +35,7 @@ export interface SkillTestResult {
   name: string;
   triggerScore: number;  // 0-1
   qualityScore: number;  // 1-10
+  contentScore: number;  // 0-10 (advisory)
   passed: boolean;       // triggerScore >= 0.8 && qualityScore >= 6
   issues: string[];
 }
@@ -233,6 +234,7 @@ export function testSkillSync(skillPath: string, preloadedContent?: string): Ski
       name: "unknown",
       triggerScore: 0,
       qualityScore: 1,
+      contentScore: 0,
       passed: false,
       issues: ["Cannot read file"],
     };
@@ -243,7 +245,7 @@ export function testSkillSync(skillPath: string, preloadedContent?: string): Ski
 
   if (!fm.description) {
     issues.push("Missing description");
-    return { skillPath, name, triggerScore: 0, qualityScore: 1, passed: false, issues };
+    return { skillPath, name, triggerScore: 0, qualityScore: 1, contentScore: 0, passed: false, issues };
   }
 
   const triggerScore = Math.round(scoreTrigger(fm.description) * 100) / 100;
@@ -268,7 +270,9 @@ export function testSkillSync(skillPath: string, preloadedContent?: string): Ski
     }
   }
 
-  return { skillPath, name, triggerScore, qualityScore, passed, issues };
+  const { score: contentScore } = scoreContentQuality(content);
+
+  return { skillPath, name, triggerScore, qualityScore, contentScore, passed, issues };
 }
 
 /**
@@ -280,7 +284,8 @@ export function domainMatches(content: string, filter: string): boolean {
   if (!match) return false;
   const domain = match[1]!.trim().toLowerCase();
   const f = filter.toLowerCase();
-  return domain === f || domain.includes(f);
+  // Exact match, prefix match (ai-ml matches ai-ml/llm-inference), or substring match
+  return domain === f || domain.startsWith(f + "/") || domain.includes(f);
 }
 
 /**
@@ -382,13 +387,13 @@ export function printQualityReport(results: SkillTestResult[]): void {
 
   console.log(`\n  Skill Quality Report`);
   console.log(`  ${"─".repeat(80)}`);
-  console.log(`  ${"Skill".padEnd(34)} ${"Trigger".padStart(8)} ${"Quality".padStart(8)} ${"Status".padStart(8)}`);
+  console.log(`  ${"Skill".padEnd(34)} ${"Trigger".padStart(8)} ${"Quality".padStart(8)} ${"Content".padStart(8)} ${"Status".padStart(8)}`);
   console.log(`  ${"─".repeat(80)}`);
 
   for (const r of results) {
     const status = r.passed ? "\x1b[32m PASS\x1b[0m" : "\x1b[31m FAIL\x1b[0m";
     console.log(
-      `  ${r.name.slice(0, 34).padEnd(34)} ${r.triggerScore.toFixed(2).padStart(8)} ${String(r.qualityScore).padStart(8)} ${status}`,
+      `  ${r.name.slice(0, 34).padEnd(34)} ${r.triggerScore.toFixed(2).padStart(8)} ${String(r.qualityScore).padStart(8)} ${String(r.contentScore).padStart(8)} ${status}`,
     );
     for (const issue of r.issues) {
       console.log(`      -> ${issue}`);
