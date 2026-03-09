@@ -14,6 +14,7 @@ import { processBatch, buildIndexes } from "./stages.js";
 
 /** Format a curated tool's source into a prefixed source string for the resolver. */
 function formatSource(meta: CliTool): string {
+  if (meta.sourceType === "local") return meta.source;
   if (meta.sourceType === "npm") {
     return meta.source.startsWith("@") ? meta.source : `npm:${meta.source}`;
   }

@@ -1,6 +1,8 @@
 import type { ToolResolver, ResolveResult, ToolMeta, SourceFormat } from "./types.js";
 import { get as httpsGet } from "node:https";
 import { get as httpGet } from "node:http";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve, join, basename } from "node:path";
 
 /** Private/reserved IP ranges that should not be followed via redirects (SSRF protection) */
 const PRIVATE_IP_PATTERNS = [
@@ -264,6 +266,28 @@ async function resolveCrates(input: string): Promise<{ meta: Partial<ToolMeta>; 
   }
 }
 
+/** Resolve a local directory tool by reading its package.json */
+function resolveLocal(input: string): { meta: Partial<ToolMeta>; version?: string } {
+  const dir = resolve(input);
+  const pkgPath = join(dir, "package.json");
+  if (existsSync(pkgPath)) {
+    try {
+      const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+      return {
+        meta: {
+          name: pkg.name ?? basename(dir),
+          description: pkg.description,
+          tags: pkg.keywords ?? [],
+        },
+        version: pkg.version,
+      };
+    } catch {
+      // fall through to basename
+    }
+  }
+  return { meta: { name: basename(dir), tags: [] } };
+}
+
 /** Create a resolver instance */
 export function createResolver(): ToolResolver {
   return {
@@ -296,6 +320,10 @@ export function createResolver(): ToolResolver {
         const cratesResult = await resolveCrates(input);
         meta = cratesResult.meta;
         ref = cratesResult.version;
+      } else if (format === "local") {
+        const localResult = resolveLocal(input);
+        meta = localResult.meta;
+        ref = localResult.version;
       }
 
       return {

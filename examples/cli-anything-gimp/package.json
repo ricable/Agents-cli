@@ -1,0 +1,8 @@
+{
+  "name": "cli-anything-gimp",
+  "version": "0.1.0",
+  "description": "CLI wrapper for GIMP image editor with JSON output and batch processing",
+  "bin": {
+    "cli-anything-gimp": "./cli-anything-gimp"
+  }
+}

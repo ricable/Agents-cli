@@ -13,7 +13,7 @@ import { join } from "node:path";
 export interface CliTool {
   name: string;
   source: string;
-  sourceType: "github" | "npm" | "pypi";
+  sourceType: "github" | "npm" | "pypi" | "local";
   description: string;
   category: string;
   agentValue: string;
@@ -144,7 +144,7 @@ export const GENERAL_TOOLS: CliTool[] = [
   { name: "exiftool", source: "exiftool/exiftool", sourceType: "github", description: "Read, write, and edit file metadata", category: "file-processing", agentValue: "JSON output (-j), metadata across 400+ file formats" },
 
   // ── GUI Wrappers (CLI-Anything — auto-generated CLIs for GUI apps)
-  { name: "cli-anything-gimp", source: "cli-anything-gimp", sourceType: "pypi", description: "CLI wrapper for GIMP image editor with JSON output and batch processing", category: "gui-wrappers", agentValue: "Automate GIMP operations (resize, filter, convert) via structured CLI" },
+  { name: "cli-anything-gimp", source: "./examples/cli-anything-gimp", sourceType: "local", description: "CLI wrapper for GIMP image editor with JSON output and batch processing", category: "gui-wrappers", agentValue: "Automate GIMP operations (resize, filter, convert) via structured CLI" },
   { name: "cli-anything-blender", source: "cli-anything-blender", sourceType: "pypi", description: "CLI wrapper for Blender 3D modeling with JSON output", category: "gui-wrappers", agentValue: "Automate Blender renders, exports, and scene manipulation via CLI" },
   { name: "cli-anything-inkscape", source: "cli-anything-inkscape", sourceType: "pypi", description: "CLI wrapper for Inkscape vector graphics editor with JSON output", category: "gui-wrappers", agentValue: "Automate SVG editing, format conversion, and batch vector operations" },
   { name: "cli-anything-audacity", source: "cli-anything-audacity", sourceType: "pypi", description: "CLI wrapper for Audacity audio editor with JSON output", category: "gui-wrappers", agentValue: "Automate audio processing, format conversion, and effects via CLI" },
@@ -165,7 +165,7 @@ export const GENERAL_TOOLS: CliTool[] = [
 interface AiMlToolEntry {
   name: string;
   source: string;
-  sourceType: "github" | "npm" | "pypi";
+  sourceType: "github" | "npm" | "pypi" | "local";
   description: string;
   subcategory: string;
   agentValue: string;

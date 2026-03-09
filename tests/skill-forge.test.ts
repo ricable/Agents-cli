@@ -296,12 +296,12 @@ echo "help"
 
 // ── Curated tools: PyPI sourceType ─────────────────────────────────────
 
-describe("curated tools: pypi sourceType", () => {
-  it("gui-wrapper entries use sourceType 'pypi' not 'npm'", () => {
+describe("curated tools: gui-wrapper sourceTypes", () => {
+  it("gui-wrapper entries use sourceType 'pypi' or 'local'", () => {
     const guiWrappers = GENERAL_TOOLS.filter(t => t.category === "gui-wrappers");
     expect(guiWrappers.length).toBeGreaterThanOrEqual(8);
     for (const t of guiWrappers) {
-      expect(t.sourceType).toBe("pypi");
+      expect(["pypi", "local"]).toContain(t.sourceType);
     }
   });
 
@@ -309,20 +309,28 @@ describe("curated tools: pypi sourceType", () => {
     const guiWrappers = GENERAL_TOOLS.filter(t => t.category === "gui-wrappers");
     for (const t of guiWrappers) {
       expect(t.source).not.toMatch(/^pypi:/);
-      // Source is the bare package name
-      expect(t.source).toMatch(/^cli-anything-/);
     }
   });
 
-  it("pypi source format produces valid pypi: source string", () => {
+  it("pypi gui-wrappers produce valid pypi: source string, local ones pass through", () => {
     const guiWrappers = GENERAL_TOOLS.filter(t => t.category === "gui-wrappers");
     for (const t of guiWrappers) {
-      // The mode-curated.ts logic: sourceType === "pypi" → `pypi:${source}`
-      const formatted = `pypi:${t.source}`;
-      expect(formatted).toMatch(/^pypi:cli-anything-/);
-      // Must NOT produce double-prefix like npm:pypi:...
-      expect(formatted).not.toMatch(/^npm:/);
+      if (t.sourceType === "pypi") {
+        const formatted = `pypi:${t.source}`;
+        expect(formatted).toMatch(/^pypi:cli-anything-/);
+        expect(formatted).not.toMatch(/^npm:/);
+      } else if (t.sourceType === "local") {
+        // Local tools use path as source
+        expect(t.source).toMatch(/^\.\//);
+      }
     }
+  });
+
+  it("cli-anything-gimp is a local tool pointing to examples dir", () => {
+    const gimp = GENERAL_TOOLS.find(t => t.name === "cli-anything-gimp");
+    expect(gimp).toBeDefined();
+    expect(gimp!.sourceType).toBe("local");
+    expect(gimp!.source).toBe("./examples/cli-anything-gimp");
   });
 
   it("all existing non-gui tools still use github or npm sourceType", () => {
