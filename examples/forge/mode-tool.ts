@@ -72,18 +72,9 @@ export async function toolMode(args: CliArgs, startTime: number): Promise<void> 
 
   const quality = assessQuality(forged.skillMd, tool.meta.name);
 
-  // Persist chunks to domain DB (Gap 3)
-  if (!args.dryRun) {
-    try {
-      const domain = inferDomainFromTool(tool);
-      const persisted = await persistChunks(tool, domain);
-      if (persisted > 0) {
-        log(`  Persisted ${persisted} chunks to ${domain} DB`);
-      }
-    } catch (err) {
-      log(`  WARN: DB persistence failed (non-fatal): ${toErrorMessage(err)}`);
-    }
-  }
+  // Persist chunks to domain DB (Gap 3) — skip by default in single-tool mode
+  // as FTS inserts are extremely slow on large tables (68K+ rows).
+  // Use --index mode to rebuild the search DB instead.
 
   printResult(tool, forged, quality, args);
 

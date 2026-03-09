@@ -348,14 +348,28 @@ export async function persistChunks(tool: Tool, domain: string): Promise<number>
   const { upsertChunks } = await import("../../lib/db/sqlite.js");
 
   const domainDb = await getDomainDb(domain);
-  let totalPersisted = 0;
 
+  // Collect all chunks first, then upsert in batched transactions.
+  // FTS inserts are slow on large tables (68K+ rows), so cap total chunks
+  // to prevent multi-minute hangs on large repos.
+  const MAX_PERSIST_CHUNKS = 2000;
+  const allChunks: AstChunk[] = [];
   walkAndChunk(installDir, tool.meta.name, (chunks) => {
-    upsertChunks(domainDb, chunks);
-    totalPersisted += chunks.length;
+    if (allChunks.length < MAX_PERSIST_CHUNKS) {
+      allChunks.push(...chunks);
+    }
   });
 
-  return totalPersisted;
+  const toInsert = allChunks.slice(0, MAX_PERSIST_CHUNKS);
+  if (toInsert.length > 0) {
+    // Batch in groups of 200 to keep transactions manageable
+    const BATCH = 200;
+    for (let i = 0; i < toInsert.length; i += BATCH) {
+      upsertChunks(domainDb, toInsert.slice(i, i + BATCH));
+    }
+  }
+
+  return toInsert.length;
 }
 
 // ── Stage 6: Generate Compliant Skill Directory ────────────────────────
