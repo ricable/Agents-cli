@@ -507,8 +507,12 @@ export function forgeSkill(tool: Tool, opts: ForgeSkillOptions): ForgedSkill {
     }
   }
 
-  // Write files
+  // Write files — only create the directory if we have a valid SKILL.md
   if (!opts.dryRun) {
+    if (!directory.skillMd || directory.skillMd.trim().length < 50) {
+      log(`  SKIP: Skill generation produced empty/invalid SKILL.md for ${tool.meta.name}`);
+      return { dir: skillDir, skillMd: directory.skillMd, files, chunkStats };
+    }
     const resolvedSkillDir = resolve(skillDir);
     mkdirSync(resolvedSkillDir, { recursive: true });
     atomicWrite(join(resolvedSkillDir, "SKILL.md"), directory.skillMd);

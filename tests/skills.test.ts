@@ -709,7 +709,7 @@ describe("spec-compliant skill generation", () => {
       const tool = makeMockTool();
       const dir = generateSkillDirectory(tool);
       expect(dir.files["references/guide.md"]).toBeDefined();
-      expect(dir.files["references/guide.md"]).toContain("Usage Guide");
+      expect(dir.files["references/guide.md"]).toContain("Setup & Configuration Guide");
     });
 
     it("always produces references/examples.md", () => {

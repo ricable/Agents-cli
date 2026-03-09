@@ -160,15 +160,33 @@ describe("generateInstallScript", () => {
     const script = generateInstallScript(makeTool({
       source: { format: "npm", uri: "npm:express" },
     } as Partial<Tool>));
-    expect(script).toContain("npm install -g");
+    // Library (0 commands) → project-local install, not global
+    expect(script).toContain("npm install");
     expect(script).toContain("set -euo pipefail");
   });
 
-  it("generates uv install script for pypi tools", () => {
+  it("generates global npm install for CLI npm tools", () => {
+    const script = generateInstallScript(makeTool({
+      source: { format: "npm", uri: "npm:eslint" },
+      capabilities: { commands: [{ name: "lint", description: "lint", flags: [] }], globalFlags: [], rawHelp: "" },
+    } as Partial<Tool>));
+    expect(script).toContain("npm install -g");
+  });
+
+  it("generates uv install script for pypi CLI tools", () => {
     const script = generateInstallScript(makeTool({
       source: { format: "pypi", uri: "pypi:ruff" },
+      capabilities: { commands: [{ name: "check", description: "check", flags: [] }], globalFlags: [], rawHelp: "" },
     } as Partial<Tool>));
     expect(script).toContain("uv tool install");
+  });
+
+  it("generates pip install for pypi library tools", () => {
+    const script = generateInstallScript(makeTool({
+      source: { format: "pypi", uri: "pypi:requests" },
+    } as Partial<Tool>));
+    // Library (0 commands) → pip install, not uv tool install
+    expect(script).toContain("pip install");
   });
 
   it("generates cargo install script for crates tools", () => {
