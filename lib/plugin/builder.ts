@@ -292,7 +292,16 @@ export async function buildPlugins(opts?: BuildPluginsOptions): Promise<BuildPlu
   if (dryRun) {
     for (const [flatDomain, { entries }] of byDomain) {
       domains.push(flatDomain);
-      totalSkillsCopied += entries.length;
+      // Only count skills whose SKILL.md actually exists (match non-dry-run behavior)
+      if (skillsSourceDir) {
+        for (const entry of entries) {
+          if (fs.existsSync(path.join(skillsSourceDir, entry.name, "SKILL.md"))) {
+            totalSkillsCopied++;
+          }
+        }
+      } else {
+        totalSkillsCopied += entries.length;
+      }
     }
     return { pluginCount: byDomain.size, skillsCopied: totalSkillsCopied, domains };
   }

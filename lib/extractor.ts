@@ -19,7 +19,9 @@ export type CodeBlockPurpose = "install" | "config" | "usage" | "advanced" | "ou
 export function classifyCodeBlock(code: string, lang: string): CodeBlockPurpose {
   if (INSTALL_CMD_RE.test(code)) return "install";
   if (/^[\s]*[{[]/.test(code) && /^(json|yaml|yml|toml)$/i.test(lang)) return "config";
-  if (/^(\$|>|#.*output|expected)/m.test(code)) return "output";
+  // Output blocks: lines starting with ">" (blockquote), or containing "output"/"expected" markers
+  // Note: "$" is a shell prompt (input, not output) so we don't match it here
+  if (/^(>(?!\s*\w+)|#.*output|expected)/m.test(code)) return "output";
   // Usage: short (< 15 lines), has function calls or imports
   if (code.split("\n").length < 15 && /\b(import|from|require|const|let|var)\b/.test(code)) return "usage";
   return "advanced";

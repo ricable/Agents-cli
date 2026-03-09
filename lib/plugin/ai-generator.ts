@@ -188,11 +188,20 @@ export async function generateAgentMarkdown(
 
 /**
  * Generate agent defs (legacy JSON format) — wraps markdown generation.
+ * Note: AI-enhanced generation is handled by generateAgentMarkdown().
+ * This legacy wrapper uses pkgNames to build a richer default description
+ * but does not call the AI API (use generateAgentMarkdown for AI features).
  */
 export async function generateAgentDefs(
   domain: string,
-  _pkgNames: string[],
+  pkgNames: string[],
   _apiKey: string
 ): Promise<AgentDef[]> {
-  return [defaultAgentDef(domain)];
+  const def = defaultAgentDef(domain);
+  // Enrich description with package names when available
+  if (pkgNames.length > 0) {
+    const tools = pkgNames.slice(0, 5).join(", ");
+    def.description = `Search and retrieve ${domain} domain source code and documentation. Covers: ${tools}`;
+  }
+  return [def];
 }

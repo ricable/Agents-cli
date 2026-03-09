@@ -632,7 +632,13 @@ export interface ProcessBatchOptions {
   onProgress?: (label: string, completed: number, total: number, result: BatchResult | null) => void;
 }
 
-/** Race a promise against a timeout. Clears timer on resolve to prevent leaks. */
+/**
+ * Race a promise against a timeout. Clears timer on resolve to prevent leaks.
+ * Note: the underlying promise is NOT cancelled on timeout (JS has no promise
+ * cancellation). Timed-out operations may continue running in the background.
+ * For batch processing, this means a timed-out install/analyze may still hold
+ * resources until it completes or errors naturally.
+ */
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeoutPromise = new Promise<never>((_, reject) => {
@@ -689,7 +695,7 @@ export async function processBatch(items: BatchItem[], opts: ProcessBatchOptions
   const concurrency = opts.concurrency ?? 1;
 
   // Resume: load completed labels from checkpoint (only skip ok/cached, retry failed)
-  let doneLabels = new Set<string>();
+  const doneLabels = new Set<string>();
   if (opts.resumeFrom && existsSync(opts.resumeFrom)) {
     try {
       const lines = readFileSync(opts.resumeFrom, "utf-8").split("\n").filter(Boolean);
@@ -711,6 +717,7 @@ export async function processBatch(items: BatchItem[], opts: ProcessBatchOptions
 
   const processOne = async (item: BatchItem): Promise<void> => {
     log(`\n  ── Forging: ${item.label} ──`);
+    let progressResult: BatchResult | null = null;
     try {
       let tool = await withTimeout(
         resolveInstallAnalyze(item.source, opts.deep),
@@ -722,14 +729,12 @@ export async function processBatch(items: BatchItem[], opts: ProcessBatchOptions
         tool = enrichToolWithCuratedMeta(tool, item.curatedMeta);
       }
       const forged = forgeSkill(tool, { dryRun: false, noCache: opts.noCache, force: opts.force });
-      completed++;
       if (forged.skipped) {
         log(`  → CACHED (skipped)`);
         // Checkpoint even cached items
         if (opts.checkpointPath) {
           appendFileSync(opts.checkpointPath, JSON.stringify({ label: item.label, status: "cached", timestamp: new Date().toISOString() }) + "\n");
         }
-        opts.onProgress?.(item.label, completed, items.length, null);
         return;
       }
       const quality = assessQuality(forged.skillMd, tool.meta.name);
@@ -739,9 +744,8 @@ export async function processBatch(items: BatchItem[], opts: ProcessBatchOptions
       if (opts.checkpointPath) {
         appendFileSync(opts.checkpointPath, JSON.stringify({ label: item.label, status: "ok", timestamp: new Date().toISOString() }) + "\n");
       }
-      opts.onProgress?.(item.label, completed, items.length, { label: item.label, tool, forged, quality });
+      progressResult = { label: item.label, tool, forged, quality };
     } catch (err) {
-      completed++;
       const msg = toErrorMessage(err);
       failures.push({ label: item.label, error: msg });
       log(`  → SKIP: ${msg}`);
@@ -749,7 +753,9 @@ export async function processBatch(items: BatchItem[], opts: ProcessBatchOptions
       if (opts.checkpointPath) {
         appendFileSync(opts.checkpointPath, JSON.stringify({ label: item.label, status: "fail", error: msg, timestamp: new Date().toISOString() }) + "\n");
       }
-      opts.onProgress?.(item.label, completed, items.length, null);
+    } finally {
+      completed++;
+      opts.onProgress?.(item.label, completed, items.length, progressResult);
     }
   };
 

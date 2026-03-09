@@ -92,16 +92,18 @@ export function parseArgs(): CliArgs {
     else if (a === "--system")                { opts.system = true; }
     // Batch processing
     else if (a === "--timeout" && argv[i+1])  {
-      const parsed = parseInt(argv[++i]!, 10);
+      const val = argv[++i]!;
+      const parsed = parseInt(val, 10);
       if (Number.isNaN(parsed) || parsed < 1000) {
-        throw new Error(`Invalid --timeout value: "${argv[i]}" (must be >= 1000ms)`);
+        throw new Error(`Invalid --timeout value: "${val}" (must be >= 1000ms)`);
       }
       opts.timeout = parsed;
     }
     else if (a === "--concurrency" && argv[i+1]) {
-      const parsed = parseInt(argv[++i]!, 10);
+      const val = argv[++i]!;
+      const parsed = parseInt(val, 10);
       if (Number.isNaN(parsed) || parsed < 1 || parsed > 16) {
-        throw new Error(`Invalid --concurrency value: "${argv[i]}" (must be 1-16)`);
+        throw new Error(`Invalid --concurrency value: "${val}" (must be 1-16)`);
       }
       opts.concurrency = parsed;
     }

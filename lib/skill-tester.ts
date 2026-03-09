@@ -140,7 +140,7 @@ export function scoreContentQuality(skillMd: string): { score: number; issues: s
     score -= 3;
     issues.push("Contains fabricated Client() constructor");
   }
-  if (/new\s+\w+\(\)/.test(skillMd) && !/new\s+(Date|Error|Map|Set|URL|RegExp|Promise)\b/.test(skillMd)) {
+  if (/new\s+\w+\(\)/.test(skillMd) && !/new\s+(Date|Error|Map|Set|URL|RegExp|Promise|Anthropic|OpenAI|Client|Server|EventEmitter|Buffer|Stream|Worker|WebSocket)\b/.test(skillMd)) {
     score -= 2;
     issues.push("Contains fabricated constructor pattern");
   }

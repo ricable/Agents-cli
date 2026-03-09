@@ -33,11 +33,13 @@ export async function pluginMode(args: CliArgs, startTime: number): Promise<void
 
   log(`  Found ${entries.length} skills across ${new Set(entries.map(e => e.domain)).size} domains`);
 
-  // Write temporary manifest (needed even for dry-run to count)
   const manifestPath = resolve(OUTPUT_DIR, "skills-manifest.json");
   const pluginsDir = resolve(OUTPUT_DIR, "..", "plugins");
 
-  atomicWrite(manifestPath, JSON.stringify({ repos: entries }, null, 2));
+  // Only write manifest when not in dry-run mode
+  if (!args.dryRun) {
+    atomicWrite(manifestPath, JSON.stringify({ repos: entries }, null, 2));
+  }
 
   // P1: pass dryRun into buildPlugins itself
   const result = await buildPlugins({
@@ -52,7 +54,6 @@ export async function pluginMode(args: CliArgs, startTime: number): Promise<void
   if (args.dryRun) {
     log(`  Would write ${result.pluginCount} plugins (${result.skillsCopied} skills) to: ${pluginsDir}/`);
   } else {
-    mkdirSync(pluginsDir, { recursive: true });
     log(`  Plugins written to: ${pluginsDir}/`);
     log(`  ${result.pluginCount} plugins, ${result.skillsCopied} skills copied`);
   }

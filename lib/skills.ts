@@ -873,7 +873,7 @@ function buildDescription(tool: Tool): string {
     if (matchCount < 2 && curated) {
       // Prefer curated category triggers over generic "running X commands"
       // Refine broad categories (python/javascript) based on tool description
-      const catKey = refineCategoryFromDescription(curated.category.toLowerCase(), effectiveDesc, tool);
+      const catKey = refineCategoryFromDescription(curated.category.toLowerCase(), enrichedDesc, tool);
       const catTriggers = CATEGORY_ACTION_MAP[catKey];
       if (catTriggers) {
         // Replace weak triggers with category-specific ones
@@ -887,7 +887,7 @@ function buildDescription(tool: Tool): string {
     }
   } else if (curated) {
     // Refine broad categories (python/javascript) based on tool description
-    const catKey = refineCategoryFromDescription(curated.category.toLowerCase(), effectiveDesc, tool);
+    const catKey = refineCategoryFromDescription(curated.category.toLowerCase(), enrichedDesc, tool);
     const catTriggers = CATEGORY_ACTION_MAP[catKey] ?? null;
     if (catTriggers) {
       // Template tool name into category triggers for uniqueness
@@ -957,7 +957,7 @@ function buildDescription(tool: Tool): string {
   // Add negative trigger ("Do NOT use for") for +0.2 score boost
   let negativeTrigger = "";
   const curatedCat = curated?.category?.toLowerCase();
-  const refinedCat = curatedCat ? refineCategoryFromDescription(curatedCat, effectiveDesc, tool) : undefined;
+  const refinedCat = curatedCat ? refineCategoryFromDescription(curatedCat, enrichedDesc, tool) : undefined;
   const domainCat = (cachedDomain ?? inferDomain(tool)).category;
   // Try refined curated category first, then raw curated, then inferred domain
   const negKey = (refinedCat && DOMAIN_NEGATIVE_TRIGGERS[refinedCat])
