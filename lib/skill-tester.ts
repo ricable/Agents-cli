@@ -119,7 +119,58 @@ export function scoreSkillDescription(description: string): number {
   const techLangs = /\b(python|rust|javascript|typescript|go|java|ruby|c\+\+|swift|kotlin|node\.js|react|vue|docker|kubernetes)\b/i;
   if (techLangs.test(description)) score += 1;
 
+  // Penalty for fabricated content patterns
+  if (/\.Client\(\)/.test(description)) score -= 2;
+  if (/new\s+\w+\(\)/.test(description)) score -= 1;
+
   return Math.max(1, Math.min(10, score));
+}
+
+/**
+ * Score content quality of a SKILL.md (advisory, not gate-blocking).
+ * Checks for fabricated patterns, meaningful examples, and real content.
+ */
+export function scoreContentQuality(skillMd: string): { score: number; issues: string[] } {
+  const issues: string[] = [];
+  let score = 10;
+
+  // Check for fabricated Client() constructors
+  if (/\.Client\(\)/.test(skillMd)) {
+    score -= 3;
+    issues.push("Contains fabricated Client() constructor");
+  }
+  if (/new\s+\w+\(\)/.test(skillMd) && !/new\s+(Date|Error|Map|Set|URL|RegExp|Promise)\b/.test(skillMd)) {
+    score -= 2;
+    issues.push("Contains fabricated constructor pattern");
+  }
+
+  // Check Quick Start has real usage (not just --help/--version)
+  const quickStartMatch = skillMd.match(/## Quick Start[\s\S]*?(?=\n## |$)/);
+  if (quickStartMatch) {
+    const qs = quickStartMatch[0];
+    const hasRealUsage = /```[\s\S]*?```/.test(qs) &&
+      !(/^[^`]*--help[^`]*$/.test(qs) && qs.split("```").length <= 3);
+    if (!hasRealUsage) {
+      score -= 1;
+      issues.push("Quick Start only has --help/--version (no real usage)");
+    }
+  }
+
+  // Check that code examples exist
+  const codeBlocks = skillMd.match(/```[\s\S]*?```/g) ?? [];
+  if (codeBlocks.length < 2) {
+    score -= 1;
+    issues.push("Fewer than 2 code examples");
+  }
+
+  // Check references directory content is substantial
+  const referenceHeaders = (skillMd.match(/^## /gm) ?? []).length;
+  if (referenceHeaders < 2) {
+    score -= 1;
+    issues.push("Fewer than 2 content sections");
+  }
+
+  return { score: Math.max(1, score), issues };
 }
 
 /**
@@ -156,7 +207,7 @@ export function scoreTrigger(description: string): number {
   // Structured "Use when X, Y, Z" with multiple comma-separated triggers
   // Use a regex that stops at ". <Uppercase>" (next sentence) or end, not at dots
   // within tech terms like nltk.word_tokenize or @0.20.0
-  const useWhenMatch = description.match(/use when (.+?)(?:\.\s+[A-Z]|\.\s*$)/i);
+  const useWhenMatch = description.match(/use when (.+?)(?:\.\s+[A-Z]|\.\s*$|$)/i);
   if (useWhenMatch && useWhenMatch[1] && useWhenMatch[1].split(",").length >= 2) {
     score += 0.1;
   }
@@ -224,12 +275,12 @@ export function testSkillSync(skillPath: string, preloadedContent?: string): Ski
  * Check if a SKILL.md content's domain field matches a filter string.
  * Handles quoted values, substring matches (e.g. "agent" matches "ai-ml/ai-agents").
  */
-function domainMatches(content: string, filter: string): boolean {
+export function domainMatches(content: string, filter: string): boolean {
   const match = content.match(/^domain:\s*["']?([^"'\n]+)["']?\s*$/m);
   if (!match) return false;
   const domain = match[1]!.trim().toLowerCase();
   const f = filter.toLowerCase();
-  return domain === f || domain.includes(f) || f.includes(domain);
+  return domain === f || domain.includes(f);
 }
 
 /**

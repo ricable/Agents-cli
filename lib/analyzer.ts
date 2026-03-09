@@ -101,6 +101,9 @@ function parseCommands(helpText: string): ToolCommand[] {
   return commands;
 }
 
+/** Flags that leak from agents-cli's own analyzer into probed tool output */
+const ANALYZER_GHOST_FLAGS = new Set(["--json", "--root-dir", "--output-format", "--data-dir"]);
+
 /** Parse global flags from help output */
 function parseFlags(helpText: string): ToolFlag[] {
   const flags: ToolFlag[] = [];
@@ -118,7 +121,7 @@ function parseFlags(helpText: string): ToolFlag[] {
         continue;
       }
       const flag = parseFlag(line);
-      if (flag) flags.push(flag);
+      if (flag && !ANALYZER_GHOST_FLAGS.has(flag.name)) flags.push(flag);
     }
   }
   return flags;
@@ -261,15 +264,48 @@ function resolveBinFromPkg(dir: string, bin: Record<string, string> | string | u
   return null;
 }
 
-/** Patterns for standard venv scripts to exclude from binary discovery */
-const VENV_EXCLUDE = /^(python[0-9.]*|pip[0-9.]*|activate.*|easy_install[0-9.]*|wheel|setuptools)$/;
+/** Patterns for standard venv scripts/dependency binaries to exclude from binary discovery */
+const VENV_EXCLUDE = /^(python[0-9.]*|pip[0-9.]*|activate.*|easy_install[0-9.]*|wheel|setuptools|f2py[0-9.]*|cython(ize)?[0-9.]*|nosetests|py\.test|chardetect|normalizer|markdown_py|pygmentize|2to3[0-9.]*|idle[0-9.]*|jsonschema|httpx|uvicorn|gunicorn|flask|celery|sphinx-[a-z]+|pydoc[0-9.]*|isort|dmypy|mypy(c)?|stubgen|stubtest|pyflakes|pycodestyle|pep8|flake8|autopep8|yapf|black(d)?|coverage|pytest|py\.test|tox|nox|virtualenv|ipython[0-9.]*|jupyter[a-z-]*|pybabel|mako-render|alembic|dulwich|rst2[a-z]+\.py|docutils|tabulate|distro|dotenv|identify|cfgv|pre-commit|nodeenv)$/;
 
-/** Try to find the main binary in a tool directory */
-export function findMainBinary(toolDir: string): string | null {
+/**
+ * Try to find the main binary in a tool directory.
+ *
+ * @param toolDir - The tool's installation directory
+ * @param preferName - Optional tool name to prefer when scanning .venv/bin/.
+ *   When provided, the function first checks for an executable matching this
+ *   name (and common variants like hyphenated forms) before falling back to
+ *   the first non-excluded executable alphabetically. This prevents picking
+ *   dependency binaries (e.g. `f2py` instead of `gradio`).
+ */
+export function findMainBinary(toolDir: string, preferName?: string): string | null {
   // Check .venv/bin/ for PyPI-installed tools
   const venvBinDir = join(toolDir, ".venv", "bin");
   if (existsSync(venvBinDir)) {
     try {
+      // Preference pass: check for binary matching the tool name first
+      if (preferName) {
+        const lower = preferName.toLowerCase();
+        const candidates = new Set([
+          preferName,                           // exact: "gradio"
+          lower,                                // lowercase: "CrewAI" → "crewai"
+          preferName.replace(/[._]/g, "-"),     // normalize: "label_studio" → "label-studio"
+          preferName.replace(/-/g, "_"),         // reverse: "label-studio" → "label_studio"
+          lower.replace(/^python-/, ""),         // strip python- prefix
+          lower.replace(/^py-/, ""),             // strip py- prefix
+          lower.replace(/-cli$/, ""),            // strip -cli suffix
+          lower.replace(/_/g, "-"),              // underscores→hyphens
+          lower.replace(/-/g, "_"),              // hyphens→underscores
+        ]);
+        for (const name of candidates) {
+          const full = join(venvBinDir, name);
+          try {
+            const st = statSync(full);
+            if (st.isFile() && (st.mode & 0o111)) return full;
+          } catch { /* not found, try next */ }
+        }
+      }
+
+      // Fallback: first non-excluded executable (original behavior)
       for (const entry of readdirSync(venvBinDir)) {
         if (VENV_EXCLUDE.test(entry)) continue;
         const full = join(venvBinDir, entry);

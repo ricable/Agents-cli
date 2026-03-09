@@ -13,7 +13,7 @@ import { join } from "node:path";
 export interface CliTool {
   name: string;
   source: string;
-  sourceType: "github" | "npm" | "pypi" | "local";
+  sourceType: "github" | "npm" | "pypi" | "crates" | "local";
   description: string;
   category: string;
   agentValue: string;

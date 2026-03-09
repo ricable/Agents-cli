@@ -316,7 +316,7 @@ examples/
   cli-anything-gimp/       — local Python CLI tool (Pillow image ops, --json output, 6 subcommands)
   regenerate-skills.ts     — batch regeneration of existing skills (reads tools.json, no re-download)
   chunker-demo.ts          — AST chunking demonstration
-  generated-skills/        — 393+ auto-generated skill directories (all at trigger score 1.0)
+  generated-skills/        — auto-generated skill directories (trigger score ≥ 0.80)
   generated-workflows/     — template-generated agent code
 tests/
   skills.test.ts, resolver.test.ts, guards.test.ts, analyzer.test.ts,

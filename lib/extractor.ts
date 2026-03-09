@@ -10,8 +10,11 @@ import { join, relative } from "node:path";
 import type { ManifestEntry, PackageAnalysis, ExportGroup, ReadmeSections } from "./types.js";
 export type { ReadmeSections } from "./types.js";
 
-/** Regex that matches common package manager install commands */
-export const INSTALL_CMD_RE = /^\$?\s*(pip|npm|brew|cargo|go|apt|yum|dnf|scoop|choco|winget|port|snap|flatpak|pacman|emerge|nix-env|conda|zypper|apk|pkg|sudo\s+\w+)\s+(install|add|get|--install|-S)\b/;
+/** Regex that matches common package manager install commands and setup patterns */
+export const INSTALL_CMD_RE = /^\$?\s*(pip|npm|brew|cargo|go|apt|yum|dnf|scoop|choco|winget|port|snap|flatpak|pacman|emerge|nix-env|conda|zypper|apk|pkg|sudo\s+\w+)\s+(install|add|get|--install|-S)\b|^\$?\s*curl\s+.*\|\s*(ba)?sh|^\$?\s*(docker\s+pull|wget\s+|git\s+clone|cmake\s+|make\s+install|gem\s+install|cpan\s+install|uv\s+(pip\s+install|add))\b/;
+
+/** Regex that matches BibTeX/academic citation blocks */
+const CITATION_RE = /^\s*@(?:inproceedings|article|misc|book|techreport|phdthesis|mastersthesis)\s*\{/m;
 
 // ── README helpers ───────────────────────────────────────────────────────
 
@@ -59,7 +62,6 @@ export function isActualCode(code: string, lang: string): boolean {
     "swift", "kotlin", "scala", "r", "powershell", "ps1", "fish", "elixir", "haskell"]);
 
   // Filter out BibTeX/academic citation blocks
-  const CITATION_RE = /^\s*@(?:inproceedings|article|misc|book|techreport|phdthesis|mastersthesis)\s*\{/m;
   if (CITATION_RE.test(code)) return false;
 
   // Filter out trivial single-line install commands (e.g. `$ brew install foo`)
@@ -114,9 +116,19 @@ export function cleanMarkdownSection(text: string): string {
 export function extractCommandsFromReadme(
   readme: string,
   toolName: string,
+  binaryNames?: string[],
 ): Array<{ name: string; description: string }> {
   const commands: Array<{ name: string; description: string }> = [];
   const seen = new Set<string>();
+
+  // Build list of names to search for (tool name + binary names)
+  const namesToSearch = [toolName];
+  if (binaryNames) {
+    for (const bn of binaryNames) {
+      if (!namesToSearch.includes(bn)) namesToSearch.push(bn);
+    }
+  }
+
   const lines = readme.split("\n");
 
   let insideCodeBlock = false;
@@ -138,21 +150,24 @@ export function extractCommandsFromReadme(
       prevComment = trimmed.replace(/^#+\s*/, "").trim();
       continue;
     }
-    // Match command lines: $ tool subcommand or tool subcommand
-    const cmdMatch = trimmed.match(new RegExp(`^\\$?\\s*${escapeRegex(toolName)}\\s+(\\S+)`));
-    if (cmdMatch) {
-      const subcmd = cmdMatch[1]!;
-      // Skip flags, file paths, special chars, and very short tokens
-      if (subcmd.startsWith("-") || subcmd.includes("/") || subcmd.includes(".")) continue;
-      if (subcmd.length < 2 || /^[^a-zA-Z]/.test(subcmd)) continue;
-      if (/^[…>|&]/.test(subcmd)) continue;
-      // Skip common shell redirection artifacts
-      if (["2>/dev/null", ">", ">>", "|", "&&", "||"].includes(subcmd)) continue;
-      if (!seen.has(subcmd)) {
-        seen.add(subcmd);
-        commands.push({ name: subcmd, description: prevComment || subcmd });
+    // Match command lines using any of the tool/binary names
+    for (const searchName of namesToSearch) {
+      const cmdMatch = trimmed.match(new RegExp(`^\\$?\\s*${escapeRegex(searchName)}\\s+(\\S+)`));
+      if (cmdMatch) {
+        const subcmd = cmdMatch[1]!;
+        // Skip flags, file paths, special chars, and very short tokens
+        if (subcmd.startsWith("-") || subcmd.includes("/") || subcmd.includes(".")) continue;
+        if (subcmd.length < 2 || /^[^a-zA-Z]/.test(subcmd)) continue;
+        if (/^[…>|&]/.test(subcmd)) continue;
+        // Skip common shell redirection artifacts
+        if (["2>/dev/null", ">", ">>", "|", "&&", "||"].includes(subcmd)) continue;
+        if (!seen.has(subcmd)) {
+          seen.add(subcmd);
+          commands.push({ name: subcmd, description: prevComment || subcmd });
+        }
+        prevComment = "";
+        break; // found match with this name, no need to try others
       }
-      prevComment = "";
     }
   }
   return commands.slice(0, 10);

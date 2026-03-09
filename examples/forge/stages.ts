@@ -28,7 +28,7 @@ import {
   generateRichSkillMd,
   generateSkillDirectory,
   installTool,
-
+  isLikelyCli,
 } from "../../lib/skills.js";
 
 // Skill content
@@ -210,7 +210,7 @@ export async function resolveInstallAnalyze(
 
   if (deep && tool.capabilities.commands.length > 0) {
     log(`  [3/3] Deep probing subcommands...`);
-    cachedBin = findMainBinary(installDir);
+    cachedBin = findMainBinary(installDir, tool.meta.name);
     if (cachedBin) {
       const probed = deepProbe(cachedBin, { maxDepth: 3 });
       (tool as { capabilities: typeof tool.capabilities }).capabilities = {
@@ -240,6 +240,10 @@ export async function resolveInstallAnalyze(
     }
   }
 
+  // Set _toolKind for template selection in skill generation
+  const toolKind = (tool.capabilities.commands.length > 0 || isLikelyCli(tool)) ? "cli" : "library";
+  (tool as { _toolKind?: string })._toolKind = toolKind;
+
   return tool;
 }
 
@@ -256,7 +260,7 @@ export interface SmokeTestResult {
  *  Reuses rawHelp from analyzer when available to avoid redundant process spawns. */
 export function smokeTest(tool: Tool, installDir: string, cachedBin?: string | null): SmokeTestResult {
   const result: SmokeTestResult = { versionOk: false, helpOk: false, commandsVerified: 0, commandsFailed: 0 };
-  const bin = cachedBin ?? findMainBinary(installDir);
+  const bin = cachedBin ?? findMainBinary(installDir, tool.meta.name);
   if (!bin) return result;
 
   const TIMEOUT = 2000;
@@ -390,9 +394,12 @@ export function forgeSkill(tool: Tool, opts: ForgeSkillOptions): ForgedSkill {
   const rSha = getRepoHeadSha(installDir);
 
   // Cache check (Gap 1)
+  // Treat "unknown" repoSha as a cache miss — PyPI/npm installs always return
+  // "unknown" from getRepoHeadSha(), so "unknown" === "unknown" would falsely
+  // cache-hit and prevent regeneration of stale skills.
   if (cache && !opts.force && manifestEntry) {
     const cached = cache.get(tool.meta.name);
-    if (cached && cached.manifestHash === mHash && cached.repoSha === rSha) {
+    if (cached && cached.manifestHash === mHash && cached.repoSha === rSha && rSha !== "unknown") {
       log(`  → Cache hit: ${tool.meta.name} (skipping regeneration)`);
       return {
         dir: skillDir,
@@ -414,19 +421,10 @@ export function forgeSkill(tool: Tool, opts: ForgeSkillOptions): ForgedSkill {
         (tool as { _readmeSections?: typeof sections })._readmeSections = sections;
 
         // If analyzer found 0 commands, try extracting from README code blocks
-        // Try both the tool name and inferred binary names (e.g. "rg" for ripgrep)
+        // Pass both tool name and inferred binary names (e.g. "rg" for ripgrep)
         if (tool.capabilities.commands.length === 0) {
-          const namesToTry = [tool.meta.name, ...inferBinaryNames(installDir)];
-          const seen = new Set<string>();
-          const allCommands: Array<{ name: string; description: string }> = [];
-          for (const name of namesToTry) {
-            if (seen.has(name)) continue;
-            seen.add(name);
-            const cmds = extractCommandsFromReadme(readme, name);
-            for (const c of cmds) {
-              if (!allCommands.some(x => x.name === c.name)) allCommands.push(c);
-            }
-          }
+          const binNames = inferBinaryNames(installDir);
+          const allCommands = extractCommandsFromReadme(readme, tool.meta.name, binNames);
           if (allCommands.length > 0) {
             const synthCommands = allCommands.map(c => ({
               name: c.name,

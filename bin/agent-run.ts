@@ -81,7 +81,7 @@ export async function runTool(
   }
 
   // Find executable using the shared analyzer logic (supports monorepos)
-  const binPath = findMainBinary(installDir);
+  const binPath = findMainBinary(installDir, tool.meta.name);
   if (!binPath) {
     return {
       success: false,

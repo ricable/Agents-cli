@@ -12,12 +12,99 @@ import { OUTPUT_DIR } from "./types.js";
 import { log, fmtTable } from "./helpers.js";
 import { processBatch, buildIndexes } from "./stages.js";
 
+/**
+ * Override map: GitHub repos → package manager source for better skill quality.
+ *
+ * GitHub sources produce 0 commands because the analyzer can't run uncompiled
+ * binaries. Using the correct package manager prefix (pypi:/npm:/crates:) lets
+ * the installer install the actual package so the analyzer can run --help and
+ * detect real commands.
+ *
+ * Format: "owner/repo" → "prefix:package-name"
+ */
+const GITHUB_TO_PKG: Record<string, string> = {
+  // Python CLI tools (pypi)
+  "astral-sh/uv": "pypi:uv",
+  "astral-sh/ruff": "pypi:ruff",
+  "httpie/cli": "pypi:httpie",
+  "commitizen-tools/commitizen": "pypi:commitizen",
+  "wireservice/csvkit": "pypi:csvkit",
+  "pre-commit/pre-commit": "pypi:pre-commit",
+  "pypa/pipx": "pypi:pipx",
+  "aws/aws-cli": "pypi:awscli",
+  "pytest-dev/pytest": "pypi:pytest",
+  "wandb/wandb": "pypi:wandb",
+  "gradio-app/gradio": "pypi:gradio",
+  "aimhubio/aim": "pypi:aim",
+  "HumanSignal/label-studio": "pypi:label-studio",
+  "langfuse/langfuse": "pypi:langfuse",
+  "argilla-io/argilla": "pypi:argilla",
+  "spotify/annoy": "pypi:annoy",
+  "SeldonIO/alibi-detect": "pypi:alibi-detect",
+  "automl/auto-sklearn": "pypi:auto-sklearn",
+  "facebookresearch/audiocraft": "pypi:audiocraft",
+  "intel/auto-round": "pypi:auto-round",
+  "agno-agi/agno": "pypi:agno",
+  "BerriAI/litellm": "pypi:litellm",
+  "protectai/llm-guard": "pypi:llm-guard",
+  "paul-gauthier/aider": "pypi:aider-chat",
+  "Chainlit/chainlit": "pypi:chainlit",
+  "crewAIInc/crewAI": "pypi:crewai",
+  "vllm-project/vllm": "pypi:vllm",
+  "huggingface/transformers": "pypi:transformers",
+  "huggingface/diffusers": "pypi:diffusers",
+  "huggingface/datasets": "pypi:datasets",
+  "huggingface/accelerate": "pypi:accelerate",
+  "huggingface/tokenizers": "pypi:tokenizers",
+  "bentoml/BentoML": "pypi:bentoml",
+  "mlflow/mlflow": "pypi:mlflow",
+  "ray-project/ray": "pypi:ray",
+  "Lightning-AI/pytorch-lightning": "pypi:pytorch-lightning",
+  "PaddlePaddle/PaddleOCR": "pypi:paddleocr",
+  "explosion/spaCy": "pypi:spacy",
+  "facebookresearch/detectron2": "pypi:detectron2",
+  "deepset-ai/haystack": "pypi:farm-haystack",
+  "mitmproxy/mitmproxy": "pypi:mitmproxy",
+  "psf/black": "pypi:black",
+  "PyCQA/isort": "pypi:isort",
+  "python-poetry/poetry": "pypi:poetry",
+
+  // Rust CLI tools (crates)
+  "BurntSushi/ripgrep": "crates:ripgrep",
+  "sharkdp/bat": "crates:bat",
+  "sharkdp/fd": "crates:fd-find",
+  "sharkdp/hyperfine": "crates:hyperfine",
+  "eza-community/eza": "crates:eza",
+  "dandavison/delta": "crates:git-delta",
+  "XAMPPRocky/tokei": "crates:tokei",
+  "tomnomnom/gron": "crates:gron",
+  "ducaale/xh": "crates:xh",
+  "dbrgn/tealdeer": "crates:tealdeer",
+  "watchexec/watchexec": "crates:watchexec-cli",
+  "casey/just": "crates:just",
+  "jdx/mise": "crates:mise",
+  "ajeetdsouza/zoxide": "crates:zoxide",
+  "ast-grep/ast-grep": "npm:@ast-grep/cli",
+
+  // npm CLI tools
+  "vercel/turbo": "npm:turbo",
+  "evanw/esbuild": "npm:esbuild",
+  "nicolo-ribaudo/biome": "npm:@biomejs/biome",
+};
+
 /** Format a curated tool's source into a prefixed source string for the resolver. */
 function formatSource(meta: CliTool): string {
+  // Check override map for GitHub tools that have package manager releases
+  if (meta.sourceType === "github") {
+    const override = GITHUB_TO_PKG[meta.source];
+    if (override) return override;
+  }
+
   switch (meta.sourceType) {
     case "local": return meta.source;
     case "npm": return meta.source.startsWith("@") ? meta.source : `npm:${meta.source}`;
     case "pypi": return `pypi:${meta.source}`;
+    case "crates": return `crates:${meta.source}`;
     case "github": return meta.source;
     default: {
       // Exhaustiveness check — compile error if a new sourceType is added without handling
@@ -136,9 +223,11 @@ export async function curatedMode(args: CliArgs, startTime: number): Promise<voi
     onProgress,
   });
 
-  if (results.length > 0) {
+  if (results.length > 0 && !args.noIndex) {
     log("\n  Building indexes...");
     await buildIndexes(results.map(r => r.tool), false);
+  } else if (args.noIndex) {
+    log("\n  Skipping index build (--no-index). Run --index separately after batch completes.");
   }
 
   log("\n  ═══════════════════════════════════════════════════════");

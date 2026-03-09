@@ -45,6 +45,47 @@ describe("findMainBinary", () => {
   it("returns null when nothing found", () => {
     expect(findMainBinary(tmpDir)).toBeNull();
   });
+
+  it("prefers binary matching preferName in .venv/bin/", () => {
+    // Simulate a PyPI venv with multiple executables (f2py comes before gradio alphabetically)
+    const venvBin = join(tmpDir, ".venv", "bin");
+    mkdirSync(venvBin, { recursive: true });
+    for (const name of ["f2py", "gradio", "uvicorn", "tqdm"]) {
+      const p = join(venvBin, name);
+      writeFileSync(p, "#!/usr/bin/env python3\n");
+      chmodSync(p, 0o755);
+    }
+
+    // Without preferName: f2py is excluded by VENV_EXCLUDE, gradio is first non-excluded
+    expect(findMainBinary(tmpDir)).toBe(join(venvBin, "gradio"));
+
+    // With preferName: picks gradio
+    expect(findMainBinary(tmpDir, "gradio")).toBe(join(venvBin, "gradio"));
+  });
+
+  it("preferName falls back to first executable when name not found", () => {
+    const venvBin = join(tmpDir, ".venv", "bin");
+    mkdirSync(venvBin, { recursive: true });
+    const p = join(venvBin, "some-tool");
+    writeFileSync(p, "#!/usr/bin/env python3\n");
+    chmodSync(p, 0o755);
+
+    // preferName doesn't match any binary — falls back to first executable
+    expect(findMainBinary(tmpDir, "nonexistent")).toBe(join(venvBin, "some-tool"));
+  });
+
+  it("preferName normalizes hyphens and underscores", () => {
+    const venvBin = join(tmpDir, ".venv", "bin");
+    mkdirSync(venvBin, { recursive: true });
+    for (const name of ["aaa-dep", "label-studio"]) {
+      const p = join(venvBin, name);
+      writeFileSync(p, "#!/usr/bin/env python3\n");
+      chmodSync(p, 0o755);
+    }
+
+    // Underscore variant matches hyphenated binary
+    expect(findMainBinary(tmpDir, "label_studio")).toBe(join(venvBin, "label-studio"));
+  });
 });
 
 describe("createAnalyzer", () => {
@@ -176,5 +217,79 @@ describe("detectInteractionMode", () => {
   it("is case-insensitive for command name matching", () => {
     expect(detectInteractionMode([cmd("Shell")], [])).toBe("repl");
     expect(detectInteractionMode([cmd("REPL")], [])).toBe("repl");
+  });
+});
+
+describe("VENV_EXCLUDE expanded patterns", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "agents-cli-venv-"));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("excludes common dependency binaries (f2py, pygmentize, etc.)", () => {
+    const venvBin = join(tmpDir, ".venv", "bin");
+    mkdirSync(venvBin, { recursive: true });
+    // Add dependency binaries that should be excluded
+    for (const dep of ["f2py", "pygmentize", "chardetect", "normalizer", "isort", "black", "pytest"]) {
+      const p = join(venvBin, dep);
+      writeFileSync(p, "#!/usr/bin/env python3\n");
+      chmodSync(p, 0o755);
+    }
+    // Add the real tool binary
+    const real = join(venvBin, "my-actual-tool");
+    writeFileSync(real, "#!/usr/bin/env python3\n");
+    chmodSync(real, 0o755);
+
+    // Without preferName, should skip all excluded and find my-actual-tool
+    expect(findMainBinary(tmpDir)).toBe(real);
+  });
+
+  it("preferName strips python- prefix", () => {
+    const venvBin = join(tmpDir, ".venv", "bin");
+    mkdirSync(venvBin, { recursive: true });
+    const p = join(venvBin, "dotenv");
+    writeFileSync(p, "#!/usr/bin/env python3\n");
+    chmodSync(p, 0o755);
+
+    expect(findMainBinary(tmpDir, "python-dotenv")).toBe(p);
+  });
+
+  it("preferName strips -cli suffix", () => {
+    const venvBin = join(tmpDir, ".venv", "bin");
+    mkdirSync(venvBin, { recursive: true });
+    const p = join(venvBin, "myapp");
+    writeFileSync(p, "#!/usr/bin/env python3\n");
+    chmodSync(p, 0o755);
+
+    expect(findMainBinary(tmpDir, "myapp-cli")).toBe(p);
+  });
+
+  it("ghost flags are filtered from analyzer output", async () => {
+    const script = join(tmpDir, "tool.sh");
+    writeFileSync(script, `#!/bin/bash
+if [ "$1" = "--help" ]; then
+  echo "Usage: tool [options]"
+  echo ""
+  echo "Options:"
+  echo "  --json         JSON output (ghost flag)"
+  echo "  --root-dir     Root directory (ghost flag)"
+  echo "  --verbose      Enable verbose mode"
+  echo "  --output       Output file"
+fi
+`);
+    chmodSync(script, 0o755);
+
+    const analyzer = createAnalyzer();
+    const result = await analyzer.analyze(script, { timeout: 5000 });
+    const flagNames = result.globalFlags.map(f => f.name);
+    expect(flagNames).not.toContain("--json");
+    expect(flagNames).not.toContain("--root-dir");
+    expect(flagNames).toContain("--verbose");
+    expect(flagNames).toContain("--output");
   });
 });

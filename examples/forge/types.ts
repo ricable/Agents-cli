@@ -67,6 +67,8 @@ export interface CliArgs {
   timeout: number;
   concurrency: number;
   resume: string;
+  // Skip index/chunk persistence during batch
+  noIndex: boolean;
 }
 
 export interface ChunkStats {

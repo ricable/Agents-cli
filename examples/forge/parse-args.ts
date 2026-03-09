@@ -25,6 +25,7 @@ export function parseArgs(): CliArgs {
     timeout: 300000,
     concurrency: 1,
     resume: "",
+    noIndex: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -77,6 +78,7 @@ export function parseArgs(): CliArgs {
     else if (a === "--pkg" && argv[i+1])      { opts.pkg = argv[++i]!; }
     // Index
     else if (a === "--index")                 { opts.index = true; }
+    else if (a === "--no-index")              { opts.noIndex = true; }
     // Plugin
     else if (a === "--plugin")                { opts.plugin = true; }
     else if (a === "--agent-defs")            { opts.agentDefs = true; }

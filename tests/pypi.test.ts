@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { detectFormat, createResolver, parsePypiPackage } from "../lib/resolver.js";
+import { detectFormat, createResolver, parsePypiPackage, normalizePypiLicense } from "../lib/resolver.js";
 import { createInstaller } from "../lib/installer.js";
 
 describe("detectFormat — pypi", () => {
@@ -76,5 +76,47 @@ describe("createInstaller — pypi", () => {
     expect(installer.supports("github")).toBe(true);
     expect(installer.supports("npm")).toBe(true);
     expect(installer.supports("local")).toBe(true);
+  });
+});
+
+describe("normalizePypiLicense", () => {
+  it("returns short SPDX identifiers unchanged", () => {
+    expect(normalizePypiLicense("MIT", [])).toBe("MIT");
+    expect(normalizePypiLicense("Apache-2.0", [])).toBe("Apache-2.0");
+    expect(normalizePypiLicense("BSD-3-Clause", [])).toBe("BSD-3-Clause");
+  });
+
+  it("extracts identifier from full MIT license text", () => {
+    const fullMit = `MIT License
+
+Copyright (c) 2024 Example
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files.`;
+    expect(normalizePypiLicense(fullMit, [])).toBe("MIT");
+  });
+
+  it("extracts identifier from full Apache license text", () => {
+    const fullApache = `Apache License
+Version 2.0, January 2004
+
+TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION. You may not use this file except in compliance with the License.`;
+    expect(normalizePypiLicense(fullApache, [])).toBe("Apache-2.0");
+  });
+
+  it("falls back to trove classifiers when license text is long", () => {
+    const longText = "x".repeat(100);
+    const classifiers = ["License :: OSI Approved :: MIT License"];
+    expect(normalizePypiLicense(longText, classifiers)).toBe("MIT");
+  });
+
+  it("normalizes classifier names", () => {
+    expect(normalizePypiLicense("", ["License :: OSI Approved :: Apache Software License"])).toBe("Apache-2.0");
+    expect(normalizePypiLicense("", ["License :: OSI Approved :: BSD License"])).toBe("BSD-3-Clause");
+  });
+
+  it("returns undefined for empty/missing license", () => {
+    expect(normalizePypiLicense("", [])).toBeUndefined();
+    expect(normalizePypiLicense(null, [])).toBeUndefined();
+    expect(normalizePypiLicense(undefined, [])).toBeUndefined();
   });
 });

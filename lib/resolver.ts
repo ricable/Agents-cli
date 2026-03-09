@@ -208,6 +208,50 @@ export function parsePypiPackage(input: string): string {
   return pkg;
 }
 
+/**
+ * Normalize a PyPI license field to a short SPDX-like identifier.
+ * PyPI's `info.license` often contains the full license text instead of
+ * a short identifier. Fall back to extracting from trove classifiers.
+ */
+export function normalizePypiLicense(
+  rawLicense: unknown,
+  classifiers: unknown,
+): string | undefined {
+  const raw = typeof rawLicense === "string" ? rawLicense.trim() : "";
+  // Short enough to be an SPDX identifier (e.g. "MIT", "Apache-2.0", "BSD-3-Clause")
+  if (raw && raw.length <= 64 && !raw.includes("\n")) return raw;
+
+  // Extract from trove classifiers: "License :: OSI Approved :: MIT License" → "MIT"
+  if (Array.isArray(classifiers)) {
+    for (const c of classifiers) {
+      if (typeof c !== "string") continue;
+      const m = (c as string).match(/^License\s*::\s*OSI Approved\s*::\s*(.+)/);
+      if (m) {
+        // "MIT License" → "MIT", "Apache Software License" → "Apache-2.0"
+        const name = m[1]!.trim().replace(/\s+License$/i, "");
+        if (name === "Apache Software") return "Apache-2.0";
+        if (name === "GNU General Public") return "GPL-3.0";
+        if (name === "GNU Lesser General Public") return "LGPL-3.0";
+        if (name === "BSD") return "BSD-3-Clause";
+        return name;
+      }
+    }
+  }
+
+  // Last resort: try to identify from the full text
+  if (raw.length > 64) {
+    if (/\bMIT\b/.test(raw)) return "MIT";
+    if (/Apache License[\s\S]*2\.0/i.test(raw)) return "Apache-2.0";
+    if (/BSD\s+3-Clause/i.test(raw)) return "BSD-3-Clause";
+    if (/BSD\s+2-Clause/i.test(raw)) return "BSD-2-Clause";
+    if (/GNU General Public License/i.test(raw)) return "GPL-3.0";
+    if (/Mozilla Public License/i.test(raw)) return "MPL-2.0";
+    if (/\bISC\b/.test(raw)) return "ISC";
+  }
+
+  return raw || undefined;
+}
+
 /** Fetch metadata from PyPI JSON API */
 async function resolvePypi(input: string): Promise<{ meta: Partial<ToolMeta>; version?: string }> {
   const pkg = parsePypiPackage(input);
@@ -221,7 +265,7 @@ async function resolvePypi(input: string): Promise<{ meta: Partial<ToolMeta>; ve
         version: (info.version as string) ?? "",
         description: (info.summary as string) ?? "",
         homepage: (info.home_page as string) || (info.project_url as string) || undefined,
-        license: (info.license as string) || undefined,
+        license: normalizePypiLicense(info.license, info.classifiers),
         tags: Array.isArray(info.keywords)
           ? info.keywords as string[]
           : typeof info.keywords === "string" && info.keywords

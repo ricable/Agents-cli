@@ -206,7 +206,7 @@ export async function installTool(
 
   // Analyze — deep probe if requested, otherwise shallow
   let capabilities: ToolCapabilities = { commands: [], globalFlags: [], analysisMethod: "help-probe" };
-  const mainBin = findMainBinary(installDir);
+  const mainBin = findMainBinary(installDir, resolved.meta.name);
   if (mainBin) {
     try {
       capabilities = await analyzer.analyze(mainBin, { recursive: options.recursive });
@@ -628,7 +628,7 @@ const CATEGORY_ACTION_MAP: Record<string, string[]> = {
   "package-managers": ["managing dependencies with %", "installing packages via %", "running project scripts using %"],
   "git": ["managing version control with %", "creating and reviewing pull requests via %", "searching commit history using %"],
   "javascript": ["linting and formatting JavaScript with %", "building and bundling projects via %", "checking types using %"],
-  "python": ["linting and formatting Python code with %", "managing Python environments via %", "running and debugging scripts using %"],
+  "python": ["building Python projects with %", "managing Python workflows via %", "running and debugging Python code using %"],
   "cloud": ["deploying applications with %", "managing cloud infrastructure via %", "configuring container orchestration using %"],
   "http-api": ["calling HTTP APIs with %", "downloading resources via %", "testing and debugging endpoints using %"],
   "documentation": ["generating documentation with %", "validating API specs via %", "building and publishing docs using %"],
@@ -653,6 +653,48 @@ const CATEGORY_ACTION_MAP: Record<string, string[]> = {
   "automation": ["automating tasks with %", "scripting workflows using %", "scheduling jobs via %"],
   "build-tools": ["building projects with %", "bundling code using %", "compiling assets via %"],
   "general": ["running % commands", "configuring % workflows", "managing % tasks"],
+};
+
+/**
+ * Refine broad category keys using tool description/agentValue context.
+ * Prevents "python" category template from bleeding "linting and formatting"
+ * into non-linter tools like pytest, gradio, flask, etc.
+ */
+function refineCategoryKey(catKey: string, tool: Tool): string {
+  const text = (
+    tool.meta.description + " " +
+    (tool._curatedMeta?.agentValue ?? "") + " " +
+    (tool._curatedMeta?.description ?? "")
+  ).toLowerCase();
+
+  if (catKey === "python") {
+    if (/\b(test|pytest|unittest|assert|fixture|coverage|mock)\b/.test(text)) return "testing";
+    if (/\b(lint|format|style|ruff|flake8|black|isort|pylint|autopep8)\b/.test(text)) return "linter";
+    if (/\b(ml|model|train|neural|tensor|torch|keras|gradio|diffus|hugging)\b/.test(text)) return "ai-ml/ml-frameworks";
+    if (/\b(web|http|flask|django|fastapi|server|route|wsgi|asgi)\b/.test(text)) return "http-api";
+    if (/\b(scrape|crawl|spider|selenium|playwright|browser)\b/.test(text)) return "browser";
+    if (/\b(data|pandas|numpy|polars|arrow|parquet|csv|dataframe)\b/.test(text)) return "data-processing";
+    if (/\b(cli|command|terminal|argparse|click|typer)\b/.test(text)) return "python";
+    return catKey;
+  }
+
+  if (catKey === "javascript") {
+    if (/\b(test|jest|mocha|vitest|cypress|playwright|assert)\b/.test(text)) return "testing";
+    if (/\b(lint|eslint|prettier|format|biome|oxlint)\b/.test(text)) return "linter";
+    if (/\b(bundl|webpack|vite|rollup|esbuild|parcel|turbopack)\b/.test(text)) return "build-tools";
+    return catKey;
+  }
+
+  return catKey;
+}
+
+/** Language → TechName display strings for the +0.1 TechName score boost */
+const LANG_TO_TECH: Record<string, string> = {
+  rust: "Rust Cargo",
+  go: "Go Module",
+  python: "Python Package",
+  node: "Node JavaScript",
+  c: "Native Binary",
 };
 
 /**
@@ -706,6 +748,43 @@ const DOMAIN_NEGATIVE_TRIGGERS: Record<string, string> = {
 };
 
 /**
+ * Refine a broad category (e.g. "python", "javascript") to a more specific
+ * CATEGORY_ACTION_MAP key based on the tool's description keywords.
+ * This prevents template bleed where a linting trigger applies to a test framework.
+ */
+function refineCategoryFromDescription(category: string, description: string, tool?: Tool): string {
+  // Only refine broad language categories — specific categories are already correct
+  const BROAD_CATEGORIES = new Set(["python", "javascript"]);
+  if (!BROAD_CATEGORIES.has(category)) return category;
+
+  // If we have the full tool object, use the richer refineCategoryKey
+  if (tool) return refineCategoryKey(category, tool);
+
+  // Fallback: description-only refinement
+  const desc = description.toLowerCase();
+  const REFINEMENTS: Array<{ pattern: RegExp; category: string }> = [
+    { pattern: /\b(test|pytest|unittest|assert|fixture|spec|coverage|mock)\b/, category: "testing" },
+    { pattern: /\b(lint|format|style|type.?check|pylint|eslint|prettier|ruff|flake8|black|biome)\b/, category: "linter" },
+    { pattern: /\b(security|vulnerab|audit|secret|scan)\b/, category: "security" },
+    { pattern: /\b(bundl|webpack|vite|rollup|esbuild|parcel|compil|transpil|minif)\b/, category: "build-tools" },
+    { pattern: /\b(ml|model|train|neural|tensor|torch|keras|gradio|diffus|hugging)\b/, category: "ai-ml/ml-frameworks" },
+    { pattern: /\b(web|http|flask|django|fastapi|server|route|wsgi|asgi)\b/, category: "http-api" },
+    { pattern: /\b(data|pandas|numpy|polars|arrow|parquet|dataframe)\b/, category: "data-processing" },
+    { pattern: /\b(scrape|crawl|spider|selenium|playwright|browser)\b/, category: "browser" },
+    { pattern: /\b(package.?manager|dependency|install packages)\b/, category: "package-managers" },
+    { pattern: /\b(monitor|profil|benchmark|performance)\b/, category: "monitoring" },
+    { pattern: /\b(document|docs|api.?doc|docstring)\b/, category: "documentation" },
+  ];
+
+  for (const { pattern, category: refined } of REFINEMENTS) {
+    if (pattern.test(desc) && CATEGORY_ACTION_MAP[refined]) {
+      return refined;
+    }
+  }
+  return category;
+}
+
+/**
  * Build a compliant description: "[What it does]. Use when [trigger phrases]."
  * Third person, under 1024 chars, no XML tags. Uses action verbs from commands
  * or domain-inferred trigger phrases — never "the task involves".
@@ -723,6 +802,7 @@ function buildDescription(tool: Tool): string {
     ? curated.description
     : desc;
 
+  let cachedDomain: InferredDomain | null = null;
   const triggers: string[] = [];
   if (commands.length > 0) {
     // Extract action verbs from command descriptions
@@ -767,7 +847,8 @@ function buildDescription(tool: Tool): string {
     const matchCount = recognizedVerbs.filter(v => triggers.some(t => t.includes(v))).length;
     if (matchCount < 2 && curated) {
       // Prefer curated category triggers over generic "running X commands"
-      const catKey = curated.category.toLowerCase();
+      // Refine broad categories (python/javascript) based on tool description
+      const catKey = refineCategoryFromDescription(curated.category.toLowerCase(), effectiveDesc, tool);
       const catTriggers = CATEGORY_ACTION_MAP[catKey];
       if (catTriggers) {
         // Replace weak triggers with category-specific ones
@@ -780,7 +861,8 @@ function buildDescription(tool: Tool): string {
       triggers.push(`running ${name} commands`, `configuring ${name}`);
     }
   } else if (curated) {
-    const catKey = curated.category.toLowerCase();
+    // Refine broad categories (python/javascript) based on tool description
+    const catKey = refineCategoryFromDescription(curated.category.toLowerCase(), effectiveDesc, tool);
     const catTriggers = CATEGORY_ACTION_MAP[catKey] ?? null;
     if (catTriggers) {
       // Template tool name into category triggers for uniqueness
@@ -804,7 +886,8 @@ function buildDescription(tool: Tool): string {
     }
   } else {
     // Fallback: domain-inferred triggers
-    const domain = inferDomain(tool);
+    cachedDomain = inferDomain(tool);
+    const domain = cachedDomain;
     const domainTriggers: Record<string, string[]> = {
       llm: [`running LLM inference with ${name}`, `generating text using ${name}`, `processing prompts via ${name}`],
       linter: [`linting files with ${name}`, `formatting code using ${name}`, `checking style via ${name}`],
@@ -849,9 +932,12 @@ function buildDescription(tool: Tool): string {
   // Add negative trigger ("Do NOT use for") for +0.2 score boost
   let negativeTrigger = "";
   const curatedCat = curated?.category?.toLowerCase();
-  const domainCat = inferDomain(tool).category;
-  // Try curated category first, then inferred domain
-  const negKey = (curatedCat && DOMAIN_NEGATIVE_TRIGGERS[curatedCat])
+  const refinedCat = curatedCat ? refineCategoryFromDescription(curatedCat, effectiveDesc, tool) : undefined;
+  const domainCat = (cachedDomain ?? inferDomain(tool)).category;
+  // Try refined curated category first, then raw curated, then inferred domain
+  const negKey = (refinedCat && DOMAIN_NEGATIVE_TRIGGERS[refinedCat])
+    ? refinedCat
+    : (curatedCat && DOMAIN_NEGATIVE_TRIGGERS[curatedCat])
     ? curatedCat
     : DOMAIN_NEGATIVE_TRIGGERS[domainCat]
       ? domainCat
@@ -862,28 +948,19 @@ function buildDescription(tool: Tool): string {
 
   // Ensure 2+ TechNames (capitalized words) for +0.1 score boost
   let techSuffix = "";
-  const draft = `${effectiveDesc}. Use when ${triggerPhrase}.${negativeTrigger}`;
-  const techNames = draft.match(/\b[A-Z][a-zA-Z]{2,}\b/g) ?? [];
+  const baseParts = `${effectiveDesc}. Use when ${triggerPhrase}.${negativeTrigger}`;
+  const techNames = baseParts.match(/\b[A-Z][a-zA-Z]{2,}\b/g) ?? [];
   if (techNames.length < 2) {
-    const langToTech: Record<string, string> = {
-      rust: "Rust Cargo",
-      go: "Go Module",
-      python: "Python Package",
-      node: "Node JavaScript",
-      c: "Native Binary",
-    };
-    const lang = detectToolLanguage(tool);
-    const extra = langToTech[lang];
+    const extra = LANG_TO_TECH[detectToolLanguage(tool)];
     if (extra) {
       techSuffix = ` Built with ${extra}.`;
     } else {
-      // Capitalize tool name as fallback TechName
       const capitalized = name.charAt(0).toUpperCase() + name.slice(1);
       techSuffix = ` Integrates with ${capitalized} CLI.`;
     }
   }
 
-  const full = `${effectiveDesc}. Use when ${triggerPhrase}.${negativeTrigger}${techSuffix}`;
+  const full = techSuffix ? `${baseParts}${techSuffix}` : baseParts;
   return full.length > 1024 ? full.slice(0, 1021) + "..." : full;
 }
 
@@ -1551,7 +1628,7 @@ function detectToolLanguage(tool: Tool): ToolLanguage {
 }
 
 /** Check if a tool is likely a CLI (not a library/SDK) */
-function isLikelyCli(tool: Tool): boolean {
+export function isLikelyCli(tool: Tool): boolean {
   // Tools with discovered commands are definitely CLIs
   if (tool.capabilities.commands.length > 0) return true;
   // Check tags
@@ -1610,27 +1687,28 @@ function generateExamplesStub(
 }
 
 /** Infer install command for a library (project-local, not global) */
-function inferLibraryInstallCommand(tool: Tool): string {
+export function inferLibraryInstallCommand(tool: Tool): string {
   const uri = tool.source.uri;
   if (tool.source.format === "npm") {
     const pkg = uri.startsWith("npm:") ? uri.slice(4) : uri;
-    return `npm install ${pkg}\n# Or: npx ${pkg}`;
+    return `npm install ${shellQuote(pkg)}\n# Or: npx ${shellQuote(pkg)}`;
   }
   if (tool.source.format === "pypi") {
     const pkg = uri.startsWith("pypi:") ? uri.slice(5) : uri;
-    return `pip install ${pkg}\n# Or: uv add ${pkg}`;
+    return `pip install ${shellQuote(pkg)}\n# Or: uv add ${shellQuote(pkg)}`;
   }
   if (tool.source.format === "crates") {
     const pkg = uri.startsWith("crates:") ? uri.slice(7) : uri;
-    return `cargo add ${pkg}`;
+    return `cargo add ${shellQuote(pkg)}`;
   }
   // GitHub repos — detect language
   const lang = detectToolLanguage(tool);
   const name = tool.meta.name.toLowerCase().replace(/[^a-z0-9-]/g, "-");
+  const safeName = shellQuote(name);
   switch (lang) {
-    case "python": return `pip install ${name}\n# Or: uv add ${name}`;
-    case "node": return `npm install ${name}`;
-    case "rust": return `cargo add ${name}`;
+    case "python": return `pip install ${safeName}\n# Or: uv add ${safeName}`;
+    case "node": return `npm install ${safeName}`;
+    case "rust": return `cargo add ${safeName}`;
     default: return `# See https://github.com/${uri} for installation instructions`;
   }
 }
@@ -1723,29 +1801,22 @@ function generateLibraryQuickStart(
       s.push("");
     }
   } else if (lang === "python") {
-    // Python library stub
+    // Python library stub — import only, no fabricated Client() calls
     const modName = name.toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_");
     s.push("```python");
-    s.push(`# ${desc}`);
     s.push(`import ${modName}`);
     s.push("");
-    s.push(`# Initialize client/module`);
-    s.push(`client = ${modName}.Client()`);
-    s.push("");
-    s.push(`# See project documentation for full API reference`);
+    s.push(`# See ${name} documentation for API usage examples`);
+    s.push(`# https://pypi.org/project/${name}/`);
     s.push("```");
   } else if (lang === "node") {
-    // JavaScript/TypeScript SDK stub
+    // JavaScript/TypeScript SDK stub — import only, no fabricated constructor
     const importName = name.replace(/[^a-zA-Z0-9]/g, "");
     const pkgName = uri.startsWith("npm:") ? uri.slice(4) : uri;
     s.push("```typescript");
-    s.push(`// ${desc}`);
     s.push(`import ${importName} from "${pkgName}";`);
     s.push("");
-    s.push(`// Initialize client`);
-    s.push(`const client = new ${importName}();`);
-    s.push("");
-    s.push(`// See project documentation for full API reference`);
+    s.push(`// See ${name} documentation for API usage examples`);
     s.push("```");
   } else {
     // Generic library
@@ -1800,7 +1871,9 @@ export function generateRichSkillMd(tool: Tool): string {
     local: "Local installation",
   };
   const compatibility = compatMap[tool.source.format] ?? "See project README";
-  const license = tool.meta.license ?? "MIT";
+  // Ensure license is a short SPDX identifier, not full license text
+  const rawLicense = tool.meta.license ?? "MIT";
+  const license = rawLicense.length > 64 || rawLicense.includes("\n") ? "MIT" : rawLicense;
 
   const s: string[] = [];
 
@@ -1826,6 +1899,13 @@ export function generateRichSkillMd(tool: Tool): string {
     // Add category-derived tags
     for (const part of curated.category.split("/")) {
       if (part.length > 2) tags.add(part);
+    }
+  }
+  // Add top command names as tags for discoverability (tools with 5+ commands)
+  if (commands.length >= 5) {
+    for (const cmd of commands.slice(0, 10)) {
+      const cmdTag = cmd.name.toLowerCase().replace(/[^a-z0-9-]/g, "");
+      if (cmdTag.length >= 2 && cmdTag.length <= 20) tags.add(cmdTag);
     }
   }
   for (const tag of tags) s.push(`  - ${tag}`);
@@ -2277,12 +2357,12 @@ export function generateSkillDirectory(tool: Tool): SkillDirectory {
       // Compute which blocks were used in Quick Start (first 2 api-like blocks) for dedup
       const quickStartCodes = new Set<string>();
       if (isLibrary) {
+        const safeName = name.toLowerCase().replace(/[^a-z0-9]/g, "");
         let apiCount = 0;
         for (const b of readmeSections.codeBlocks) {
           if (apiCount >= 2) break;
           const code = b.code.toLowerCase();
           if (INSTALL_CMD_RE.test(code) && code.split("\n").length < 3) continue;
-          const safeName = name.toLowerCase().replace(/[^a-z0-9]/g, "");
           const isApi = code.includes("import ") || code.includes("require(") || code.includes("from ")
             || code.includes(safeName)
             || b.lang === "yaml" || b.lang === "yml" || b.lang === "toml"
@@ -2494,16 +2574,18 @@ export function generateInstallScript(tool: Tool): string {
   lines.push("");
   if (isCli) {
     lines.push(`# Verify installation`);
-    lines.push(`${name} --version 2>/dev/null || ${name} version 2>/dev/null || echo "${tool.meta.name} installed (no --version flag)"`);
+    lines.push(`${name} --version 2>/dev/null || ${name} version 2>/dev/null || echo ${shellQuote(tool.meta.name + " installed (no --version flag)")}`);
   } else {
     lines.push(`# Verify installation`);
     const lang = detectToolLanguage(tool);
     if (lang === "python") {
-      lines.push(`python -c "import ${tool.meta.name.toLowerCase().replace(/[^a-z0-9_]/g, "_")}; print('${tool.meta.name} installed')" 2>/dev/null || echo "${tool.meta.name} installed (verify with: pip show ${tool.meta.name})"`);
+      const pyMod = tool.meta.name.toLowerCase().replace(/[^a-z0-9_]/g, "_");
+      lines.push(`python -c "import ${pyMod}; print(${shellQuote(tool.meta.name + " installed")})" 2>/dev/null || echo ${shellQuote(tool.meta.name + " installed (verify with: pip show " + tool.meta.name + ")")}`);
     } else if (lang === "node") {
-      lines.push(`node -e "require('${tool.source.uri.replace(/^npm:/, "")}')" 2>/dev/null || echo "${tool.meta.name} installed (verify with: npm list ${tool.meta.name})"`);
+      const pkg = shellQuote(tool.source.uri.replace(/^npm:/, ""));
+      lines.push(`node -e "require(${pkg})" 2>/dev/null || echo ${shellQuote(tool.meta.name + " installed (verify with: npm list " + tool.meta.name + ")")}`);
     } else {
-      lines.push(`echo "${tool.meta.name} installed — verify by importing in your project"`);
+      lines.push(`echo ${shellQuote(tool.meta.name + " installed — verify by importing in your project")}`);
     }
   }
   lines.push("");
