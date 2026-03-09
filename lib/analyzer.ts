@@ -416,8 +416,8 @@ import type { InteractionMode } from "./types.js";
 /** REPL-indicating subcommand names */
 const REPL_COMMANDS = new Set(["shell", "repl", "interactive", "console", "prompt"]);
 
-/** REPL-indicating flags */
-const REPL_FLAGS = /^--(interactive|repl|shell|console)$|^-i$/;
+/** REPL-indicating long flags */
+const REPL_FLAGS = /^--(interactive|repl|shell|console)$/;
 
 /** Detect whether a tool operates as repl, subcommand, or single-shot */
 export function detectInteractionMode(
@@ -429,10 +429,10 @@ export function detectInteractionMode(
   for (const cmd of commands) {
     if (REPL_COMMANDS.has(cmd.name.toLowerCase())) return "repl";
   }
-  // Check for REPL-indicating flags
+  // Check for REPL-indicating flags (long form only — short -i is too
+  // ambiguous since grep -i, sed -i, curl -i etc. all use it)
   for (const flag of globalFlags) {
     if (REPL_FLAGS.test(flag.name)) return "repl";
-    if (flag.alias && REPL_FLAGS.test(flag.alias)) return "repl";
   }
   // Check raw help text for REPL indicators
   if (rawHelp) {

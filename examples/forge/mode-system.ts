@@ -10,6 +10,7 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { success, emit } from "../../lib/output.js";
 import { parseCommands, parseFlags, detectInteractionMode, probeHelp } from "../../lib/analyzer.js";
+import { validateToolName } from "../../lib/guards.js";
 import type { InteractionMode } from "../../lib/types.js";
 import type { CliArgs } from "./types.js";
 import { log, fmtTable } from "./helpers.js";
@@ -52,6 +53,7 @@ function discoverPathBinaries(limit: number): Array<{ name: string; path: string
   const pathDirs = (process.env["PATH"] ?? "").split(":");
   const seen = new Set<string>();
   const results: Array<{ name: string; path: string }> = [];
+  // Over-collect by 5x since most binaries won't respond to --help
   const cap = limit * 5;
 
   for (const dir of pathDirs) {
@@ -63,6 +65,8 @@ function discoverPathBinaries(limit: number): Array<{ name: string; path: string
       if (seen.has(entry) || SKIP_NAMES.has(entry)) continue;
       // Skip dotfiles and names with extensions (likely not CLI tools)
       if (entry.startsWith(".") || entry.includes(".")) continue;
+      // Validate name is safe for use in paths/scripts
+      try { validateToolName(entry); } catch { continue; }
 
       const full = join(dir, entry);
       try {
@@ -145,9 +149,11 @@ export async function systemMode(args: CliArgs, startTime: number): Promise<void
     return;
   }
 
+  // System binaries have absolute paths (e.g. /usr/bin/rg) which match
+  // the local source format pattern in resolver.ts (starts with /)
   const { processBatch, buildIndexes } = await import("./stages.js");
   const { results, failures } = await processBatch(
-    responsive.map(b => ({ label: b.name, source: `local:${b.path}` })),
+    responsive.map(b => ({ label: b.name, source: b.path })),
     { deep: args.deep, noCache: args.noCache, force: args.force },
   );
 

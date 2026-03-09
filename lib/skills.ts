@@ -1582,7 +1582,7 @@ export function generateRichSkillMd(tool: Tool): string {
   // Note interaction mode for agents
   const interactionMode = tool.capabilities.interactionMode;
   if (interactionMode === "repl") {
-    s.push(`> **Mode**: This tool supports an interactive REPL/shell mode. Use \`${binName} shell\` or \`${binName} --interactive\` for multi-command sessions.`);
+    s.push(`> **Mode**: This tool supports an interactive REPL/shell mode. Run \`${binName} --help\` to find the interactive subcommand or flag.`);
     s.push("");
   }
 
