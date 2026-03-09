@@ -1,6 +1,8 @@
 /**
  * forge/mode-plugin.ts — Build plugins, agent defs, and marketplace.
- * (Gap 5: --plugin, --agent-defs, --marketplace)
+ *
+ * Produces self-contained Claude Code plugins conforming to the official spec:
+ *   https://code.claude.com/docs/en/plugins-reference
  */
 
 import { resolve } from "node:path";
@@ -44,6 +46,7 @@ export async function pluginMode(args: CliArgs, startTime: number): Promise<void
       pluginsDir,
       domain: args.domain || undefined,
       aiGenerate: args.ai,
+      skillsSourceDir: OUTPUT_DIR,
     });
 
     log(`  Plugins written to: ${pluginsDir}/`);
@@ -62,7 +65,7 @@ export async function pluginMode(args: CliArgs, startTime: number): Promise<void
 }
 
 export async function agentDefsMode(args: CliArgs, startTime: number): Promise<void> {
-  const { generateAgentDefs, defaultAgentDef } = await import("../../lib/plugin/ai-generator.js");
+  const { generateAgentMarkdown, defaultAgentMarkdown } = await import("../../lib/plugin/ai-generator.js");
 
   log(`  Mode:   agent-defs`);
   if (args.domain) log(`  Domain: ${args.domain}`);
@@ -83,24 +86,24 @@ export async function agentDefsMode(args: CliArgs, startTime: number): Promise<v
     : [...byDomain.entries()];
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  const allDefs: Array<{ domain: string; agents: unknown[] }> = [];
+  const allDefs: Array<{ domain: string; agents: Array<{ name: string }> }> = [];
 
   for (const [domain, domEntries] of targetDomains) {
     const pkgNames = domEntries.map(e => e.name);
-    let agents;
+    let agents: Array<{ name: string; content: string }>;
 
     if (args.ai && apiKey) {
       try {
-        agents = await generateAgentDefs(domain, pkgNames, apiKey);
+        agents = await generateAgentMarkdown(domain, pkgNames, apiKey);
       } catch {
-        agents = [defaultAgentDef(domain)];
+        agents = [defaultAgentMarkdown(domain, pkgNames)];
       }
     } else {
-      agents = [defaultAgentDef(domain)];
+      agents = [defaultAgentMarkdown(domain, pkgNames)];
     }
 
-    allDefs.push({ domain, agents });
-    log(`  ${domain}: ${agents.length} agent definition(s)`);
+    allDefs.push({ domain, agents: agents.map(a => ({ name: a.name })) });
+    log(`  ${domain}: ${agents.length} agent(s)`);
   }
 
   if (args.json) {
@@ -115,10 +118,12 @@ export async function marketplaceMode(args: CliArgs, startTime: number): Promise
   log(`  Dry run: ${args.dryRun}`);
   log("");
 
+  const pluginsDir = resolve(OUTPUT_DIR, "..", "plugins");
   const outDir = resolve(OUTPUT_DIR, "..", "marketplace");
 
   const result = await generateMarketplace({
     outputDir: outDir,
+    pluginsSourceDir: pluginsDir,
     config: {
       name: "agents-cli-skills",
       ownerName: "agents-cli",
@@ -131,9 +136,11 @@ export async function marketplaceMode(args: CliArgs, startTime: number): Promise
   });
 
   log(`  Marketplace: ${result.pluginCount} plugins, ${result.skillCount} skills`);
+  if (result.marketplacePath) {
+    log(`  Output: ${result.marketplacePath}`);
+  }
 
   if (args.json) {
     emit(success("skill-forge:marketplace", result, startTime), true);
   }
 }
-

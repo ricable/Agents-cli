@@ -272,11 +272,11 @@ lib/
     capability-map.ts  — capability → search query mapping
     workflow-gen.ts    — generate skills from workflow templates
     templates/         — workflow skill templates
-  plugin/              — plugin system
-    builder.ts         — build plugin.json from installed tools
-    publisher.ts       — publish plugins to registry
-    ai-generator.ts    — generate agent definitions
-    marketplace.ts     — marketplace generation
+  plugin/              — plugin system (Claude Code spec-compliant)
+    builder.ts         — build self-contained plugin directories (.claude-plugin/, skills/, agents/, commands/)
+    publisher.ts       — package and publish plugins to npm
+    ai-generator.ts    — generate agent markdown files (YAML frontmatter + system prompt)
+    marketplace.ts     — generate marketplace.json + copy plugins into marketplace directory
   db/                  — database layer (lazy better-sqlite3)
     domain-db.ts       — per-domain SQLite databases
     aggregated-db.ts   — aggregated cross-domain database
@@ -368,6 +368,81 @@ The forge dispatcher delegates to mode modules in `examples/forge/`:
 | Lockfile | `--freeze`/`--verify` | `mode-lockfile.ts` | Freeze/verify skill integrity |
 | System | `--system` | `mode-system.ts` | Scan PATH for executables → probe → forge |
 | MCP | `--mcp` | `mode-mcp.ts` | Expose forged skills as MCP tools |
+
+## Plugin system (Claude Code spec-compliant)
+
+The plugin pipeline in `lib/plugin/` generates self-contained plugins conforming to the
+[Claude Code plugin specification](https://code.claude.com/docs/en/plugins-reference).
+
+### Plugin directory structure (output)
+
+```
+plugins/{domain}/
+├── .claude-plugin/
+│   └── plugin.json           ← manifest (official schema: name, version, description, keywords, license)
+├── skills/
+│   └── <name>/
+│       ├── SKILL.md          ← copied from generated-skills/
+│       ├── references/       ← guide, examples, troubleshooting, commands
+│       └── scripts/          ← install.sh, validate.py, grep.sh, search.sh
+├── agents/
+│   └── <domain>-expert.md    ← YAML frontmatter + system prompt
+└── commands/
+    ├── search.md             ← user-invokable /plugin:search command
+    └── list.md               ← user-invokable /plugin:list command
+```
+
+### Plugin commands
+
+```bash
+# Build all domain plugins from generated skills
+npx tsx examples/skill-forge.ts --plugin
+npx tsx examples/skill-forge.ts --plugin --domain database     # single domain
+npx tsx examples/skill-forge.ts --plugin --ai                  # AI-enhanced agent defs
+npx tsx examples/skill-forge.ts --plugin --dry-run             # preview
+
+# Generate agent markdown files
+npx tsx examples/skill-forge.ts --agent-defs
+npx tsx examples/skill-forge.ts --agent-defs --domain agent --ai
+
+# Build marketplace manifest
+npx tsx examples/skill-forge.ts --marketplace
+npx tsx examples/skill-forge.ts --marketplace --dry-run
+
+# Test a plugin locally in Claude Code
+claude --plugin-dir ./examples/plugins/database
+```
+
+### Plugin spec compliance rules
+
+- **plugin.json at `.claude-plugin/plugin.json`** — NOT at plugin root
+- **Only official schema fields**: `name`, `version`, `description`, `keywords`, `license`, `author`, `homepage`, `repository`
+- **No non-standard fields**: never add `domain`, `skills`, or `agents` arrays to plugin.json
+- **Skills are self-contained**: SKILL.md + references/ + scripts/ copied into `skills/<name>/`
+- **Agents are markdown files**: `agents/<name>.md` with YAML frontmatter (`name`, `description`) + system prompt body
+- **Commands are markdown files**: `commands/<name>.md` with YAML frontmatter (`description`) + instructions
+- **Domains are flattened**: `ai-ml/llm-inference` → `ai-ml-llm-inference` (no nested plugin dirs)
+- **Plugins cannot reference external paths**: no `.claude/skills/...` — everything must be within the plugin dir
+
+### Key plugin functions
+
+```typescript
+// Builder (lib/plugin/builder.ts)
+buildPlugins(opts?: BuildPluginsOptions): Promise<void>  // builds spec-compliant plugin directories
+// Options: { domain?, aiGenerate?, rootDir?, manifestPath?, pluginsDir?, skillsSourceDir? }
+
+// AI generator (lib/plugin/ai-generator.ts)
+defaultAgentMarkdown(domain: string, pkgNames: string[]): AgentMarkdownFile  // { name, content }
+generateAgentMarkdown(domain: string, pkgNames: string[], apiKey: string): Promise<AgentMarkdownFile[]>
+
+// Marketplace (lib/plugin/marketplace.ts)
+generateMarketplace(opts: MarketplaceOptions): Promise<MarketplaceResult>
+// Returns: { pluginCount, skillCount, marketplacePath }
+
+// Publisher (lib/plugin/publisher.ts)
+publishPlugin(domain: string, dryRun?: boolean, pluginsDir?: string): Promise<void>
+publishAllPlugins(dryRun?: boolean, domainFilter?: string, pluginsDir?: string): Promise<void>
+```
 
 ## Classifier API conventions
 

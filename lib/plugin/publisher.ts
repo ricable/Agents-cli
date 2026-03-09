@@ -5,6 +5,8 @@
  *   1. Creates a package.json suitable for npm publishing
  *   2. Optionally runs npm publish --access public
  *   3. Updates {pluginsDir}/registry.json with published metadata
+ *
+ * Reads plugin metadata from .claude-plugin/plugin.json (spec-compliant path).
  */
 
 import fs from "node:fs";
@@ -23,31 +25,64 @@ interface RegistryEntry {
 
 // ── Internal helpers ───────────────────────────────────────────────────
 
+/**
+ * Read the plugin manifest from .claude-plugin/plugin.json.
+ */
+function readPluginManifest(pluginDir: string): {
+  name: string;
+  version: string;
+  description: string;
+  keywords: string[];
+} {
+  const manifestPath = path.join(pluginDir, ".claude-plugin", "plugin.json");
+  if (!fs.existsSync(manifestPath)) {
+    throw new Error(`No .claude-plugin/plugin.json found in ${pluginDir}`);
+  }
+  const raw = JSON.parse(fs.readFileSync(manifestPath, "utf-8")) as Record<string, unknown>;
+  return {
+    name: String(raw.name ?? ""),
+    version: String(raw.version ?? "1.0.0"),
+    description: String(raw.description ?? ""),
+    keywords: Array.isArray(raw.keywords) ? (raw.keywords as unknown[]).map(String) : [],
+  };
+}
+
+/**
+ * Count SKILL.md files in skills/ directory.
+ */
+function countSkills(pluginDir: string): number {
+  const skillsDir = path.join(pluginDir, "skills");
+  if (!fs.existsSync(skillsDir)) return 0;
+
+  let count = 0;
+  for (const name of fs.readdirSync(skillsDir)) {
+    if (fs.existsSync(path.join(skillsDir, name, "SKILL.md"))) count++;
+  }
+  return count;
+}
+
 function createPackageJson(domain: string, pluginDir: string): void {
-  const pluginJson = JSON.parse(
-    fs.readFileSync(path.join(pluginDir, "plugin.json"), "utf-8")
-  ) as { name: string; version: string; description: string; skills: string[] };
+  const manifest = readPluginManifest(pluginDir);
 
   const pkgJson = {
     name: `@opensrc-skills/${domain}`,
-    version: pluginJson.version,
-    description: pluginJson.description,
-    main: "plugin.json",
+    version: manifest.version,
+    description: manifest.description,
+    main: ".claude-plugin/plugin.json",
     keywords: [
       "claude-code",
-      "skill",
       "plugin",
-      domain,
-      "ai",
-      "opensrc",
-    ],
+      ...manifest.keywords,
+    ].filter((v, i, a) => a.indexOf(v) === i),
     license: "MIT",
-    author: "@ruvnet/pop-skills",
-    repository: {
-      type: "git",
-      url: "https://github.com/ruvnet/pop-skills",
-    },
-    files: ["plugin.json", "skills/", "agents/", "hooks/", "commands/"],
+    files: [
+      ".claude-plugin/",
+      "skills/",
+      "agents/",
+      "commands/",
+      "hooks/",
+      "scripts/",
+    ],
     engines: { node: ">=18" },
     publishConfig: { access: "public" },
   };
@@ -73,17 +108,15 @@ function updateRegistry(
     ) as RegistryEntry[];
   }
 
-  const pluginJson = JSON.parse(
-    fs.readFileSync(path.join(pluginDir, "plugin.json"), "utf-8")
-  ) as { version: string; skills: string[] };
+  const manifest = readPluginManifest(pluginDir);
 
   const existing = registry.findIndex((e) => e.domain === domain);
   const entry: RegistryEntry = {
     domain,
     package: `@opensrc-skills/${domain}`,
-    version: pluginJson.version,
+    version: manifest.version,
     publishedAt: new Date().toISOString(),
-    skillCount: pluginJson.skills.length,
+    skillCount: countSkills(pluginDir),
   };
 
   if (existing >= 0) {
@@ -122,8 +155,8 @@ export async function publishPlugin(
     );
   }
 
-  if (!fs.existsSync(path.join(pluginDir, "plugin.json"))) {
-    throw new Error(`plugin.json not found in ${pluginDir}`);
+  if (!fs.existsSync(path.join(pluginDir, ".claude-plugin", "plugin.json"))) {
+    throw new Error(`.claude-plugin/plugin.json not found in ${pluginDir}`);
   }
 
   // Create publishable package.json
