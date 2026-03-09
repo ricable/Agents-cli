@@ -3,6 +3,7 @@ import { get as httpsGet } from "node:https";
 import { get as httpGet } from "node:http";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve, join, basename } from "node:path";
+import { rejectPathTraversal } from "./guards.js";
 
 /** Private/reserved IP ranges that should not be followed via redirects (SSRF protection) */
 const PRIVATE_IP_PATTERNS = [
@@ -268,6 +269,7 @@ async function resolveCrates(input: string): Promise<{ meta: Partial<ToolMeta>; 
 
 /** Resolve a local directory tool by reading its package.json */
 function resolveLocal(input: string): { meta: Partial<ToolMeta>; version?: string } {
+  rejectPathTraversal(input, "local tool path");
   const dir = resolve(input);
   const pkgPath = join(dir, "package.json");
   if (existsSync(pkgPath)) {
