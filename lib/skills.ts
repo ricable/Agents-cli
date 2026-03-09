@@ -20,6 +20,7 @@ import { createAnalyzer, findMainBinary } from "./analyzer.js";
 import { createStore, getToolInstallDir } from "./store.js";
 import { readPkgVersion } from "./pkg-utils.js";
 import { validateToolName } from "./guards.js";
+import { INSTALL_CMD_RE } from "./extractor.js";
 
 // =============================================================================
 // YAML Frontmatter Parsing
@@ -580,6 +581,50 @@ function normalizeDesc(tool: Tool): string {
 }
 
 /**
+ * Category → action-verb trigger templates. The `%` placeholder is replaced
+ * with the tool name at runtime so each tool gets unique triggers.
+ */
+const CATEGORY_ACTION_MAP: Record<string, string[]> = {
+  "ai-ml/llm-inference": ["running LLM inference with %", "deploying % for language model serving", "generating text using %"],
+  "ai-ml/ai-agents": ["building AI agents with %", "orchestrating agent workflows via %", "managing autonomous tasks using %"],
+  "ai-ml/ai-coding": ["generating code with %", "building AI-powered dev tools using %", "debugging with % assistance"],
+  "ai-ml/rag-and-embeddings": ["building retrieval pipelines with %", "embedding documents using %", "indexing knowledge bases via %"],
+  "ai-ml/vector-search": ["storing vector embeddings with %", "searching similarity indexes via %", "querying % vector databases"],
+  "ai-ml/ml-frameworks": ["training models with %", "building neural networks using %", "running % model inference"],
+  "ai-ml/model-serving": ["deploying models with %", "managing % model endpoints", "running % inference servers"],
+  "ai-ml/model-optimization": ["optimizing models with %", "converting model formats via %", "running quantized inference using %"],
+  "ai-ml/model-monitoring": ["monitoring model performance with %", "analyzing prediction drift via %", "managing % model metrics"],
+  "ai-ml/nlp": ["processing text with %", "analyzing sentiment using %", "parsing linguistic structures via %"],
+  "ai-ml/computer-vision": ["processing images with %", "running % object detection", "analyzing visual content using %"],
+  "ai-ml/data-labeling": ["creating annotations with %", "managing % labeling workflows", "validating data quality via %"],
+  "ai-ml/data-processing": ["processing datasets with %", "transforming data using %", "building % data pipelines"],
+  "ai-ml/ml-experiment-tracking": ["monitoring experiments with %", "analyzing % model metrics", "managing training runs via %"],
+  "ai-ml/mlops-pipelines": ["deploying ML pipelines with %", "orchestrating % model workflows", "managing % ML infrastructure"],
+  "ai-ml/prompt-engineering": ["building prompts with %", "testing prompt variations via %", "managing % prompt workflows"],
+  "ai-ml/ai-evaluation": ["testing model outputs with %", "benchmarking AI via %", "validating % model accuracy"],
+  "ai-ml/ai-safety": ["scanning AI outputs with %", "validating model behavior via %", "monitoring % AI guardrails"],
+  "ai-ml/ai-security": ["scanning AI systems with %", "validating security via %", "monitoring % AI threats"],
+  "ai-ml/audio/speech": ["processing audio with %", "generating speech via %", "converting speech using %"],
+  "ai-ml/image-generation": ["generating images with %", "creating visual content via %", "running % diffusion models"],
+  "ai-ml/document-ai": ["processing documents with %", "analyzing structure via %", "converting documents using %"],
+  "ai-ml/fine-tuning": ["fine-tuning models with %", "running % transfer learning", "managing fine-tune jobs via %"],
+  "ai-ml/gpu-tools": ["monitoring GPU with %", "managing % GPU resources", "deploying GPU workloads via %"],
+  "ai-ml/notebooks": ["running % notebooks", "managing % computational environments", "executing code cells via %"],
+  "ai-ml/synthetic-data": ["generating synthetic data with %", "creating % training datasets", "validating distributions via %"],
+  "ai-ml/feature-stores": ["storing features with %", "managing % feature pipelines", "retrieving training features via %"],
+  "ai-ml/knowledge-graphs": ["building knowledge graphs with %", "querying % graph databases", "managing entities via %"],
+  "ai-ml/model-hub": ["downloading models from %", "managing % model repositories", "searching % model registries"],
+  "ai-ml/automl": ["running AutoML with %", "optimizing hyperparameters via %", "building % ML pipelines"],
+  "ai-ml/ai-apis": ["calling % AI API endpoints", "managing % API keys", "streaming AI responses via %"],
+  "code-search": ["searching code with %", "running % to find patterns", "retrieving source content via %"],
+  "security": ["scanning for vulnerabilities with %", "auditing dependencies via %", "detecting security issues using %"],
+  "testing": ["running tests with %", "checking test coverage via %", "debugging test failures using %"],
+  "data-processing": ["processing data with %", "converting formats using %", "transforming datasets via %"],
+  "devops": ["deploying applications with %", "managing infrastructure via %", "orchestrating services using %"],
+  "package-managers": ["managing dependencies with %", "installing packages via %", "running project scripts using %"],
+};
+
+/**
  * Build a compliant description: "[What it does]. Use when [trigger phrases]."
  * Third person, under 1024 chars, no XML tags. Uses action verbs from commands
  * or domain-inferred trigger phrases — never "the task involves".
@@ -639,73 +684,40 @@ function buildDescription(tool: Tool): string {
       "analyzing", "generating", "searching", "converting", "debugging",
     ];
     const matchCount = recognizedVerbs.filter(v => triggers.some(t => t.includes(v))).length;
-    if (matchCount < 2) {
+    if (matchCount < 2 && curated) {
+      // Prefer curated category triggers over generic "running X commands"
+      const catKey = curated.category.toLowerCase();
+      const catTriggers = CATEGORY_ACTION_MAP[catKey];
+      if (catTriggers) {
+        // Replace weak triggers with category-specific ones
+        triggers.length = 0;
+        triggers.push(...catTriggers.map(t => t.replace(/%/g, name)));
+      } else {
+        triggers.push(`running ${name} commands`, `configuring ${name}`);
+      }
+    } else if (matchCount < 2) {
       triggers.push(`running ${name} commands`, `configuring ${name}`);
     }
   } else if (curated) {
-    // Map curated category → action-verb triggers the scorer recognizes
-    // Keys must match actual domain values from ai-ml-tools.json (lowercase with hyphens)
-    const categoryActionMap: Record<string, string[]> = {
-      "ai-ml/llm-inference": ["running LLM inference", "deploying language models", "generating text with AI"],
-      "ai-ml/ai-agents": ["building AI agents", "orchestrating agent workflows", "managing autonomous tasks"],
-      "ai-ml/ai-coding": ["generating code with AI", "building AI-powered dev tools", "debugging with AI assistance"],
-      "ai-ml/rag-and-embeddings": ["building retrieval pipelines", "embedding documents for search", "indexing knowledge bases"],
-      "ai-ml/vector-search": ["storing vector embeddings", "searching similarity indexes", "querying vector databases"],
-      "ai-ml/ml-frameworks": ["training machine learning models", "building neural networks", "running model inference"],
-      "ai-ml/model-serving": ["deploying ML models to production", "managing model endpoints", "running inference servers"],
-      "ai-ml/model-optimization": ["compiling and optimizing models", "converting model formats", "running quantized inference"],
-      "ai-ml/model-monitoring": ["monitoring model performance", "analyzing prediction drift", "managing model metrics"],
-      "ai-ml/nlp": ["processing natural language text", "analyzing text sentiment", "parsing linguistic structures"],
-      "ai-ml/computer-vision": ["processing images with AI", "running object detection", "analyzing visual content"],
-      "ai-ml/data-labeling": ["creating training annotations", "managing labeling workflows", "validating data quality"],
-      "ai-ml/data-processing": ["processing and transforming datasets", "validating data quality", "building data pipelines"],
-      "ai-ml/ml-experiment-tracking": ["monitoring ML experiments", "analyzing model metrics", "managing training runs"],
-      "ai-ml/mlops-pipelines": ["deploying ML pipelines", "orchestrating model workflows", "managing ML infrastructure"],
-      "ai-ml/prompt-engineering": ["building prompt templates", "testing prompt variations", "managing prompt workflows"],
-      "ai-ml/ai-evaluation": ["testing model outputs", "benchmarking AI performance", "validating model accuracy"],
-      "ai-ml/ai-safety": ["scanning AI outputs for safety", "validating model behavior", "monitoring AI guardrails"],
-      "ai-ml/ai-security": ["scanning AI systems for vulnerabilities", "validating model security", "monitoring AI threats"],
-      "ai-ml/audio/speech": ["processing audio files", "generating speech from text", "converting speech to text"],
-      "ai-ml/image-generation": ["generating images with AI", "creating visual content", "running diffusion models"],
-      "ai-ml/document-ai": ["processing documents with AI", "analyzing document structure", "converting document formats"],
-      "ai-ml/fine-tuning": ["training on custom datasets", "running transfer learning", "managing fine-tune jobs"],
-      "ai-ml/gpu-tools": ["monitoring GPU utilization", "managing GPU resources", "deploying GPU workloads"],
-      "ai-ml/notebooks": ["running interactive notebooks", "managing computational environments", "executing code cells"],
-      "ai-ml/synthetic-data": ["generating synthetic datasets", "creating training data", "validating data distributions"],
-      "ai-ml/feature-stores": ["storing ML features", "managing feature pipelines", "retrieving training features"],
-      "ai-ml/knowledge-graphs": ["building knowledge graphs", "querying graph databases", "managing entity relationships"],
-      "ai-ml/model-hub": ["downloading pretrained models", "managing model repositories", "searching model registries"],
-      "ai-ml/automl": ["running automated model selection", "optimizing hyperparameters", "building ML pipelines"],
-      "ai-ml/ai-apis": ["calling AI API endpoints", "managing API keys", "streaming AI responses"],
-      // General tool categories
-      "code-search": ["searching files and code", "installing search indexes", "retrieving source content"],
-      "security": ["scanning for vulnerabilities", "auditing dependencies", "detecting security issues"],
-      "testing": ["running tests", "checking test coverage", "debugging test failures"],
-      "data-processing": ["processing structured data", "converting between formats", "transforming datasets"],
-      "devops": ["deploying applications", "managing infrastructure", "orchestrating services"],
-      "package-managers": ["managing dependencies", "installing packages", "running project scripts"],
-    };
-    // Find matching category triggers — exact match only, no prefix fallback
     const catKey = curated.category.toLowerCase();
-    const catTriggers = categoryActionMap[catKey] ?? null;
+    const catTriggers = CATEGORY_ACTION_MAP[catKey] ?? null;
     if (catTriggers) {
-      triggers.push(...catTriggers);
+      // Template tool name into category triggers for uniqueness
+      triggers.push(...catTriggers.map(t => t.replace(/%/g, name)));
     } else {
-      // Derive action triggers from agentValue, ensuring gerund verbs
+      // Derive tool-specific triggers from agentValue
       const agentPhrases = curated.agentValue
         .split(/[,;.]/)
         .map(s => s.trim().toLowerCase())
         .filter(s => s.length > 5)
         .slice(0, 2);
-      // Always include at least one scorer-recognized verb
       triggers.push(`installing and configuring ${name}`);
       if (agentPhrases.length > 0) {
         triggers.push(...agentPhrases.map(p => {
-          // Prefix with an action verb if phrase doesn't start with one
           if (/^(building|running|creating|deploying|managing|processing|generating|training|testing|checking|monitoring|installing|configuring|searching|analyzing|formatting|scanning|validating|converting|embedding|streaming|querying|orchestrating|implementing|routing|scheduling|publishing|parsing|rendering|transforming|auditing|debugging|fixing|downloading|compiling|storing|retrieving)/.test(p)) {
             return p;
           }
-          return `working with ${p}`;
+          return `working with ${name} for ${p}`;
         }));
       }
     }
@@ -1350,9 +1362,65 @@ function inferDomain(tool: Tool): InferredDomain {
 /** Curated metadata shape (attached by forge pipeline) */
 interface CuratedMetaShape { description: string; agentValue: string; category: string }
 
-/** Infer the install command for a library based on source format and category. */
-function inferInstallCommand(tool: Tool, curated: CuratedMetaShape): string {
-  const cat = curated.category.toLowerCase();
+/** Detected language for a tool */
+type ToolLanguage = "rust" | "go" | "python" | "node" | "c" | "unknown";
+
+/** Detect the primary implementation language of a tool from all available signals */
+function detectToolLanguage(tool: Tool): ToolLanguage {
+  // 1. Source format is definitive
+  if (tool.source.format === "npm") return "node";
+  if (tool.source.format === "pypi") return "python";
+  if (tool.source.format === "crates") return "rust";
+
+  // 2. GitHub topics (tags from API)
+  const tags = (tool.meta.tags as string[]).map(t => t.toLowerCase());
+  if (tags.includes("rust") || tags.includes("rust-lang")) return "rust";
+  if (tags.includes("go") || tags.includes("golang")) return "go";
+  if (tags.includes("python") || tags.includes("python3")) return "python";
+  if (tags.includes("nodejs") || tags.includes("node") || tags.includes("typescript") || tags.includes("javascript")) return "node";
+  if (tags.includes("c") || tags.includes("cpp") || tags.includes("c-plus-plus")) return "c";
+
+  // 3. Check installed files for build system markers
+  if (tool.installPath) {
+    if (existsSync(join(tool.installPath, "Cargo.toml"))) return "rust";
+    if (existsSync(join(tool.installPath, "go.mod")) || existsSync(join(tool.installPath, "go.sum"))) return "go";
+    if (existsSync(join(tool.installPath, "pyproject.toml")) || existsSync(join(tool.installPath, "setup.py"))) return "python";
+    if (existsSync(join(tool.installPath, "package.json"))) return "node";
+    if (existsSync(join(tool.installPath, "Makefile")) || existsSync(join(tool.installPath, "CMakeLists.txt"))) return "c";
+  }
+
+  // 4. Curated category hints
+  const curated = (tool as Tool & { _curatedMeta?: CuratedMetaShape })._curatedMeta;
+  if (curated) {
+    const cat = curated.category.toLowerCase();
+    if (cat.includes("ml") || cat.includes("nlp") || cat.includes("data") || cat.includes("vision") ||
+        cat.includes("audio") || cat.includes("fine-tun") || cat.includes("train") || cat.includes("python")) {
+      return "python";
+    }
+  }
+
+  return "unknown";
+}
+
+/** Check if a tool is likely a CLI (not a library/SDK) */
+function isLikelyCli(tool: Tool): boolean {
+  // Tools with discovered commands are definitely CLIs
+  if (tool.capabilities.commands.length > 0) return true;
+  // Check tags
+  const tags = (tool.meta.tags as string[]).map(t => t.toLowerCase());
+  if (tags.some(t => ["cli", "command-line", "terminal", "shell"].includes(t))) return true;
+  // Check description/agentValue for CLI indicators
+  const curated = (tool as Tool & { _curatedMeta?: CuratedMetaShape })._curatedMeta;
+  const searchText = [tool.meta.description, curated?.agentValue ?? ""].join(" ").toLowerCase();
+  if (/\b(cli|command.line|terminal|flags?|subcommands?|--\w+)\b/.test(searchText)) return true;
+  // Check if binary files were found during install
+  const installDir = tool.installPath;
+  if (installDir && existsSync(join(installDir, "bin"))) return true;
+  return false;
+}
+
+/** Infer the install command based on detected language and source format */
+function inferInstallCommand(tool: Tool, _curated?: CuratedMetaShape): string {
   const uri = tool.source.uri;
   if (tool.source.format === "npm") {
     return `npm install ${uri.startsWith("npm:") ? uri.slice(4) : uri}`;
@@ -1363,28 +1431,23 @@ function inferInstallCommand(tool: Tool, curated: CuratedMetaShape): string {
   if (tool.source.format === "crates") {
     return `cargo install ${uri.startsWith("crates:") ? uri.slice(7) : uri}`;
   }
-  // GitHub repos — infer from category
-  if (cat.includes("python") || cat.includes("ml") || cat.includes("nlp") || cat.includes("data") ||
-      cat.includes("audio") || cat.includes("vision") || cat.includes("ai-")) {
-    return `pip install ${tool.meta.name.toLowerCase().replace(/[^a-z0-9-]/g, "-")}`;
+  // GitHub repos — use detected language
+  const lang = detectToolLanguage(tool);
+  const name = tool.meta.name.toLowerCase().replace(/[^a-z0-9-]/g, "-");
+  switch (lang) {
+    case "rust": return `cargo binstall ${name}\n# Or: cargo install ${name}`;
+    case "go": return `go install github.com/${uri}@latest`;
+    case "python": return `uv tool install ${name}\n# Or: pip install ${name}`;
+    case "node": return `npm install -g ${name}`;
+    default: return `# Download from https://github.com/${uri}/releases\n# Or: brew install ${name}`;
   }
-  return `git clone https://github.com/${uri}.git && cd ${tool.meta.name}`;
 }
 
-/** Infer the primary language for a tool from its source format and category. */
-function inferLanguageHint(tool: Tool, curated: CuratedMetaShape): "python" | "javascript" | "other" {
-  if (tool.source.format === "npm") return "javascript";
-  if (tool.source.format === "pypi") return "python";
-  const cat = curated.category.toLowerCase();
-  const tags = (tool.meta.tags as string[]).join(" ").toLowerCase();
-  if (cat.includes("ml") || cat.includes("nlp") || cat.includes("data") || cat.includes("vision") ||
-      cat.includes("audio") || cat.includes("fine-tun") || cat.includes("train") ||
-      tags.includes("python") || tags.includes("pytorch") || tags.includes("tensorflow")) {
-    return "python";
-  }
-  if (tags.includes("node") || tags.includes("typescript") || tags.includes("javascript")) {
-    return "javascript";
-  }
+/** Infer the primary language hint (for code examples) */
+function inferLanguageHint(tool: Tool, _curated: CuratedMetaShape): "python" | "javascript" | "other" {
+  const lang = detectToolLanguage(tool);
+  if (lang === "python") return "python";
+  if (lang === "node") return "javascript";
   return "other";
 }
 
@@ -1411,7 +1474,8 @@ export function generateRichSkillMd(tool: Tool): string {
 
   // Check for curated metadata
   const curated = (tool as Tool & { _curatedMeta?: { description: string; agentValue: string; category: string } })._curatedMeta;
-  const isLibrary = commands.length === 0 && !hasCapabilities;
+  const isCli = isLikelyCli(tool);
+  const isLibrary = !isCli && commands.length === 0;
 
   // Use curated description for header when resolver returned a generic one
   const headerDesc = (curated && (desc.length < 30 || desc.toLowerCase() === name.toLowerCase()))
@@ -1458,8 +1522,8 @@ export function generateRichSkillMd(tool: Tool): string {
   s.push(uri.includes("@") || uri.includes(":") ? `  - "${uri}"` : `  - ${uri}`);
   s.push(`tags:`);
   const tags = new Set<string>([...(tool.meta.tags as string[])]);
-  // Only add "cli" tag if the tool actually has CLI commands
-  if (hasCapabilities) tags.add("cli");
+  // Tag based on whether this is a CLI tool or a library/SDK
+  if (hasCapabilities || isCli) tags.add("cli-tool");
   if (isLibrary) tags.add("library");
   if (curated) {
     // Add category-derived tags
@@ -1509,8 +1573,8 @@ export function generateRichSkillMd(tool: Tool): string {
       s.push("");
     }
     s.push("```");
-  } else if (readmeQuickStart) {
-    // Use actual README Quick Start content — render as-is, preserving code blocks
+  } else if (readmeQuickStart && readmeQuickStart.replace(/\s/g, "").length > 20) {
+    // Use actual README Quick Start content (skip if it's just whitespace/noise)
     const qsLines = readmeQuickStart.split("\n").slice(0, 30);
     for (const line of qsLines) s.push(line);
   } else if (readmeInstall || readmeUsage) {
@@ -1532,6 +1596,16 @@ export function generateRichSkillMd(tool: Tool): string {
       s.push("```");
       s.push("");
     }
+  } else if (isCli && curated) {
+    // CLI tool with curated metadata but no README content — generate install + usage
+    const installCmd = inferInstallCommand(tool, curated);
+    s.push("```bash");
+    s.push(`# Install`);
+    s.push(installCmd);
+    s.push("");
+    s.push(`# Show help`);
+    s.push(`${name} --help`);
+    s.push("```");
   } else if (isLibrary && curated) {
     // Library/SDK with curated metadata — generate install + API usage
     const installCmd = inferInstallCommand(tool, curated);
@@ -1768,18 +1842,35 @@ export function generateSkillDirectory(tool: Tool): SkillDirectory {
       const installLines = readmeInstallGuide.split("\n").slice(0, 25);
       for (const il of installLines) lines.push(il);
       lines.push("");
-    } else if (isLibrary && curated) {
-      // Use language-appropriate install for libraries
+    } else if (curated) {
+      // Use language-appropriate install (works for both libraries and CLIs)
       lines.push("```bash");
       lines.push(inferInstallCommand(tool, curated));
       lines.push("```");
     } else if (tool.source.format === "github") {
+      // GitHub tool without curated metadata — use detected language
+      const lang = detectToolLanguage(tool);
       lines.push("```bash");
-      lines.push(`# Clone from GitHub`);
-      lines.push(`git clone https://github.com/${tool.source.uri}.git`);
-      lines.push(`cd ${name}`);
-      lines.push("");
-      lines.push(`# Follow the project's README for build/install instructions`);
+      switch (lang) {
+        case "rust":
+          lines.push(`cargo binstall ${name}`);
+          lines.push(`# Or: cargo install ${name}`);
+          break;
+        case "go":
+          lines.push(`go install github.com/${tool.source.uri}@latest`);
+          break;
+        case "python":
+          lines.push(`uv tool install ${name}`);
+          lines.push(`# Or: pip install ${name}`);
+          break;
+        case "node":
+          lines.push(`npm install -g ${name}`);
+          break;
+        default:
+          lines.push(`# Download from https://github.com/${tool.source.uri}/releases`);
+          lines.push(`brew install ${name} # or download binary`);
+          break;
+      }
       lines.push("```");
     } else if (tool.source.format === "npm") {
       lines.push("```bash");
@@ -1800,10 +1891,15 @@ export function generateSkillDirectory(tool: Tool): SkillDirectory {
     lines.push("");
     lines.push("## Detailed Examples");
     lines.push("");
-    // Prefer README code blocks for real examples
-    const guideCodeBlocks = readmeSections?.codeBlocks.filter(b =>
-      b.code.length > 30 && !b.code.startsWith("pip install") && !b.code.startsWith("npm install")
-    ).slice(0, 3) ?? [];
+    // Prefer README code blocks for real examples (exclude install-only blocks)
+    const guideCodeBlocks = readmeSections?.codeBlocks.filter(b => {
+      if (b.code.length < 30) return false;
+      const lines = b.code.split("\n").filter(l => l.trim().length > 0);
+      // Reject blocks that are only install/package manager commands
+      const isInstallOnly = lines.every(l => INSTALL_CMD_RE.test(l.trim())
+        || l.trim().startsWith("#") || l.trim().startsWith("$") && l.trim().length < 5);
+      return !isInstallOnly;
+    }).slice(0, 3) ?? [];
     if (guideCodeBlocks.length > 0) {
       for (const block of guideCodeBlocks) {
         lines.push(`\`\`\`${block.lang}`);
@@ -1866,8 +1962,13 @@ export function generateSkillDirectory(tool: Tool): SkillDirectory {
       }
       lines.push("```");
     } else if (readmeSections && readmeSections.codeBlocks.length > 0) {
-      // Use actual code blocks from the README
-      for (const block of readmeSections.codeBlocks.slice(0, 5)) {
+      // Use actual code blocks from the README (exclude install-only blocks)
+      const usageBlocks = readmeSections.codeBlocks.filter(b => {
+        const bLines = b.code.split("\n").filter(l => l.trim().length > 0);
+        return !bLines.every(l => INSTALL_CMD_RE.test(l.trim())
+          || l.trim().startsWith("#") || l.trim().startsWith("$") && l.trim().length < 5);
+      });
+      for (const block of usageBlocks.slice(0, 5)) {
         lines.push(`\`\`\`${block.lang}`);
         lines.push(block.code);
         lines.push("```");
@@ -1939,35 +2040,45 @@ export function generateSkillDirectory(tool: Tool): SkillDirectory {
         lines.push(`- ${tip}`);
       }
     } else {
-      // Ecosystem-aware troubleshooting based on source format
-      const fmt = tool.source.format;
-      const curated = (tool as Tool & { _curatedMeta?: { category: string } })._curatedMeta;
-      const isPython = fmt === "pypi" || curated?.category.toLowerCase().includes("python");
-      const isNode = fmt === "npm";
-      const isRust = fmt === "crates";
-      const isGo = tool.meta.tags.some(t => t === "go" || t === "golang");
+      // Ecosystem-aware troubleshooting using detectToolLanguage()
+      const lang = detectToolLanguage(tool);
+      const releasesUrl = tool.meta.homepage || `https://github.com/${tool.source.uri}/releases`;
 
-      if (isPython) {
-        lines.push(`- **Installation fails**: Check Python version (3.10+ recommended): \`python3 --version\``);
-        lines.push(`- **Import errors**: Verify the package is installed: \`pip list | grep ${name}\``);
-        lines.push(`- **Version mismatch**: Update to latest: \`pip install --upgrade ${name}\``);
-        lines.push(`- **Virtual env issues**: Create a clean venv: \`uv venv && uv pip install ${name}\``);
-      } else if (isNode) {
-        lines.push(`- **Installation fails**: Check Node.js version (18+ recommended): \`node --version\``);
-        lines.push(`- **Module not found**: Verify installation: \`npm list -g ${name}\``);
-        lines.push(`- **Version mismatch**: Update to latest: \`npm update -g ${name}\``);
-        lines.push(`- **Permission errors**: Use \`npx ${name}\` instead of global install`);
-      } else if (isRust) {
-        lines.push(`- **Installation fails**: Install Rust toolchain: \`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh\``);
-        lines.push(`- **Binary not found**: Ensure \`~/.cargo/bin\` is in your PATH`);
-        lines.push(`- **Version mismatch**: Update: \`cargo install ${name}\``);
-      } else if (isGo || fmt === "github") {
-        lines.push(`- **Binary not found**: Download from [releases](${tool.meta.homepage || `https://github.com/${tool.source.uri}/releases`})`);
-        lines.push(`- **Build fails**: Check build requirements in project README`);
-        lines.push(`- **Version mismatch**: Download latest release or rebuild from source`);
-      } else {
-        lines.push(`- **Installation fails**: See project README for requirements`);
-        lines.push(`- **Not found**: Verify the tool is installed and in your PATH`);
+      switch (lang) {
+        case "python":
+          lines.push(`- **Installation fails**: Check Python version (3.10+ recommended): \`python3 --version\``);
+          lines.push(`- **Import errors**: Verify the package is installed: \`pip list | grep ${name}\``);
+          lines.push(`- **Version mismatch**: Update to latest: \`pip install --upgrade ${name}\``);
+          lines.push(`- **Virtual env issues**: Create a clean venv: \`uv venv && uv pip install ${name}\``);
+          break;
+        case "node":
+          lines.push(`- **Installation fails**: Check Node.js version (18+ recommended): \`node --version\``);
+          lines.push(`- **Module not found**: Verify installation: \`npm list -g ${name}\``);
+          lines.push(`- **Version mismatch**: Update to latest: \`npm update -g ${name}\``);
+          lines.push(`- **Permission errors**: Use \`npx ${name}\` instead of global install`);
+          break;
+        case "rust":
+          lines.push(`- **Installation fails**: Install Rust toolchain: \`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh\``);
+          lines.push(`- **Binary not found**: Ensure \`~/.cargo/bin\` is in your PATH: \`echo $PATH | grep cargo\``);
+          lines.push(`- **Build from source fails**: Check MSRV in Cargo.toml, update Rust: \`rustup update\``);
+          lines.push(`- **Version mismatch**: Update: \`cargo install ${name}\` or download from [releases](${releasesUrl})`);
+          break;
+        case "go":
+          lines.push(`- **Binary not found**: Download from [releases](${releasesUrl}) or \`go install github.com/${tool.source.uri}@latest\``);
+          lines.push(`- **GOBIN not in PATH**: Add \`export PATH=$PATH:$(go env GOPATH)/bin\` to your shell profile`);
+          lines.push(`- **Build fails**: Check Go version: \`go version\` (1.21+ recommended)`);
+          lines.push(`- **Version mismatch**: \`go install github.com/${tool.source.uri}@latest\``);
+          break;
+        case "c":
+          lines.push(`- **Build fails**: Install build dependencies: \`apt install build-essential\` or \`xcode-select --install\``);
+          lines.push(`- **Binary not found**: Download from [releases](${releasesUrl}) or build from source`);
+          lines.push(`- **Missing libraries**: Check README for required system dependencies`);
+          break;
+        default:
+          lines.push(`- **Binary not found**: Download from [releases](${releasesUrl})`);
+          lines.push(`- **Installation fails**: Try \`brew install ${name}\` or see project README`);
+          lines.push(`- **Version mismatch**: Download latest release from [releases](${releasesUrl})`);
+          break;
       }
     }
     lines.push("");
@@ -2020,9 +2131,40 @@ export function generateInstallScript(tool: Tool): string {
       break;
     case "github": {
       const uri = shellQuote(tool.source.uri);
-      lines.push(`# Clone and build from source`);
-      lines.push(`git clone "https://github.com/"${uri}".git"`, `cd ${name}`);
-      lines.push(`# Follow README for build instructions`);
+      const lang = detectToolLanguage(tool);
+      switch (lang) {
+        case "rust":
+          lines.push(`# Install via cargo-binstall (pre-built binaries)`);
+          lines.push(`cargo binstall ${name}`, "");
+          lines.push(`# Or build from source`);
+          lines.push(`cargo install --git "https://github.com/"${uri}".git"`);
+          break;
+        case "go":
+          lines.push(`# Install via go install`);
+          lines.push(`go install "github.com/"${uri}"@latest"`, "");
+          lines.push(`# Or download binary from releases`);
+          lines.push(`# https://github.com/${tool.source.uri}/releases`);
+          break;
+        case "python":
+          lines.push(`# Install via uv (recommended)`);
+          lines.push(`uv tool install ${name}`, "");
+          lines.push(`# Or: pip install ${name}`);
+          break;
+        case "node":
+          lines.push(`# Install via npm`);
+          lines.push(`npm install -g ${name}`, "");
+          lines.push(`# Or run without installing`);
+          lines.push(`npx ${name} --help`);
+          break;
+        default:
+          lines.push(`# Download pre-built binary from releases`);
+          lines.push(`# https://github.com/${tool.source.uri}/releases`, "");
+          lines.push(`# Or install via package manager`);
+          lines.push(`brew install ${name} 2>/dev/null || echo "See project README"`, "");
+          lines.push(`# Or build from source`);
+          lines.push(`git clone "https://github.com/"${uri}".git" && cd ${name}`);
+          break;
+      }
       break;
     }
     default:

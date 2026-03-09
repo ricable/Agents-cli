@@ -815,13 +815,22 @@ describe("spec-compliant skill generation", () => {
       expect(dir.skillMd).toContain('compatibility: "Rust toolchain"');
     });
 
-    it("github tool gets correct install script", () => {
-      const tool = makeMockTool({
-        source: { format: "github", uri: "astral-sh/uv" },
-        meta: { ...makeMockTool().meta, name: "uv" },
+    it("github tool gets language-aware install script", () => {
+      // Rust tool detected by tags
+      const rustTool = makeMockTool({
+        source: { format: "github", uri: "BurntSushi/ripgrep" },
+        meta: { ...makeMockTool().meta, name: "ripgrep", tags: ["rust", "cli"] },
       });
-      const dir = generateSkillDirectory(tool);
-      expect(dir.files["scripts/install.sh"]).toContain("git clone");
+      const rustDir = generateSkillDirectory(rustTool);
+      expect(rustDir.files["scripts/install.sh"]).toContain("cargo");
+
+      // Unknown language falls back to releases/brew
+      const unknownTool = makeMockTool({
+        source: { format: "github", uri: "astral-sh/uv" },
+        meta: { ...makeMockTool().meta, name: "uv", tags: [] },
+      });
+      const unknownDir = generateSkillDirectory(unknownTool);
+      expect(unknownDir.files["scripts/install.sh"]).toContain("releases");
     });
   });
 });

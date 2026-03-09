@@ -9,6 +9,9 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { ManifestEntry, PackageAnalysis, ExportGroup } from "./types.js";
 
+/** Regex that matches common package manager install commands */
+export const INSTALL_CMD_RE = /^\$?\s*(pip|npm|brew|cargo|go|apt|yum|dnf|scoop|choco|winget|port|snap|flatpak|pacman|emerge|nix-env|conda|zypper|apk|pkg|sudo\s+\w+)\s+(install|add|get|--install|-S)\b/;
+
 // ── README helpers ───────────────────────────────────────────────────────
 
 export function readReadme(repoDir: string): string {
@@ -54,6 +57,113 @@ export interface ReadmeSections {
   raw: string;
 }
 
+/** Check if a fenced code block contains actual code (not prose or install-only commands) */
+export function isActualCode(code: string, lang: string): boolean {
+  // Known code languages are code — but still filter trivial single-install blocks
+  const codeLangs = new Set(["bash", "sh", "shell", "zsh", "python", "py", "javascript", "js",
+    "typescript", "ts", "rust", "go", "ruby", "rb", "java", "c", "cpp", "yaml", "yml",
+    "json", "toml", "ini", "sql", "dockerfile", "makefile", "cmake", "lua", "perl",
+    "swift", "kotlin", "scala", "r", "powershell", "ps1", "fish", "elixir", "haskell"]);
+  // Filter out trivial single-line install commands (e.g. `$ brew install foo`)
+  const nonEmptyLines = code.split("\n").filter(l => l.trim().length > 0 && !l.trim().startsWith("#"));
+  if (nonEmptyLines.length <= 2) {
+    const allInstall = nonEmptyLines.every(l =>
+      INSTALL_CMD_RE.test(l.trim()));
+    if (allInstall) return false;
+  }
+  if (lang && codeLangs.has(lang.toLowerCase())) return true;
+  // Known non-code languages
+  if (["text", "txt", "output", "console", "log", "plaintext"].includes(lang.toLowerCase())) return false;
+
+  const lines = code.split("\n").filter(l => l.trim().length > 0);
+  if (lines.length === 0) return false;
+  // Heuristic: code lines typically start with special chars, commands, or keywords
+  const codeIndicators = /^[\s]*[$#>%]|^import |^from |^export |^const |^let |^var |^func |^fn |^def |^class |^use |^pub |^package |^module |[=(){}|;[\]<>]|^\w+\s+install\b|^\w+\s+--/;
+  const codeLineCount = lines.filter(l => codeIndicators.test(l)).length;
+  // If less than 30% of lines look like code, it's probably prose
+  return codeLineCount / lines.length >= 0.3;
+}
+
+/** Strip badges, HTML comments, and noise from a markdown section */
+export function cleanMarkdownSection(text: string): string {
+  return text
+    .split("\n")
+    .filter(line => {
+      const t = line.trim();
+      // Remove badge images: ![text](url)
+      if (/^!\[.*\]\(.*\)$/.test(t)) return false;
+      // Remove shields.io / repology badges
+      if (t.includes("shields.io") || t.includes("repology.org") || t.includes("badge")) return false;
+      // Remove HTML comments
+      if (/^<!--.*-->$/.test(t)) return false;
+      // Remove pure HTML block tags
+      if (/^<\/?(?:div|p|br|hr|a|details|summary|table|tr|td|th|img)\b[^>]*\/?>$/.test(t)) return false;
+      // Remove HTML with only id/class attributes (anchors)
+      if (/^<[a-z]+\s+(?:id|class)="[^"]*"\s*\/?>$/i.test(t)) return false;
+      return true;
+    })
+    .join("\n")
+    // Strip inline HTML comments spanning multiple lines
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/**
+ * Extract CLI commands for a specific tool from README code blocks.
+ * Only returns commands where the first token matches the tool name.
+ */
+export function extractCommandsFromReadme(
+  readme: string,
+  toolName: string,
+): Array<{ name: string; description: string }> {
+  const commands: Array<{ name: string; description: string }> = [];
+  const seen = new Set<string>();
+  const lines = readme.split("\n");
+
+  let insideCodeBlock = false;
+  let prevComment = "";
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("```")) {
+      insideCodeBlock = !insideCodeBlock;
+      if (!insideCodeBlock) prevComment = "";
+      continue;
+    }
+    if (!insideCodeBlock) {
+      prevComment = "";
+      continue;
+    }
+    // Track comment lines as potential descriptions
+    if (trimmed.startsWith("#") && !trimmed.startsWith("#!")) {
+      prevComment = trimmed.replace(/^#+\s*/, "").trim();
+      continue;
+    }
+    // Match command lines: $ tool subcommand or tool subcommand
+    const cmdMatch = trimmed.match(new RegExp(`^\\$?\\s*${escapeRegex(toolName)}\\s+(\\S+)`));
+    if (cmdMatch) {
+      const subcmd = cmdMatch[1]!;
+      // Skip flags, file paths, special chars, and very short tokens
+      if (subcmd.startsWith("-") || subcmd.includes("/") || subcmd.includes(".")) continue;
+      if (subcmd.length < 2 || /^[^a-zA-Z]/.test(subcmd)) continue;
+      if (/^[…>|&]/.test(subcmd)) continue;
+      // Skip common shell redirection artifacts
+      if (["2>/dev/null", ">", ">>", "|", "&&", "||"].includes(subcmd)) continue;
+      if (!seen.has(subcmd)) {
+        seen.add(subcmd);
+        commands.push({ name: subcmd, description: prevComment || subcmd });
+      }
+      prevComment = "";
+    }
+  }
+  return commands.slice(0, 10);
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /**
  * Extract structured sections from a README.
  * Returns code blocks and heading-keyed sections for enriching skill content.
@@ -62,13 +172,14 @@ export function extractReadmeSections(readme: string, maxSectionChars = 2000): R
   const result: ReadmeSections = { codeBlocks: [], sections: {}, raw: readme.slice(0, 10000) };
   if (!readme) return result;
 
-  // Extract all fenced code blocks (any language)
+  // Extract all fenced code blocks (any language), filtering out prose
   const codeRe = /```(\w*)\n([\s\S]*?)```/g;
   let cm: RegExpExecArray | null;
   while ((cm = codeRe.exec(readme)) !== null && result.codeBlocks.length < 10) {
     const code = cm[2]!.trim();
-    if (code.length >= 10) {
-      result.codeBlocks.push({ lang: cm[1] || "bash", code: code.slice(0, 1500) });
+    const lang = cm[1] || "bash";
+    if (code.length >= 10 && isActualCode(code, lang)) {
+      result.codeBlocks.push({ lang, code: code.slice(0, 1500) });
     }
   }
 
@@ -91,7 +202,7 @@ export function extractReadmeSections(readme: string, maxSectionChars = 2000): R
     if (headingMatch) {
       // Save previous section
       if (currentHeading && currentContent.length > 0) {
-        const text = currentContent.join("\n").trim().slice(0, maxSectionChars);
+        const text = cleanMarkdownSection(currentContent.join("\n")).slice(0, maxSectionChars);
         if (text.length > 10) {
           result.sections[currentHeading] = text;
         }
@@ -104,7 +215,7 @@ export function extractReadmeSections(readme: string, maxSectionChars = 2000): R
   }
   // Save last section
   if (currentHeading && currentContent.length > 0) {
-    const text = currentContent.join("\n").trim().slice(0, maxSectionChars);
+    const text = cleanMarkdownSection(currentContent.join("\n")).slice(0, maxSectionChars);
     if (text.length > 10) {
       result.sections[currentHeading] = text;
     }

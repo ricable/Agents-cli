@@ -56,7 +56,7 @@ import { discoverPyPIPackages } from "../../lib/classifier/pypi.js";
 
 // Chunking + extraction
 import { chunkFileAST, shouldSkipFile, extractMetadataChunks } from "../../lib/chunker.js";
-import { analyzeRepo, extractExportGroups, findEntryPoints, extractCodeBlocks, readReadme, extractReadmeSections } from "../../lib/extractor.js";
+import { analyzeRepo, extractExportGroups, findEntryPoints, extractCodeBlocks, readReadme, extractReadmeSections, extractCommandsFromReadme } from "../../lib/extractor.js";
 
 // Indexing
 import { groupByDomain, generateDomainIndex, generateMasterIndex } from "../../lib/indexes.js";
@@ -331,6 +331,25 @@ export function forgeSkill(tool: Tool, opts: ForgeSkillOptions): ForgedSkill {
       if (readme.length > 50) {
         const sections = extractReadmeSections(readme);
         (tool as Tool & { _readmeSections?: typeof sections })._readmeSections = sections;
+
+        // If analyzer found 0 commands, try extracting from README code blocks
+        if (tool.capabilities.commands.length === 0) {
+          const readmeCommands = extractCommandsFromReadme(readme, tool.meta.name);
+          if (readmeCommands.length > 0) {
+            const synthCommands = readmeCommands.map(c => ({
+              name: c.name,
+              description: c.description,
+              flags: [] as readonly import("../../lib/types.js").ToolFlag[],
+            }));
+            tool = {
+              ...tool,
+              capabilities: {
+                ...tool.capabilities,
+                commands: synthCommands,
+              },
+            } as Tool;
+          }
+        }
       }
     } catch { /* non-fatal */ }
   }
