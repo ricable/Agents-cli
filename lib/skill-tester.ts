@@ -154,7 +154,9 @@ export function scoreTrigger(description: string): number {
   if (/do not use for|don't use for/i.test(description)) score += 0.2;
 
   // Structured "Use when X, Y, Z" with multiple comma-separated triggers
-  const useWhenMatch = description.match(/use when (.+?)(?:\.|$)/i);
+  // Use a regex that stops at ". <Uppercase>" (next sentence) or end, not at dots
+  // within tech terms like nltk.word_tokenize or @0.20.0
+  const useWhenMatch = description.match(/use when (.+?)(?:\.\s+[A-Z]|\.\s*$)/i);
   if (useWhenMatch && useWhenMatch[1] && useWhenMatch[1].split(",").length >= 2) {
     score += 0.1;
   }

@@ -25,7 +25,7 @@ Built on the "Rewrite Your CLI for AI Agents" philosophy — every command outpu
 - **Structured output everywhere**: Every command must support `--json` flag and `OUTPUT_FORMAT=json` env var via the `CliOutput<T>` envelope from `lib/output.ts`. Error paths must also use `emit(failure(...))` when `--json` is active — never fall back to bare `console.error`.
 - **Dry-run on mutating commands**: All commands that modify state must support `--dry-run`. This includes file writes, index generation, and lockfile creation — not just the primary operation.
 - **Input hardening**: All user/agent inputs must pass through guards in `lib/guards.ts` before use. Key guards: `validateSource()` for tool URIs, `validateToolName()` for tool names used in paths/scripts, `rejectPathTraversal()` for file paths.
-- **Skill description quality**: Generated descriptions must include "Use when" + action verbs recognized by `scoreTrigger()` (e.g. "running", "building", "deploying", "configuring", "managing", "processing"). Trigger score must be ≥ 0.80. Use `CATEGORY_ACTION_MAP` (module-level constant) in `buildDescription()` for curated tools — triggers use `%` placeholder templated with tool name for uniqueness (e.g. "searching code with %").
+- **Skill description quality**: Generated descriptions must include "Use when" + action verbs recognized by `scoreTrigger()` (e.g. "running", "building", "deploying", "configuring", "managing", "processing"), a "Do NOT use for" negative trigger clause (from `DOMAIN_NEGATIVE_TRIGGERS`), and 2+ TechNames (capitalized words like `Python`, `Docker`). All three are required to reach trigger score 1.0. Trigger score must be ≥ 0.80. Use `CATEGORY_ACTION_MAP` (module-level constant) in `buildDescription()` for curated tools — triggers use `%` placeholder templated with tool name for uniqueness (e.g. "searching code with %"). The `scoreTrigger()` formula: +0.3 "Use when", +0.4 action verbs (0.15 each, 3 needed), +0.2 "Do NOT use for", +0.1 comma-separated triggers, +0.1 TechNames.
 - **Ecosystem-aware content**: Generated troubleshooting, install scripts, and guides must match the tool's actual ecosystem. Use `detectToolLanguage(tool)` which checks source format → GitHub topics → installed files (Cargo.toml/go.mod/etc.) → curated category. Never suggest `pip install` for a Rust binary or `npm update` for a Python tool.
 - **No fabricated commands**: Never generate CLI subcommands that don't exist. Only emit commands extracted from actual `--help` output or README code blocks. Libraries with 0 commands get API usage, not fake CLI commands.
 - **Version resolution fallbacks**: GitHub tools may get 0.0.0 when API is rate-limited. The pipeline uses: GitHub releases API → GitHub tags API → `readSourceVersion()` (Cargo.toml/pyproject.toml/CMakeLists.txt) → package.json → "0.0.0". Set `GITHUB_TOKEN` env var to increase rate limit from 60 to 5000 requests/hour.
@@ -46,6 +46,18 @@ npx tsx bin/agents-cli.ts <command>
 
 # Run CLI from build
 node dist/bin/agents-cli.js <command>
+```
+
+### Skill quality & regeneration
+
+```bash
+# Regenerate all SKILL.md from stored tool metadata (no re-download)
+npx tsx examples/regenerate-skills.ts [--dry-run] [--verbose]
+
+# Audit skill quality scores
+npx tsx examples/skill-forge.ts --audit
+npx tsx examples/skill-forge.ts --audit --domain agent
+npx tsx examples/skill-forge.ts --audit --ai --strict
 ```
 
 ## CLI commands reference
@@ -302,9 +314,9 @@ examples/
     mode-system.ts         — --system mode (PATH discovery)
     mode-mcp.ts            — --mcp mode (MCP server)
   cli-anything-gimp/       — local Python CLI tool (Pillow image ops, --json output, 6 subcommands)
-  regenerate-skills.ts     — batch regeneration of existing skills
+  regenerate-skills.ts     — batch regeneration of existing skills (reads tools.json, no re-download)
   chunker-demo.ts          — AST chunking demonstration
-  generated-skills/        — 350+ auto-generated skill directories
+  generated-skills/        — 393+ auto-generated skill directories (all at trigger score 1.0)
   generated-workflows/     — template-generated agent code
 tests/
   skills.test.ts, resolver.test.ts, guards.test.ts, analyzer.test.ts,
@@ -474,6 +486,18 @@ Generated skills must comply with the Anthropic skill specification:
 Quality gate thresholds (from `testSkillSync`):
 - Trigger score ≥ 0.80 (fraction of trigger queries that match the description)
 - Quality score ≥ 6/10 (structural quality check)
+
+`scoreTrigger()` formula breakdown (max 1.0):
+- +0.3: contains "Use when"
+- +0.4: action verbs (0.15 each, cap at 3 verbs matched from 60+ recognized verbs)
+- +0.2: contains "Do NOT use for" negative trigger (from `DOMAIN_NEGATIVE_TRIGGERS` map)
+- +0.1: multiple comma-separated triggers after "Use when" (≥ 2 clauses)
+- +0.1: 2+ TechNames — capitalized words ≥ 3 chars (e.g. `Python`, `Docker`, `BentoML`)
+
+`buildDescription()` auto-generates all five components:
+- `CATEGORY_ACTION_MAP` provides domain-specific action verbs with `%` tool-name templates
+- `DOMAIN_NEGATIVE_TRIGGERS` maps 40+ domain categories to "Do NOT use for" phrases
+- `detectToolLanguage()` appends ecosystem TechNames when description has < 2 (e.g. "Built with Python Package.")
 
 ## Key function signatures
 

@@ -639,6 +639,70 @@ const CATEGORY_ACTION_MAP: Record<string, string[]> = {
   "gui-wrappers": ["running batch image operations with %", "converting and processing files via %", "automating GUI application tasks using %"],
   "network": ["analyzing network paths with %", "querying DNS records via %", "testing and monitoring connections using %"],
   "ai-ml": ["running AI models with %", "building intelligent workflows using %", "processing and generating content via %"],
+  // inferDomain categories not covered above
+  "containers": ["deploying containers with %", "managing Docker and Kubernetes using %", "orchestrating container services via %"],
+  "linter": ["linting code with %", "formatting source files using %", "checking code quality via %"],
+  "llm": ["running LLM inference with %", "generating text using %", "processing prompts via %"],
+  "ml": ["training models with %", "running inference via %", "evaluating model performance using %"],
+  "search": ["searching files with %", "finding patterns using %", "querying codebases via %"],
+  "data": ["processing data with %", "converting formats using %", "transforming datasets via %"],
+  "http": ["calling HTTP APIs with %", "testing endpoints using %", "debugging HTTP requests via %"],
+  "agents": ["building AI agents with %", "orchestrating agent workflows via %", "automating autonomous tasks using %"],
+  "rag": ["building retrieval pipelines with %", "embedding documents using %", "indexing knowledge bases via %"],
+  "package-manager": ["installing packages with %", "managing dependencies using %", "resolving versions via %"],
+  "automation": ["automating tasks with %", "scripting workflows using %", "scheduling jobs via %"],
+  "build-tools": ["building projects with %", "bundling code using %", "compiling assets via %"],
+  "general": ["running % commands", "configuring % workflows", "managing % tasks"],
+};
+
+/**
+ * Domain → negative trigger phrase for "Do NOT use for" clause.
+ * Adding this boosts scoreTrigger() by +0.2 points.
+ */
+const DOMAIN_NEGATIVE_TRIGGERS: Record<string, string> = {
+  "python": "non-Python language projects",
+  "javascript": "non-JavaScript or non-TypeScript projects",
+  "linter": "runtime execution or deployment tasks",
+  "testing": "production deployment or code generation",
+  "security": "general application development unrelated to security",
+  "containers": "bare-metal deployments without containerization",
+  "cloud": "local-only development without cloud resources",
+  "database": "in-memory caching or file-based storage",
+  "monitoring": "initial development before deployment",
+  "documentation": "runtime code execution or testing",
+  "git": "file editing or code generation tasks",
+  "http": "local file operations or database queries",
+  "data": "real-time streaming or interactive user interfaces",
+  "data-processing": "real-time streaming or interactive user interfaces",
+  "search": "file editing or code generation",
+  "code-search": "file editing or code generation",
+  "llm": "traditional rule-based or non-AI tasks",
+  "ml": "simple rule-based logic that does not require machine learning",
+  "agents": "simple single-step tasks that do not need orchestration",
+  "rag": "tasks that do not involve document retrieval or knowledge bases",
+  "package-manager": "runtime application logic or deployment",
+  "package-managers": "runtime application logic or deployment",
+  "build-tools": "runtime execution or production monitoring",
+  "automation": "interactive manual workflows",
+  "devops": "local development without infrastructure concerns",
+  "network": "application-level business logic",
+  "browser": "backend server tasks or CLI-only workflows",
+  "file-processing": "database queries or network operations",
+  "gui-wrappers": "headless server environments without GUI",
+  "ai-ml": "non-AI traditional programming tasks",
+  "ai-ml/llm-inference": "non-LLM computation tasks",
+  "ai-ml/ai-agents": "simple single-step automation without agent orchestration",
+  "ai-ml/ai-coding": "non-code generation or manual coding tasks",
+  "ai-ml/rag-and-embeddings": "tasks not involving document retrieval",
+  "ai-ml/vector-search": "relational database queries or text-based search",
+  "ai-ml/ml-frameworks": "simple data processing without model training",
+  "ai-ml/model-serving": "model training or data preparation tasks",
+  "ai-ml/model-optimization": "initial model training or data collection",
+  "ai-ml/fine-tuning": "inference-only tasks that do not require model adaptation",
+  "ai-ml/data-processing": "real-time streaming or interactive UIs",
+  "ai-ml/mlops-pipelines": "local development without ML infrastructure",
+  "ai-ml/ai-apis": "offline or local-only computation",
+  "general": "tasks better served by a domain-specific tool",
 };
 
 /**
@@ -781,7 +845,45 @@ function buildDescription(tool: Tool): string {
   }
 
   const triggerPhrase = triggers.join(", ");
-  const full = `${effectiveDesc}. Use when ${triggerPhrase}.`;
+
+  // Add negative trigger ("Do NOT use for") for +0.2 score boost
+  let negativeTrigger = "";
+  const curatedCat = curated?.category?.toLowerCase();
+  const domainCat = inferDomain(tool).category;
+  // Try curated category first, then inferred domain
+  const negKey = (curatedCat && DOMAIN_NEGATIVE_TRIGGERS[curatedCat])
+    ? curatedCat
+    : DOMAIN_NEGATIVE_TRIGGERS[domainCat]
+      ? domainCat
+      : "";
+  if (negKey) {
+    negativeTrigger = ` Do NOT use for ${DOMAIN_NEGATIVE_TRIGGERS[negKey]}.`;
+  }
+
+  // Ensure 2+ TechNames (capitalized words) for +0.1 score boost
+  let techSuffix = "";
+  const draft = `${effectiveDesc}. Use when ${triggerPhrase}.${negativeTrigger}`;
+  const techNames = draft.match(/\b[A-Z][a-zA-Z]{2,}\b/g) ?? [];
+  if (techNames.length < 2) {
+    const langToTech: Record<string, string> = {
+      rust: "Rust Cargo",
+      go: "Go Module",
+      python: "Python Package",
+      node: "Node JavaScript",
+      c: "Native Binary",
+    };
+    const lang = detectToolLanguage(tool);
+    const extra = langToTech[lang];
+    if (extra) {
+      techSuffix = ` Built with ${extra}.`;
+    } else {
+      // Capitalize tool name as fallback TechName
+      const capitalized = name.charAt(0).toUpperCase() + name.slice(1);
+      techSuffix = ` Integrates with ${capitalized} CLI.`;
+    }
+  }
+
+  const full = `${effectiveDesc}. Use when ${triggerPhrase}.${negativeTrigger}${techSuffix}`;
   return full.length > 1024 ? full.slice(0, 1021) + "..." : full;
 }
 
@@ -1588,8 +1690,19 @@ function generateLibraryQuickStart(
     const safeName = name.toLowerCase().replace(/[^a-z0-9]/g, "");
     if (code.includes("import ") || code.includes("require(") || code.includes("from ")) return true;
     if (code.includes(safeName)) return true;
-    // Skip pure bash/shell blocks for libraries
-    if (b.lang === "bash" || b.lang === "sh" || b.lang === "shell") return false;
+    // Accept bash/shell blocks that reference the tool name (real CLI usage, not just install)
+    if (b.lang === "bash" || b.lang === "sh" || b.lang === "shell") {
+      const binName = name.toLowerCase().replace(/[^a-z0-9-]/g, "");
+      const lines = code.split("\n").filter(l => l.trim().length > 0 && !l.trim().startsWith("#"));
+      const hasToolUsage = lines.some(l => {
+        const trimmed = l.trim().replace(/^\$\s*/, "");
+        return trimmed.startsWith(binName + " ") || trimmed.startsWith(binName + "\t");
+      });
+      if (hasToolUsage) return true;
+      return false;
+    }
+    // Accept YAML/TOML config blocks (tool configuration files)
+    if (b.lang === "yaml" || b.lang === "yml" || b.lang === "toml") return true;
     return b.lang === "python" || b.lang === "javascript" || b.lang === "typescript" || b.lang === "js" || b.lang === "ts";
   });
 
@@ -2161,8 +2274,25 @@ export function generateSkillDirectory(tool: Tool): SkillDirectory {
       }
       lines.push("```");
     } else if (readmeSections && readmeSections.codeBlocks.length > 0) {
-      // Use actual code blocks from the README (exclude install-only blocks)
+      // Compute which blocks were used in Quick Start (first 2 api-like blocks) for dedup
+      const quickStartCodes = new Set<string>();
+      if (isLibrary) {
+        let apiCount = 0;
+        for (const b of readmeSections.codeBlocks) {
+          if (apiCount >= 2) break;
+          const code = b.code.toLowerCase();
+          if (INSTALL_CMD_RE.test(code) && code.split("\n").length < 3) continue;
+          const safeName = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+          const isApi = code.includes("import ") || code.includes("require(") || code.includes("from ")
+            || code.includes(safeName)
+            || b.lang === "yaml" || b.lang === "yml" || b.lang === "toml"
+            || b.lang === "python" || b.lang === "javascript" || b.lang === "typescript";
+          if (isApi) { quickStartCodes.add(b.code); apiCount++; }
+        }
+      }
+      // Use actual code blocks from the README (exclude install-only blocks and blocks already in Quick Start)
       const usageBlocks = readmeSections.codeBlocks.filter(b => {
+        if (quickStartCodes.has(b.code)) return false;
         const bLines = b.code.split("\n").filter(l => l.trim().length > 0);
         return !bLines.every(l => INSTALL_CMD_RE.test(l.trim())
           || l.trim().startsWith("#") || l.trim().startsWith("$") && l.trim().length < 5);

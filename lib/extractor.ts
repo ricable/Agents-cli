@@ -57,6 +57,11 @@ export function isActualCode(code: string, lang: string): boolean {
     "typescript", "ts", "rust", "go", "ruby", "rb", "java", "c", "cpp", "yaml", "yml",
     "json", "toml", "ini", "sql", "dockerfile", "makefile", "cmake", "lua", "perl",
     "swift", "kotlin", "scala", "r", "powershell", "ps1", "fish", "elixir", "haskell"]);
+
+  // Filter out BibTeX/academic citation blocks
+  const CITATION_RE = /^\s*@(?:inproceedings|article|misc|book|techreport|phdthesis|mastersthesis)\s*\{/m;
+  if (CITATION_RE.test(code)) return false;
+
   // Filter out trivial single-line install commands (e.g. `$ brew install foo`)
   const nonEmptyLines = code.split("\n").filter(l => l.trim().length > 0 && !l.trim().startsWith("#"));
   if (nonEmptyLines.length <= 2) {
@@ -277,7 +282,11 @@ export function readSourceVersion(repoDir: string): string | undefined {
   try {
     const pyproj = readFileSync(join(repoDir, "pyproject.toml"), "utf-8");
     const ver = pyproj.match(/version\s*=\s*"([^"]+)"/);
-    if (ver) return ver[1];
+    if (ver) {
+      const v = ver[1]!;
+      // Skip dynamic version markers like "attr:" or "{attr:" — these aren't real versions
+      if (!/^(?:\{?\s*attr:|file:)/.test(v)) return v;
+    }
   } catch { /* no pyproject.toml */ }
 
   // Python: setup.cfg
