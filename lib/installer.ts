@@ -182,11 +182,27 @@ async function installFromGithub(
   const { owner, repo } = parsed;
   const ref = source.ref ?? "main";
 
-  // Download tarball
+  // Download tarball — try specified ref first, fall back to common alternatives
   const tmpFile = join(tmpdir(), `agents-cli-${randomBytes(6).toString("hex")}.tar.gz`);
-  const tarballUrl = `https://github.com/${owner}/${repo}/archive/refs/heads/${ref}.tar.gz`;
-
-  await downloadFile(tarballUrl, tmpFile);
+  const branches = ref === "main" ? ["main", "master", "develop"] : [ref, "main", "master"];
+  let downloaded = false;
+  for (const branch of branches) {
+    const tarballUrl = `https://github.com/${owner}/${repo}/archive/refs/heads/${branch}.tar.gz`;
+    try {
+      await downloadFile(tarballUrl, tmpFile);
+      downloaded = true;
+      break;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("404") && branch !== branches[branches.length - 1]) {
+        continue; // try next branch
+      }
+      if (!msg.includes("404")) throw err; // non-404 errors are real failures
+    }
+  }
+  if (!downloaded) {
+    throw new Error(`HTTP 404 downloading https://github.com/${owner}/${repo} (tried branches: ${branches.join(", ")})`);
+  }
 
   // Extract to dest
   mkdirSync(dest, { recursive: true });

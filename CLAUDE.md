@@ -24,6 +24,10 @@ Built on the "Rewrite Your CLI for AI Agents" philosophy — every command outpu
 - **Structured output everywhere**: Every command must support `--json` flag and `OUTPUT_FORMAT=json` env var via the `CliOutput<T>` envelope from `lib/output.ts`. Error paths must also use `emit(failure(...))` when `--json` is active — never fall back to bare `console.error`.
 - **Dry-run on mutating commands**: All commands that modify state must support `--dry-run`. This includes file writes, index generation, and lockfile creation — not just the primary operation.
 - **Input hardening**: All user/agent inputs must pass through guards in `lib/guards.ts` before use. Key guards: `validateSource()` for tool URIs, `validateToolName()` for tool names used in paths/scripts, `rejectPathTraversal()` for file paths.
+- **Skill description quality**: Generated descriptions must include "Use when" + action verbs recognized by `scoreTrigger()` (e.g. "running", "building", "deploying", "configuring", "managing", "processing"). Trigger score must be ≥ 0.80. Use `categoryActionMap` in `buildDescription()` for curated tools.
+- **Ecosystem-aware content**: Generated troubleshooting, install scripts, and guides must match the tool's actual ecosystem (Python→pip/uv, npm→npm/npx, Rust→cargo, Go→releases). Never suggest `pip install` for a Rust binary or `npm update` for a Python tool.
+- **No fabricated commands**: Never generate CLI subcommands that don't exist. Only emit commands extracted from actual `--help` output or README code blocks. Libraries with 0 commands get API usage, not fake CLI commands.
+- **Frontmatter fields**: `ALLOWED_FIELDS` in `lib/guards.ts` must include all fields used by the forge: `name`, `description`, `version`, `ingredients`, `tags`, `domain`, `allowed-tools`, `compatibility`, `license`, `metadata`.
 
 ## Key commands
 
@@ -156,6 +160,7 @@ npx tsx examples/skill-forge.ts --curated --list-categories
 npx tsx examples/skill-forge.ts --curated --category ai-ml/llm-inference
 npx tsx examples/skill-forge.ts --curated --category code-search --limit 5
 npx tsx examples/skill-forge.ts --curated --skip-installed --limit 20
+npx tsx examples/skill-forge.ts --curated --force --limit 600  # full run, all tools
 
 # Workflow mode — NL prompt → template-based agent code generation
 npx tsx examples/skill-forge.ts --workflow "build a content publishing pipeline"
@@ -237,7 +242,7 @@ lib/
   mcp.ts               — MCP bridge for exposing tools to AI agents
   mcp-skill.ts         — opensrc MCP skill bridge (callOpensrc, opensrc)
   chunker.ts           — AST-aware semantic chunking of source files
-  extractor.ts         — README excerpts, code blocks, export groups, repo analysis
+  extractor.ts         — README excerpts, code blocks, export groups, repo analysis, section extraction
   curated-tools.ts     — 91 general + AI/ML tool registry for --curated mode
   cache.ts             — SkillCache, file hashing, incremental generation
   search.ts            — hybrid FTS + vector search (lazy better-sqlite3)
@@ -324,11 +329,11 @@ Bare names without `/` or prefix (e.g. `httpie`) fall back to `pypi:` then error
 ## Pipeline flow
 
 1. **Resolve** — `createResolver()` detects format (github/npm/pypi/crates/local), fetches metadata from API
-2. **Install** — `createInstaller()` downloads tarball, extracts, runs `npm install` / `uv pip install` / `cargo binstall`
+2. **Install** — `createInstaller()` downloads tarball (with branch fallback: main→master→develop), extracts, runs `npm install` / `uv pip install` / `cargo binstall`. Huge repos (bun, pytorch, etc.) are skipped via `HUGE_REPOS` set in `stages.ts`.
 3. **Analyze** — `createAnalyzer()` runs `--help`/`-h`/`help`, parses commands and flags (recursive mode available)
 4. **Deep probe** — `deepProbe(binPath, { maxDepth })` recursively probes subcommand trees; returns `{ tree, totalCommands }`
 5. **Store** — `createStore()` persists tool JSON + generates CONTEXT.md
-6. **Generate** — `generateRichSkillMd()` / `generateSkillDirectory()` produces SKILL.md + references/ + scripts/
+6. **Generate** — `generateRichSkillMd()` / `generateSkillDirectory()` produces SKILL.md + references/ + scripts/. Uses curated metadata (`_curatedMeta`) for category-specific triggers and README sections (`_readmeSections`) for real content. Troubleshooting and install scripts are ecosystem-aware (Python/Node/Rust/Go).
 7. **Quality** — `testSkillSync()` / `assessQuality()` trigger scoring + structural quality gate
 8. **Index** — `groupByDomain()` / `generateMasterIndex()` domain grouping + index skills
 9. **Factory** — `runSkillFactory()` optional 3-layer pipeline (structural → AI-enhanced)
@@ -431,6 +436,11 @@ loadAiMlTools(projectRoot: string): CliTool[]   // AI/ML tools only
 getCategories(tools: CliTool[]): string[]       // unique sorted categories
 GENERAL_TOOLS: CliTool[]                        // 91 general-purpose CLI tools
 
+// Extractor (lib/extractor.ts) — README content extraction for skill generation
+extractReadmeSections(readme: string, maxSectionChars?: number): ReadmeSections  // code-block-aware section splitting
+extractReadmeExcerpt(readme: string, maxChars?: number): string
+extractCodeBlocks(markdown: string, maxBlocks?: number, maxChars?: number): string[]
+
 // Skill factory (lib/skill-factory.ts)
 runSkillFactory(opts: SkillFactoryOptions): Promise<SkillFactoryResult>
 
@@ -458,3 +468,6 @@ generateMasterIndex(manifest: Manifest, triggers: DomainTriggers): string
 - Add HTTP helpers without SSRF checks — validate hostname and cap response body size
 - Use magic numbers for detection — check file existence directly (e.g. `existsSync`) not indirect heuristics
 - Match frontmatter fields with full-content regex — use `parseFrontmatter()` return values (it extracts `domain`, `name`, `description`, etc.)
+- Generate fabricated CLI subcommands — only emit commands from actual `--help` output or README code blocks
+- Use the same trigger text for different tool categories — each `categoryActionMap` entry must be unique and match the tool's actual domain
+- Suggest wrong package managers in generated content — match ecosystem to source format (pypi→pip, npm→npm, crates→cargo, github→releases)

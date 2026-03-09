@@ -44,6 +44,75 @@ export function extractReadmeExcerpt(readme: string, maxChars = 400): string {
   return prose.join(" ").slice(0, maxChars);
 }
 
+/** Extracted README sections keyed by normalized heading */
+export interface ReadmeSections {
+  /** All code blocks (any language) from the README, capped at 10 */
+  codeBlocks: Array<{ lang: string; code: string }>;
+  /** Sections by heading (lowercase, e.g. "quick start", "installation", "usage") */
+  sections: Record<string, string>;
+  /** Full README text (capped) */
+  raw: string;
+}
+
+/**
+ * Extract structured sections from a README.
+ * Returns code blocks and heading-keyed sections for enriching skill content.
+ */
+export function extractReadmeSections(readme: string, maxSectionChars = 2000): ReadmeSections {
+  const result: ReadmeSections = { codeBlocks: [], sections: {}, raw: readme.slice(0, 10000) };
+  if (!readme) return result;
+
+  // Extract all fenced code blocks (any language)
+  const codeRe = /```(\w*)\n([\s\S]*?)```/g;
+  let cm: RegExpExecArray | null;
+  while ((cm = codeRe.exec(readme)) !== null && result.codeBlocks.length < 10) {
+    const code = cm[2]!.trim();
+    if (code.length >= 10) {
+      result.codeBlocks.push({ lang: cm[1] || "bash", code: code.slice(0, 1500) });
+    }
+  }
+
+  // Extract sections by heading (respecting code blocks)
+  const lines = readme.split("\n");
+  let currentHeading = "";
+  let currentContent: string[] = [];
+  let insideCodeBlock = false;
+
+  for (const line of lines) {
+    // Track code block boundaries
+    if (line.trimStart().startsWith("```")) {
+      insideCodeBlock = !insideCodeBlock;
+      currentContent.push(line);
+      continue;
+    }
+
+    // Only split on headings outside code blocks
+    const headingMatch = !insideCodeBlock && line.match(/^#{1,3}\s+(.+)/);
+    if (headingMatch) {
+      // Save previous section
+      if (currentHeading && currentContent.length > 0) {
+        const text = currentContent.join("\n").trim().slice(0, maxSectionChars);
+        if (text.length > 10) {
+          result.sections[currentHeading] = text;
+        }
+      }
+      currentHeading = headingMatch[1]!.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+      currentContent = [];
+    } else {
+      currentContent.push(line);
+    }
+  }
+  // Save last section
+  if (currentHeading && currentContent.length > 0) {
+    const text = currentContent.join("\n").trim().slice(0, maxSectionChars);
+    if (text.length > 10) {
+      result.sections[currentHeading] = text;
+    }
+  }
+
+  return result;
+}
+
 /**
  * Extracts fenced TypeScript/JavaScript code blocks from markdown.
  * Returns up to maxBlocks blocks, each capped at maxChars characters.

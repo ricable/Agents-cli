@@ -87,9 +87,17 @@ export interface QualityResult {
   validationErrors?: string[];
 }
 
+/** Curated metadata from ai-ml-tools.json or curated-tools.ts */
+export interface CuratedMeta {
+  description: string;
+  agentValue: string;
+  category: string;
+}
+
 export interface BatchItem {
   label: string;
   source: string;
+  curatedMeta?: CuratedMeta;
 }
 
 export interface BatchResult {

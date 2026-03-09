@@ -98,6 +98,8 @@ export class InputValidationError extends Error {
 /** Allowed top-level YAML fields in SKILL.md frontmatter */
 const ALLOWED_FIELDS = new Set([
   "name", "description", "allowed-tools", "compatibility", "license", "metadata",
+  // Extended fields used by skill-forge pipeline
+  "version", "ingredients", "tags", "domain",
 ]) as ReadonlySet<string>;
 
 /**

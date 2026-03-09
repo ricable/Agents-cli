@@ -97,6 +97,11 @@ export async function curatedMode(args: CliArgs, startTime: number): Promise<voi
     source: meta.sourceType === "npm"
       ? (meta.source.startsWith("@") ? meta.source : `npm:${meta.source}`)
       : meta.source,
+    curatedMeta: {
+      description: meta.description,
+      agentValue: meta.agentValue,
+      category: meta.category,
+    },
   }));
 
   const { results, failures } = await processBatch(batchItems, { deep: args.deep, noCache: args.noCache, force: args.force });

@@ -56,7 +56,7 @@ import { discoverPyPIPackages } from "../../lib/classifier/pypi.js";
 
 // Chunking + extraction
 import { chunkFileAST, shouldSkipFile, extractMetadataChunks } from "../../lib/chunker.js";
-import { analyzeRepo, extractExportGroups, findEntryPoints, extractCodeBlocks, readReadme } from "../../lib/extractor.js";
+import { analyzeRepo, extractExportGroups, findEntryPoints, extractCodeBlocks, readReadme, extractReadmeSections } from "../../lib/extractor.js";
 
 // Indexing
 import { groupByDomain, generateDomainIndex, generateMasterIndex } from "../../lib/indexes.js";
@@ -173,6 +173,19 @@ export async function resolveInstallAnalyze(
       return resolveInstallAnalyze(pypiSource, deep);
     }
     throw new Error(`Unsupported source format: ${source}. Use owner/repo, @scope/pkg, pypi:name, or crates:name`);
+  }
+
+  // Skip known huge repos (>200MB tarball) that take too long to download
+  const HUGE_REPOS = new Set([
+    "oven-sh/bun", "NVIDIA/TensorRT-LLM", "pytorch/pytorch", "tensorflow/tensorflow",
+    "huggingface/transformers", "microsoft/DeepSpeed", "ray-project/ray",
+    "PaddlePaddle/PaddleOCR", "PaddlePaddle/Paddle", "apache/spark",
+    "apache/airflow", "kubernetes/kubernetes", "rust-lang/rust",
+    "llvm/llvm-project", "chromium/chromium", "nicbarker/clay",
+  ]);
+  const repoId = source.replace(/^github:/, "");
+  if (HUGE_REPOS.has(repoId)) {
+    throw new Error(`Skipping oversized repo ${repoId} (>200MB tarball)`);
   }
 
   log(`  [1/3] Resolving ${source}...`);
@@ -309,6 +322,17 @@ export function forgeSkill(tool: Tool, opts: ForgeSkillOptions): ForgedSkill {
         skipped: true,
       };
     }
+  }
+
+  // Extract README sections and attach to tool for richer skill generation
+  if (existsSync(installDir)) {
+    try {
+      const readme = readReadme(installDir);
+      if (readme.length > 50) {
+        const sections = extractReadmeSections(readme);
+        (tool as Tool & { _readmeSections?: typeof sections })._readmeSections = sections;
+      }
+    } catch { /* non-fatal */ }
   }
 
   // Generate skill directory
@@ -495,6 +519,29 @@ interface ProcessBatchOptions {
   force?: boolean;
 }
 
+/** Enrich a Tool's metadata with curated info (description, tags, domain). */
+function enrichToolWithCuratedMeta(tool: Tool, curated: import("./types.js").CuratedMeta): Tool {
+  const enrichedMeta = {
+    ...tool.meta,
+    // Use curated description if resolver returned a generic/empty one
+    description: (tool.meta.description && tool.meta.description.length > 20)
+      ? tool.meta.description
+      : curated.description,
+    tags: [...new Set([
+      ...tool.meta.tags,
+      ...curated.category.split("/"),
+      ...(curated.agentValue.length > 10 ? ["agent-ready"] : []),
+    ])],
+  };
+  // Attach agentValue and category as extra metadata on the tool object
+  // so generateRichSkillMd can use them
+  return {
+    ...tool,
+    meta: enrichedMeta,
+    _curatedMeta: curated,
+  } as Tool & { _curatedMeta: import("./types.js").CuratedMeta };
+}
+
 export async function processBatch(items: BatchItem[], opts: ProcessBatchOptions): Promise<BatchOutcome> {
   const results: BatchResult[] = [];
   const failures: Array<{ label: string; error: string }> = [];
@@ -502,7 +549,11 @@ export async function processBatch(items: BatchItem[], opts: ProcessBatchOptions
   for (const item of items) {
     log(`\n  ── Forging: ${item.label} ──`);
     try {
-      const tool = await resolveInstallAnalyze(item.source, opts.deep);
+      let tool = await resolveInstallAnalyze(item.source, opts.deep);
+      // Enrich with curated metadata if available
+      if (item.curatedMeta) {
+        tool = enrichToolWithCuratedMeta(tool, item.curatedMeta);
+      }
       const forged = forgeSkill(tool, { dryRun: false, noCache: opts.noCache, force: opts.force });
       if (forged.skipped) {
         log(`  → CACHED (skipped)`);
