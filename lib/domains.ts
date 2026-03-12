@@ -25,6 +25,14 @@ export const DOMAIN_TRIGGERS: Record<string, string> = {
   "state":        "state management, reactive stores, derived state, React integration",
   "ui":           "React UI components, accessible primitives, styling, component variants",
   "wasm":         "WebAssembly bindings, WASM component model, Rust->WASM compilation, WASI",
+  "cloud":        "deploying cloud infrastructure, managing AWS/GCP/Azure resources, provisioning servers, IaC templates",
+  "automation":   "automating CI/CD pipelines, running task workflows, scripting build processes, scheduling jobs",
+  "network":      "configuring network connections, managing DNS records, creating tunnels, TLS certificates",
+  "browser":      "browser automation, web scraping, headless testing, taking screenshots, generating PDFs",
+  "file-management": "managing files and directories, archiving, syncing folders, batch renaming",
+  "tui":          "building terminal UIs, interactive prompts, TUI dashboards, rich terminal output",
+  "media":        "processing images, converting video/audio, resizing media, transcoding formats",
+  "security":     "scanning for vulnerabilities, checking secrets, auditing dependencies, SAST/DAST analysis",
 };
 
 /**
@@ -33,7 +41,7 @@ export const DOMAIN_TRIGGERS: Record<string, string> = {
  */
 export function inferDomainLabel(tool: { meta: { name: string; description: string; tags: readonly string[] } }): string {
   const text = `${tool.meta.name} ${tool.meta.description} ${(tool.meta.tags as string[]).join(" ")}`.toLowerCase();
-  let bestDomain = "build";
+  let bestDomain = "general";
   let bestScore = 0;
   for (const [domain, triggers] of Object.entries(DOMAIN_TRIGGERS)) {
     const keywords = triggers.toLowerCase().split(/[,\s]+/).filter(k => k.length > 3);

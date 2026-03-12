@@ -579,9 +579,12 @@ function esc(s: string): string {
 
 /** Normalize description: strip trailing period, strip "CLI tool:" prefix, provide fallback */
 function normalizeDesc(tool: Tool): string {
-  const raw = (tool.meta.description || tool.meta.name).replace(/\.$/, "");
+  let raw = (tool.meta.description || tool.meta.name).replace(/\.$/, "");
   // Strip generic "CLI tool:" prefix — always lead with actual description
-  return raw.replace(/^CLI tool:\s*/i, "").trim() || tool.meta.name;
+  raw = raw.replace(/^CLI tool:\s*/i, "").trim();
+  // Strip markdown blockquote markers and HTML/XML tags that leak from READMEs
+  raw = raw.replace(/^>\s*/gm, "").replace(/<\/?[a-zA-Z][^>]*>/g, "").trim();
+  return raw || tool.meta.name;
 }
 
 /**
@@ -1563,6 +1566,215 @@ const DOMAIN_PATTERNS: ReadonlyArray<{
       `**Broken links**: Run \`${n} validate --check-links\``,
     ],
   },
+  {
+    match: /\b(cloud|aws|gcp|azure|s3|ec2|lambda|bucket|iam|terraform|pulumi|cdk|cloudformation)\b/i,
+    category: "cloud",
+    quickStart: (n) => [
+      `# List resources`,
+      `${n} list --region us-east-1`,
+      ``,
+      `# Deploy infrastructure`,
+      `${n} deploy --stack production`,
+      ``,
+      `# Check status`,
+      `${n} status`,
+    ],
+    patterns: (n) => [
+      `# Plan changes before applying`,
+      `${n} plan --var-file production.tfvars`,
+      ``,
+      `# Apply with auto-approve (CI only)`,
+      `${n} apply --auto-approve`,
+      ``,
+      `# Destroy resources`,
+      `${n} destroy --target module.staging`,
+      ``,
+      `# Import existing resource`,
+      `${n} import aws_s3_bucket.my_bucket my-bucket-name`,
+    ],
+    troubleshooting: (n) => [
+      `**Credentials error**: Check \`AWS_PROFILE\` or run \`${n} configure\``,
+      `**Region mismatch**: Set \`--region\` explicitly or export \`AWS_REGION\``,
+      `**Rate limiting**: Add retry logic or reduce parallelism`,
+    ],
+  },
+  {
+    match: /\b(automat|workflow|task.runner|make|just|script|ci|cd|pipeline|github.action)\b/i,
+    category: "automation",
+    quickStart: (n) => [
+      `# Run the default task`,
+      `${n} run`,
+      ``,
+      `# List available tasks`,
+      `${n} list`,
+      ``,
+      `# Run a specific task`,
+      `${n} run build`,
+    ],
+    patterns: (n) => [
+      `# Run tasks in parallel`,
+      `${n} run --parallel build test lint`,
+      ``,
+      `# Dry-run to preview actions`,
+      `${n} run --dry-run deploy`,
+      ``,
+      `# Run with environment variables`,
+      `${n} run --env NODE_ENV=production build`,
+      ``,
+      `# Watch mode for continuous runs`,
+      `${n} run --watch test`,
+    ],
+    troubleshooting: (n) => [
+      `**Task not found**: Run \`${n} list\` to see available tasks`,
+      `**Permission denied**: Check file permissions on scripts`,
+      `**Circular dependency**: Review task dependency graph`,
+    ],
+  },
+  {
+    match: /\b(network|dns|tcp|udp|proxy|tunnel|ssh|port|firewall|ssl|tls|cert)\b/i,
+    category: "network",
+    quickStart: (n) => [
+      `# Check connectivity`,
+      `${n} check example.com`,
+      ``,
+      `# Scan ports`,
+      `${n} scan --port 80,443 example.com`,
+      ``,
+      `# Show network info`,
+      `${n} info`,
+    ],
+    patterns: (n) => [
+      `# Create a tunnel`,
+      `${n} tunnel --local 8080 --remote example.com:443`,
+      ``,
+      `# DNS lookup`,
+      `${n} lookup example.com --type A,AAAA,MX`,
+      ``,
+      `# Generate TLS certificate`,
+      `${n} cert generate --domain example.com --output certs/`,
+    ],
+    troubleshooting: (n) => [
+      `**Connection refused**: Check firewall rules and service availability`,
+      `**Certificate error**: Verify cert chain with \`${n} cert verify\``,
+      `**DNS resolution**: Try \`${n} lookup --server 8.8.8.8\``,
+    ],
+  },
+  {
+    match: /\b(browser|chromium|puppeteer|selenium|playwright|headless|scrape|crawl|screenshot)\b/i,
+    category: "browser",
+    quickStart: (n) => [
+      `# Take a screenshot`,
+      `${n} screenshot https://example.com --output page.png`,
+      ``,
+      `# Scrape page content`,
+      `${n} scrape https://example.com --selector "h1"`,
+      ``,
+      `# Run browser tests`,
+      `${n} test --headed`,
+    ],
+    patterns: (n) => [
+      `# Generate PDF from URL`,
+      `${n} pdf https://example.com --output page.pdf`,
+      ``,
+      `# Crawl a site`,
+      `${n} crawl https://example.com --depth 3 --output sitemap.json`,
+      ``,
+      `# Run in headless mode`,
+      `${n} run --headless --browser chromium`,
+    ],
+    troubleshooting: (n) => [
+      `**Browser not found**: Install with \`${n} install chromium\``,
+      `**Timeout on page load**: Increase with \`--timeout 60000\``,
+      `**Element not found**: Verify selector with browser DevTools`,
+    ],
+  },
+  {
+    match: /\b(file|fs|directory|copy|move|rename|archive|zip|tar|compress|backup)\b/i,
+    category: "file-management",
+    quickStart: (n) => [
+      `# List files`,
+      `${n} list .`,
+      ``,
+      `# Copy with progress`,
+      `${n} copy src/ dest/ --progress`,
+      ``,
+      `# Archive a directory`,
+      `${n} archive --input src/ --output backup.tar.gz`,
+    ],
+    patterns: (n) => [
+      `# Sync directories`,
+      `${n} sync source/ destination/ --delete`,
+      ``,
+      `# Find duplicate files`,
+      `${n} dedup --dir . --dry-run`,
+      ``,
+      `# Batch rename`,
+      `${n} rename "*.jpg" --pattern '{name}-{date}.jpg'`,
+    ],
+    troubleshooting: (n) => [
+      `**Permission denied**: Check file ownership; use \`sudo\` if necessary`,
+      `**Disk full**: Free space or use \`${n} --compress\``,
+      `**Symlink issues**: Use \`--follow-links\` or \`--no-follow-links\``,
+    ],
+  },
+  {
+    match: /\b(tui|terminal.ui|curses|prompt|interactive|menu|select|dialog|rich|textual)\b/i,
+    category: "tui",
+    quickStart: (n) => [
+      `# Launch interactive mode`,
+      `${n}`,
+      ``,
+      `# Run with a specific view`,
+      `${n} --view dashboard`,
+      ``,
+      `# Use non-interactive mode for scripts`,
+      `${n} --no-interactive --output json`,
+    ],
+    patterns: (n) => [
+      `# Custom theme`,
+      `${n} --theme dark`,
+      ``,
+      `# Pipe-friendly output`,
+      `${n} list --format plain | head -20`,
+      ``,
+      `# Resize-aware rendering`,
+      `${n} --columns 120 --rows 40`,
+    ],
+    troubleshooting: (n) => [
+      `**Display garbled**: Check terminal supports 256 colors or set \`TERM=xterm-256color\``,
+      `**Key bindings not working**: Try \`${n} --keys emacs\` or check \`$TERM\``,
+      `**No output in pipe**: Use \`--no-interactive\` or \`--format plain\``,
+    ],
+  },
+  {
+    match: /\b(image|video|audio|media|ffmpeg|imagemagick|convert|resize|encode|decode|transcode)\b/i,
+    category: "media",
+    quickStart: (n) => [
+      `# Convert format`,
+      `${n} convert input.png --to webp --output result.webp`,
+      ``,
+      `# Resize image`,
+      `${n} resize input.jpg --width 800 --output thumb.jpg`,
+      ``,
+      `# Get media info`,
+      `${n} info video.mp4`,
+    ],
+    patterns: (n) => [
+      `# Batch convert`,
+      `${n} convert *.png --to webp --output-dir converted/`,
+      ``,
+      `# Extract audio from video`,
+      `${n} extract --audio video.mp4 --output audio.mp3`,
+      ``,
+      `# Optimize for web`,
+      `${n} optimize --quality 80 images/`,
+    ],
+    troubleshooting: (n) => [
+      `**Codec not found**: Install codec pack or use \`${n} --codec libx264\``,
+      `**Out of memory**: Reduce resolution or process in chunks`,
+      `**Format unsupported**: Check \`${n} formats\` for supported types`,
+    ],
+  },
 ];
 
 /** Default domain when nothing matches */
@@ -1855,6 +2067,52 @@ function generateLibraryQuickStart(
   }
 }
 
+// ── Rich frontmatter helpers ──
+
+/** Domain → allowed-tools mapping */
+const DOMAIN_ALLOWED_TOOLS: Record<string, string> = {
+  "python":     "Read,Grep,Glob,Bash(python *),Bash(pip *),Bash(uv *),Bash(ruff *),Bash(pytest *)",
+  "javascript": "Read,Grep,Glob,Bash(node *),Bash(npm *),Bash(npx *),Bash(tsc *)",
+  "database":   "Read,Grep,Glob,Bash",
+  "security":   "Read,Grep,Glob,Bash",
+  "devops":     "Read,Grep,Glob,Bash",
+  "git":        "Read,Grep,Glob,Bash(git *)",
+  "testing":    "Read,Grep,Glob,Bash",
+  "cloud":      "Read,Grep,Glob,Bash",
+  "agent":      "Read,Grep,Glob,Bash,Agent",
+  "web":        "Read,Grep,Glob,Bash(node *),Bash(npm *)",
+};
+
+function inferAllowedTools(tool: Tool, domainValue: string): string | null {
+  const baseDomain = domainValue.split("/")[0]!;
+  const mapped = DOMAIN_ALLOWED_TOOLS[baseDomain];
+  if (mapped) return mapped;
+
+  // For CLI tools with commands, allow Bash with tool-specific pattern
+  if (tool.capabilities.commands.length > 0) {
+    const binName = inferBinName(tool);
+    return `Read,Grep,Glob,Bash(${binName} *)`;
+  }
+  return null;
+}
+
+function isHeavyWorkflow(tool: Tool): boolean {
+  // Tools with many commands or large analysis surface are heavy
+  if (tool.capabilities.commands.length > 20) return true;
+  // Tools that are known CI/build/deploy tools
+  const heavyNames = ["terraform", "ansible", "docker", "kubernetes", "helm", "webpack", "turbo"];
+  return heavyNames.some(n => tool.meta.name.toLowerCase().includes(n));
+}
+
+function inferArgumentHint(tool: Tool, binName: string): string | null {
+  if (tool.capabilities.commands.length === 0) return null;
+  // Check for common argument patterns
+  const hasFileArgs = tool.capabilities.commands.some(c =>
+    c.flags.some(f => f.name.includes("file") || f.name.includes("path") || f.name.includes("input")));
+  if (hasFileArgs) return `<file or directory>`;
+  return `<${binName} subcommand or query>`;
+}
+
 export function generateRichSkillMd(tool: Tool): string {
   const commands = tool.capabilities.commands;
   const flags = tool.capabilities.globalFlags;
@@ -1937,6 +2195,16 @@ export function generateRichSkillMd(tool: Tool): string {
     }
   }
   for (const tag of tags) s.push(`  - ${tag}`);
+  // Determine binary name early (needed by frontmatter + Quick Start)
+  const binName = inferBinName(tool);
+  // Rich frontmatter: allowed-tools based on domain
+  const allowedTools = inferAllowedTools(tool, domainValue);
+  if (allowedTools) s.push(`allowed-tools: "${allowedTools}"`);
+  // Rich frontmatter: context:fork for heavy workflows
+  if (isHeavyWorkflow(tool)) s.push("context: fork");
+  // Rich frontmatter: argument-hint for parameterized tools
+  const argHint = inferArgumentHint(tool, binName);
+  if (argHint) s.push(`argument-hint: "${argHint}"`);
   s.push("---");
   s.push("");
 
@@ -1967,8 +2235,7 @@ export function generateRichSkillMd(tool: Tool): string {
   const readmeUsage = readmeSections?.sections["usage"]
     ?? readmeSections?.sections["basic usage"];
 
-  // Determine binary name for Quick Start examples
-  const binName = inferBinName(tool);
+  // Show binary name if different from tool name
   if (binName !== name) {
     s.push(`The binary name for ${name} is \`${binName}\`.`);
     s.push("");
@@ -2073,6 +2340,15 @@ export function generateRichSkillMd(tool: Tool): string {
       const alias = f.alias ? ` (${f.alias})` : "";
       s.push(`- \`${f.name}\`${alias} — ${f.description}`);
     }
+    s.push("");
+  }
+
+  // ── Current Environment (dynamic injection) ──
+  if (isCli && commands.length > 0) {
+    s.push("## Current Environment");
+    s.push("");
+    s.push(`- Version: !\`${binName} --version 2>/dev/null || echo "not installed"\``);
+    s.push(`- Help: !\`${binName} --help 2>/dev/null | head -5\``);
     s.push("");
   }
 
@@ -2322,6 +2598,29 @@ export function generateSkillDirectory(tool: Tool): SkillDirectory {
       lines.push("");
     }
 
+    // Domain-specific getting started content when guide is thin
+    // (no README description, no config, no integration sections found)
+    const hasReadmeContent = !!(readmeSections?.sections["description"]
+      || readmeSections?.sections["about"]
+      || readmeSections?.sections["overview"]
+      || readmeSections?.sections["configuration"]
+      || readmeSections?.sections["config"]
+      || readmeSections?.sections["integration"]);
+    if (!hasReadmeContent && domain.quickStart.length > 0) {
+      lines.push("## Getting Started");
+      lines.push("");
+      lines.push("```bash");
+      for (const qs of domain.quickStart) lines.push(qs);
+      lines.push("```");
+      lines.push("");
+    }
+    if (!hasReadmeContent && domain.troubleshooting.length > 0) {
+      lines.push("## Common Issues");
+      lines.push("");
+      for (const ts of domain.troubleshooting) lines.push(`- ${ts}`);
+      lines.push("");
+    }
+
     // Tags
     const tagList = tool.meta.tags as string[];
     if (tagList.length > 0) {
@@ -2507,6 +2806,18 @@ export function generateSkillDirectory(tool: Tool): SkillDirectory {
 
   // ── scripts/validate.py — ALWAYS generated ──
   files["scripts/validate.py"] = generateValidateScript();
+
+  // ── scripts/run-headless.sh — headless claude -p wrapper ──
+  if (commands.length > 0) {
+    const binNameH = inferBinName(tool);
+    files["scripts/run-headless.sh"] = generateHeadlessScript(name, binNameH);
+  }
+
+  // ── scripts/test.sh — smoke test ──
+  {
+    const binNameT = inferBinName(tool);
+    files["scripts/test.sh"] = generateTestScript(name, binNameT, tool);
+  }
 
   return { skillMd, files };
 }
@@ -2717,6 +3028,47 @@ if __name__ == "__main__":
     else:
         print("PASS: Skill is compliant")
 `;
+}
+
+/** Generate a headless claude -p wrapper script */
+function generateHeadlessScript(name: string, binName: string): string {
+  return [
+    "#!/bin/bash",
+    "set -euo pipefail",
+    `# Headless wrapper for ${name} via claude -p`,
+    `# Usage: bash scripts/run-headless.sh "your task description"`,
+    "",
+    'TASK="${1:-"Run ' + binName + ' --help and summarize the output"}"',
+    "",
+    `claude -p "Using the ${name} tool (binary: ${binName}), please: $TASK" \\`,
+    `  --allowedTools "Bash(${binName} *)" "Read" "Grep"`,
+    "",
+  ].join("\n");
+}
+
+/** Generate a smoke test script */
+function generateTestScript(name: string, binName: string, _tool: Tool): string {
+  const checks: string[] = [];
+  checks.push(`# Check if ${binName} is installed`);
+  checks.push(`if command -v ${shellQuote(binName)} >/dev/null 2>&1; then`);
+  checks.push(`  echo "PASS: ${binName} is installed"`,);
+  checks.push(`  ${shellQuote(binName)} --version 2>/dev/null && echo "PASS: --version works" || echo "WARN: --version failed"`);
+  checks.push(`  ${shellQuote(binName)} --help 2>/dev/null | head -1 && echo "PASS: --help works" || echo "WARN: --help failed"`);
+  checks.push("else");
+  checks.push(`  echo "FAIL: ${binName} is not installed"`);
+  checks.push("  exit 1");
+  checks.push("fi");
+
+  return [
+    "#!/bin/bash",
+    "set -uo pipefail",
+    `# Smoke test for ${name}`,
+    "",
+    ...checks,
+    "",
+    "echo 'Smoke test complete'",
+    "",
+  ].join("\n");
 }
 
 /** Generate a new SKILL.md scaffold with compliant description */

@@ -171,6 +171,29 @@ export function scoreContentQuality(skillMd: string): { score: number; issues: s
     issues.push("Fewer than 2 content sections");
   }
 
+  // Detect generic boilerplate descriptions — same template for every tool
+  const descMatch = skillMd.match(/^description:\s*["']?(.+?)["']?\s*$/m);
+  if (descMatch) {
+    const desc = descMatch[1] ?? "";
+    // Pattern: "installing and configuring X, running X commands, managing X workflows"
+    const genericPattern = /installing and configuring \w+, running \w+ commands, managing \w+ workflows/i;
+    if (genericPattern.test(desc)) {
+      score -= 2;
+      issues.push("Generic boilerplate description (template not customized)");
+    }
+  }
+
+  // Check body content is substantial (not just frontmatter + thin skeleton)
+  const bodyStart = skillMd.indexOf("---", skillMd.indexOf("---") + 3);
+  if (bodyStart > 0) {
+    const body = skillMd.slice(bodyStart + 3).trim();
+    const bodyLines = body.split("\n").filter(l => l.trim().length > 0);
+    if (bodyLines.length < 15) {
+      score -= 1;
+      issues.push("Body content too thin (fewer than 15 non-empty lines)");
+    }
+  }
+
   return { score: Math.max(1, score), issues };
 }
 
@@ -250,10 +273,12 @@ export function testSkillSync(skillPath: string, preloadedContent?: string): Ski
 
   const triggerScore = Math.round(scoreTrigger(fm.description) * 100) / 100;
   const qualityScore = scoreSkillDescription(fm.description);
-  const passed = triggerScore >= 0.8 && qualityScore >= 6;
+  const { score: contentScore, issues: contentIssues } = scoreContentQuality(content);
+  const passed = triggerScore >= 0.8 && qualityScore >= 6 && contentScore >= 5;
 
   if (triggerScore < 0.8) issues.push(`Low trigger score: ${triggerScore.toFixed(2)} (need >= 0.80)`);
   if (qualityScore < 6) issues.push(`Low quality score: ${qualityScore}/10 (need >= 6)`);
+  if (contentScore < 5) issues.push(`Low content score: ${contentScore}/10 (need >= 5)`);
   if (!fm.license) issues.push("Missing license field");
   if (!fm.allowedTools) issues.push("Missing allowed-tools field");
   if (!fm.compatibility) issues.push("Missing compatibility field");
@@ -270,7 +295,8 @@ export function testSkillSync(skillPath: string, preloadedContent?: string): Ski
     }
   }
 
-  const { score: contentScore } = scoreContentQuality(content);
+  // Add content issues as advisory
+  for (const ci of contentIssues) issues.push(`Content: ${ci}`);
 
   return { skillPath, name, triggerScore, qualityScore, contentScore, passed, issues };
 }

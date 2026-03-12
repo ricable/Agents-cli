@@ -1122,13 +1122,25 @@ description: "Fast Python linter. Use when linting code."
 
 \`\`\`bash
 ruff check .
+ruff check --fix .
+ruff format src/
 \`\`\`
 
 ## Commands
 
 \`\`\`bash
 ruff format .
+ruff check --select E501 src/
 \`\`\`
+
+## Configuration
+
+Create a \`ruff.toml\` or \`pyproject.toml\` to configure rules.
+
+## Troubleshooting
+
+- **Config not found**: Run \`ruff init\` to create a config file
+- **Too many errors**: Use \`--fix\` to auto-fix, or \`--select\` for specific rules
 `;
     const result = scoreContentQuality(content);
     expect(result.score).toBeGreaterThanOrEqual(8);

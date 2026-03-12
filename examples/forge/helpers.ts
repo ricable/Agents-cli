@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { parseFrontmatter } from "../../lib/skills.js";
 import type { Tool, ManifestEntry } from "../../lib/types.js";
-import { DOMAIN_TRIGGERS, inferDomainLabel } from "../../lib/domains.js";
+import { inferDomainLabel } from "../../lib/domains.js";
 
 // ── Logging ────────────────────────────────────────────────────────────
 
@@ -38,7 +38,11 @@ export function inferDomainFromTool(tool: Tool): string {
 // ── Tool → ManifestEntry ──────────────────────────────────────────────
 
 export function toolToManifestEntry(tool: Tool): ManifestEntry | null {
-  const domain = inferDomainFromTool(tool);
+  // Prefer curated category (e.g. "ai-ml/llm-inference") over keyword-inferred domain
+  const curated = (tool as { _curatedMeta?: { category?: string } })._curatedMeta;
+  const domain = curated?.category
+    ? curated.category.replace(/\//g, "-")  // flatten "ai-ml/llm-inference" → "ai-ml-llm-inference"
+    : inferDomainFromTool(tool);
   const repo = tool.source.format === "github" ? tool.source.uri : tool.meta.name;
   return {
     name: tool.meta.name,
@@ -72,6 +76,7 @@ export function scanSkillEntries(dir: string): ManifestEntry[] {
           repo: "",
           domain: fm.domain ?? "uncategorized",
           description: fm.description ?? "",
+          dirName: name,  // Store actual directory name for lockfile consistency
         });
       }
     } catch {

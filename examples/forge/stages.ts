@@ -667,12 +667,22 @@ class Semaphore {
 
 /** Enrich a Tool's metadata with curated info (description, tags, domain). */
 function enrichToolWithCuratedMeta(tool: Tool, curated: CuratedMeta): Tool {
+  // Prefer curated description when:
+  // 1. Resolver returned short/empty description (< 20 chars), OR
+  // 2. Resolver description is generic boilerplate (matches common patterns), OR
+  // 3. Curated description is substantially longer and more specific
+  const resolverDesc = tool.meta.description ?? "";
+  const isGenericResolver = /^(A |An |The )?(CLI )?(tool|library|package|framework|utility) (for|to) /i.test(resolverDesc)
+    || /^(Python|Node|Rust|Go) (package|library|tool)/i.test(resolverDesc)
+    || resolverDesc.length < 20;
+  const curatedIsRicher = curated.description.length > resolverDesc.length * 1.3
+    && curated.description.length > 40;
+
   const enrichedMeta = {
     ...tool.meta,
-    // Use curated description if resolver returned a generic/empty one
-    description: (tool.meta.description && tool.meta.description.length > 20)
-      ? tool.meta.description
-      : curated.description,
+    description: (isGenericResolver || curatedIsRicher)
+      ? curated.description
+      : resolverDesc,
     tags: [...new Set([
       ...tool.meta.tags,
       ...curated.category.split("/"),

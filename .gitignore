@@ -54,5 +54,11 @@ mise.toml
 # Claude Code agent metadata
 .claude/
 
+# Chainlit
+.chainlit/
+
+# Large binary files
+*.pdf
+
 # Lock files are committed
 # !agentcli.lock
