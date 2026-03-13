@@ -38,6 +38,7 @@ __pycache__/
 *.sqlite3
 *.sqlite3-journal
 /db/
+agentdb.sqlite
 
 # Generated artifacts (runtime)
 .mcp.json
@@ -62,3 +63,4 @@ mise.toml
 
 # Lock files are committed
 # !agentcli.lock
+.vercel

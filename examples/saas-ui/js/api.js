@@ -3,8 +3,13 @@
  * Loads marketplace.json for catalog data (works standalone or connected).
  */
 
+// Auto-detect base URL: empty string (same origin) in production, localhost in dev
+const DEFAULT_API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://127.0.0.1:3100'
+  : '';
+
 export class AgentsApi {
-  constructor(baseUrl = 'http://127.0.0.1:3100') {
+  constructor(baseUrl = DEFAULT_API_BASE) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
     this.token = null;
     this.catalog = [];

@@ -812,3 +812,17 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
 
   return { server, stop };
 }
+
+/**
+ * Creates a request handler without binding to a port.
+ * Used by Vercel serverless functions and other embedding contexts.
+ */
+export function createHandler(
+  config: WebServiceConfig,
+): (req: IncomingMessage, res: ServerResponse) => void {
+  const { server } = startServer(config);
+  // The request listener is added synchronously by createServer — safe to extract before listen resolves.
+  const [listener] = server.rawListeners("request") as [(req: IncomingMessage, res: ServerResponse) => void];
+  server.close(); // release the port; listener closure remains valid
+  return listener;
+}

@@ -1,0 +1,46 @@
+# Dependencies (Vercel installs these during build)
+node_modules
+
+# Build artifacts (Vercel rebuilds these)
+dist
+coverage
+
+# SQLite databases — never deploy
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite3
+db/
+agentdb.sqlite
+
+# Examples: only saas-ui is needed
+examples/generated-skills/
+examples/generated-skills-old/
+examples/marketplace/
+examples/marketplace-v2/
+examples/plugins/
+examples/generated-workflows/
+examples/generated-workflows-old/
+examples/examples/
+examples/forge/
+examples/regenerate-skills.ts
+examples/skill-forge.ts
+examples/chunker-demo.ts
+examples/cli-anything-core/
+examples/cli-anything-gimp/
+
+# Tests
+tests/
+
+# Dev tools
+.chainlit/
+.claude/
+python/
+mise.toml
+
+# Large binaries
+*.pdf
+
+# Scripts
+battle-test-ecosystem.sh
+score-all.ts
