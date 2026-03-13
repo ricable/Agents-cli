@@ -153,7 +153,7 @@ function sendJson<T>(res: ServerResponse, status: number, data: CliOutput<T>): v
     "X-Content-Type-Options": "nosniff",
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "Authorization, Content-Type",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
   });
   res.end(body);
 }
@@ -262,8 +262,9 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     if (config.clerkConfig) {
       const session = await verifyClerkToken(req, config.clerkConfig);
       if (session) {
-        // Synthesize a "pro" ApiKeyRecord for Clerk-authenticated users
-        const syntheticKey: ApiKeyRecord = { tier: "pro", label: `clerk:${session.userId}` };
+        // Read tier from Clerk publicMetadata (updated by Stripe webhook on subscription events)
+        const tier = (session.publicMetadata["tier"] as ApiTier | undefined) ?? "free";
+        const syntheticKey: ApiKeyRecord = { tier, label: `clerk:${session.userId}` };
         return {
           keyRecord: syntheticKey,
           clerkUserId: session.userId,
@@ -286,7 +287,8 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     if (typeof existing === "string" && existing) return existing;
 
     const billing = createBillingProvider("stripe");
-    const { customerId } = await billing.createCustomer(clerkEmail ?? "", "pro");
+    // Store clerkUserId in Stripe customer metadata so webhooks can reverse-lookup
+    const { customerId } = await billing.createCustomer(clerkEmail ?? "", "pro", { clerkUserId });
 
     // Persist on Clerk user metadata (best-effort)
     if (config.clerkConfig) {
@@ -371,7 +373,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
       res.writeHead(204, {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": "Authorization, Content-Type",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
       });
       res.end();
       return;
@@ -564,7 +566,30 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
         }
         const billing = createBillingProvider("stripe");
         const event = await billing.verifyWebhook(payload, signature, config.stripeWebhookSecret);
-        // TODO: handle event.type (e.g. checkout.session.completed, customer.subscription.updated)
+
+        // Sync subscription tier to Clerk user publicMetadata
+        if (config.clerkConfig) {
+          const clerkUserId =
+            (event.data["clerkUserId"] as string | undefined) ??
+            ((event.data["metadata"] as Record<string, string> | undefined)?.["clerkUserId"]);
+
+          if (clerkUserId) {
+            let tier: ApiTier = "free";
+            if (event.type === "checkout.session.completed" || event.type === "customer.subscription.updated") {
+              // Derive tier from Stripe price metadata or default to "starter"
+              const plan = event.data["plan"] as Record<string, unknown> | undefined;
+              const priceMeta = plan?.["metadata"] as Record<string, string> | undefined;
+              tier = (priceMeta?.["tier"] as ApiTier | undefined) ?? "starter";
+            }
+            // "customer.subscription.deleted" leaves tier as "free" (default above)
+            await updateUserMetadata(
+              clerkUserId,
+              { tier, stripeCustomerId: event.customerId },
+              config.clerkConfig,
+            ).catch(() => { /* non-fatal */ });
+          }
+        }
+
         sendJson(res, 200, success("billing-webhook", { received: true, type: event.type }, Date.now()));
       } catch (err) {
         sendError(res, 400, "WEBHOOK_ERROR", toErrorMessage(err));

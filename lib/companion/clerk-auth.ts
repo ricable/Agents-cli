@@ -22,6 +22,12 @@ export interface ClerkSession {
 export interface ClerkConfig {
   readonly secretKey: string;
   readonly publishableKey?: string;
+  /**
+   * Allowlist of frontend origins permitted to use Clerk JWTs against this API.
+   * Prevents token reuse across apps (e.g. ['https://ui.spectredve.com', 'http://localhost:3100']).
+   * Reads CLERK_AUTHORIZED_PARTIES env var (comma-separated) when not set explicitly.
+   */
+  readonly authorizedParties?: string[];
 }
 
 // ── Verification ───────────────────────────────────────────────────────
@@ -53,8 +59,14 @@ export async function verifyClerkToken(
     }
     const fetchReq = new Request(url, { headers: fetchHeaders });
 
+    // Resolve authorizedParties: explicit config → env var → undefined (permissive)
+    const authorizedParties =
+      config.authorizedParties ??
+      process.env["CLERK_AUTHORIZED_PARTIES"]?.split(",").map((s) => s.trim()).filter(Boolean);
+
     const authResult = await clerk.authenticateRequest(fetchReq, {
       publishableKey: config.publishableKey,
+      authorizedParties,
     });
 
     // 'handshake' = multi-domain cookie sync redirect — not applicable to JSON API
@@ -67,22 +79,21 @@ export async function verifyClerkToken(
     const sessionId = auth.sessionId ?? "";
     if (!userId || !sessionId) return null;
 
-    // Fetch user details for email (non-fatal if unavailable)
+    // Fetch user to get email + publicMetadata (more reliable than session claims)
     let email: string | undefined;
+    let publicMetadata: Record<string, unknown> = {};
     try {
       const user = await clerk.users.getUser(userId);
       email = user.emailAddresses[0]?.emailAddress;
+      publicMetadata = (user.publicMetadata as Record<string, unknown>) ?? {};
     } catch {
-      // Non-fatal
+      // Non-fatal — fall back to session claims for publicMetadata
+      publicMetadata =
+        (auth.sessionClaims?.["public_metadata"] as Record<string, unknown>) ??
+        (auth.sessionClaims?.["publicMetadata"] as Record<string, unknown>) ?? {};
     }
 
-    return {
-      userId,
-      sessionId,
-      email,
-      publicMetadata:
-        (auth.sessionClaims?.["publicMetadata"] as Record<string, unknown>) ?? {},
-    };
+    return { userId, sessionId, email, publicMetadata };
   } catch {
     return null;
   }

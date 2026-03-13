@@ -74,6 +74,17 @@ export class AuthManager {
         }
       });
 
+      // Handle SSO callback redirect (/sso-callback path)
+      if (window.location.pathname === '/sso-callback') {
+        try {
+          await clerk.handleRedirectCallback();
+        } catch {
+          // Redirect back to home if callback fails
+          window.location.href = '/';
+        }
+        return;
+      }
+
       // Restore existing session immediately if signed in
       if (clerk.session) {
         const user = clerk.user;
@@ -220,24 +231,66 @@ export class AuthManager {
     }
   }
 
+  // ── Social provider login (direct redirect via Clerk OAuth) ─────
+
+  /**
+   * Directly redirect to a specific OAuth provider.
+   * strategy: 'oauth_google' | 'oauth_github' | 'oauth_apple' | 'oauth_microsoft'
+   * Falls back to generic sign-in modal if authenticateWithRedirect is unavailable.
+   */
+  async loginWithProvider(strategy) {
+    await this._ready;
+    if (!this._clerk) return this._mockLogin(strategy.replace('oauth_', ''));
+
+    try {
+      const signIn = this._clerk.client?.signIn;
+      if (signIn?.authenticateWithRedirect) {
+        await signIn.authenticateWithRedirect({
+          strategy,
+          redirectUrl: `${window.location.origin}/sso-callback`,
+          redirectUrlComplete: window.location.href,
+        });
+      } else {
+        // Clerk JS version doesn't support direct redirect — open modal instead
+        this._clerk.openSignIn({});
+      }
+    } catch {
+      this._clerk.openSignIn({});
+    }
+  }
+
   // ── Legacy OAuth flows (kept for backward compat, delegate to Clerk) ─
 
   async loginWithGoogle() {
     await this._ready;
     if (this._clerk) {
-      this._clerk.openSignIn({ redirectUrl: window.location.href });
-    } else {
-      return this._mockLogin('google');
+      return this.loginWithProvider('oauth_google');
     }
+    return this._mockLogin('google');
   }
 
   async loginWithGithub() {
     await this._ready;
     if (this._clerk) {
-      this._clerk.openSignIn({ redirectUrl: window.location.href });
-    } else {
-      return this._mockLogin('github');
+      return this.loginWithProvider('oauth_github');
     }
+    return this._mockLogin('github');
+  }
+
+  async loginWithApple() {
+    await this._ready;
+    if (this._clerk) {
+      return this.loginWithProvider('oauth_apple');
+    }
+    return this._mockLogin('apple');
+  }
+
+  async loginWithMicrosoft() {
+    await this._ready;
+    if (this._clerk) {
+      return this.loginWithProvider('oauth_microsoft');
+    }
+    return this._mockLogin('microsoft');
   }
 
   async loginWithEmail(email, _password) {

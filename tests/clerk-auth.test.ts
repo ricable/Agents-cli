@@ -69,6 +69,7 @@ describe("verifyClerkToken", () => {
       users: {
         getUser: vi.fn().mockResolvedValue({
           emailAddresses: [{ emailAddress: "alice@example.com" }],
+          publicMetadata: { stripeCustomerId: "cus_xyz" },
         }),
       },
     } as unknown as ReturnType<typeof createClerkClient>);

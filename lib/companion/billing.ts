@@ -28,7 +28,7 @@ export interface WebhookEvent {
 
 export interface BillingProvider {
   name: string;
-  createCustomer(email: string, tier: string): Promise<{ customerId: string }>;
+  createCustomer(email: string, tier: string, metadata?: Record<string, string>): Promise<{ customerId: string }>;
   createCheckoutSession(customerId: string, priceId: string, returnUrl: string): Promise<{ url: string }>;
   getPortalUrl(customerId: string): Promise<{ url: string }>;
   listInvoices(customerId: string, limit?: number): Promise<{ invoices: Invoice[] }>;
@@ -67,7 +67,7 @@ export class LemonSqueezyProvider implements BillingProvider {
     return !this.apiKey;
   }
 
-  async createCustomer(email: string, tier: string): Promise<{ customerId: string }> {
+  async createCustomer(email: string, tier: string, _metadata?: Record<string, string>): Promise<{ customerId: string }> {
     if (this.isMock) {
       return { customerId: mockCustomerId() };
     }
@@ -223,14 +223,14 @@ export class StripeProvider implements BillingProvider {
     return this.stripe === null;
   }
 
-  async createCustomer(email: string, tier: string): Promise<{ customerId: string }> {
+  async createCustomer(email: string, tier: string, metadata?: Record<string, string>): Promise<{ customerId: string }> {
     if (this.isMock) {
       return { customerId: mockCustomerId() };
     }
     try {
       const customer = await this.stripe!.customers.create({
         email,
-        metadata: { tier },
+        metadata: { tier, ...metadata },
       });
       return { customerId: customer.id };
     } catch (err) {
