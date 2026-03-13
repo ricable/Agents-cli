@@ -17,16 +17,21 @@ export class AuthManager {
   // ── Init ────────────────────────────────────────────────────────
 
   async _init() {
-    // Fetch publishable key from server
-    let publishableKey = null;
-    try {
-      const res = await fetch(this.api.baseUrl + '/api/config');
-      if (res.ok) {
-        const data = await res.json();
-        publishableKey = data?.data?.clerkPublishableKey ?? null;
+    // Priority 1: inline window.__CLERK_KEY set by index.html <script> tag
+    // Priority 2: fetch from /api/config serverless function
+    // Priority 3: fall through to mock mode
+    let publishableKey = window.__CLERK_KEY ?? null;
+
+    if (!publishableKey) {
+      try {
+        const res = await fetch(this.api.baseUrl + '/api/config');
+        if (res.ok) {
+          const data = await res.json();
+          publishableKey = data?.data?.clerkPublishableKey ?? null;
+        }
+      } catch {
+        // Server unavailable — fall through to mock mode
       }
-    } catch {
-      // Server unavailable — fall through to mock mode
     }
 
     if (!publishableKey) {
