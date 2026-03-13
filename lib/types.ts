@@ -589,6 +589,29 @@ export interface PromptAnalysis {
   };
 }
 
+// =============================================================================
+// Pipeline quality reporting
+// =============================================================================
+
+/** Quality score for a single pipeline step */
+export interface StepQuality {
+  step: string;
+  score: number;         // 0-1 normalized
+  issues: string[];
+  durationMs: number;
+}
+
+/** Full pipeline quality report */
+export interface PipelineReport {
+  tool: string;
+  source: string;
+  steps: StepQuality[];
+  aggregate: number;     // weighted average
+  passed: boolean;
+  failedAt?: string;     // first failing step
+  workflows: string[];   // auto-generated workflow names
+}
+
 /** Workflow configuration for generation */
 export interface WorkflowConfig {
   name: string;
@@ -607,3 +630,21 @@ export interface GeneratedWorkflow {
   files: Record<string, string>;
   envVars: string[];
 }
+
+// ── CLI-Anything Types (re-exported from lib/cli-anything/types.ts) ────
+
+export type {
+  AppProfile,
+  HarnessDesign,
+  HarnessBundle,
+  TestPlan,
+  TestSuite,
+  QualityGate6Axis,
+  QualityAxis,
+  CliAnythingOpts,
+  CliAnythingResult,
+  AppCategory,
+  BackendType,
+  GapAnalysis,
+  PublishResult,
+} from "./cli-anything/types.js";

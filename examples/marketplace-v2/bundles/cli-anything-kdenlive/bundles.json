@@ -1,0 +1,70 @@
+[
+  {
+    "id": "cli-anything-kdenlive-harness",
+    "name": "cli-anything-kdenlive CLI Harness",
+    "version": "0.1.0",
+    "productType": "harness",
+    "contents": [
+      "README.md",
+      "cli_anything_kdenlive/__init__.py",
+      "cli_anything_kdenlive/backend.py",
+      "cli_anything_kdenlive/cli.py",
+      "cli_anything_kdenlive/output.py",
+      "pyproject.toml",
+      "tests/__init__.py",
+      "tests/conftest.py"
+    ],
+    "checksum": "2461baee651c5a8e919424deed0f6c6d2c66bdeddbf57c2743d4f1df54dd5033",
+    "createdAt": "2026-03-13T12:35:26.313Z"
+  },
+  {
+    "id": "cli-anything-kdenlive-skill",
+    "name": "cli-anything-kdenlive Skill",
+    "version": "0.1.0",
+    "productType": "skill",
+    "contents": [
+      "SKILL.md",
+      "references/api-coverage.md",
+      "references/commands.md",
+      "references/examples.md",
+      "references/troubleshooting.md"
+    ],
+    "checksum": "f9a6fae01ee3e432c5344ace242e9aa3a0cbb96458670fe1abeaa3a27da95860",
+    "createdAt": "2026-03-13T12:35:26.313Z"
+  },
+  {
+    "id": "cli-anything-kdenlive-plugin",
+    "name": "cli-anything-kdenlive Plugin",
+    "version": "1.0.0",
+    "productType": "plugin",
+    "contents": [
+      ".claude-plugin/plugin.json",
+      "skills/cli-anything-kdenlive/SKILL.md",
+      "commands/search.md"
+    ],
+    "checksum": "e08679d0d53d5194cbed9855f0d4855885e3b4ee6cdc142f68e0f8a5fffd3366",
+    "createdAt": "2026-03-13T12:35:26.313Z"
+  },
+  {
+    "id": "cli-anything-kdenlive-hooks",
+    "name": "cli-anything-kdenlive Hooks",
+    "version": "1.0.0",
+    "productType": "hook-bundle",
+    "contents": [
+      "hooks.json"
+    ],
+    "checksum": "4bfdf7cc0b1425c4520720dd93eff7c4facfbbff4951cd5756e743e4ecef3b55",
+    "createdAt": "2026-03-13T12:35:26.313Z"
+  },
+  {
+    "id": "cli-anything-kdenlive-agents",
+    "name": "cli-anything-kdenlive Agent Definitions",
+    "version": "1.0.0",
+    "productType": "agent-def",
+    "contents": [
+      "cli-anything-kdenlive-expert.md"
+    ],
+    "checksum": "10a13ef0cf4cb738c7e861478ed2fadac8000bba1f7cfdaeeb56e29af41e1d7c",
+    "createdAt": "2026-03-13T12:35:26.313Z"
+  }
+]

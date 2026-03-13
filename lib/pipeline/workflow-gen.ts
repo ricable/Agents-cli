@@ -18,7 +18,7 @@ export function generateSkillFromWorkflow(workflow: GeneratedWorkflow): string {
 name: ${workflowName}
 description: ${getSkillDescription(intent)}
 version: 1.0.0
-author: pop-skills
+author: agents-cli
 ---
 
 # ${workflowName}
@@ -29,7 +29,7 @@ ${getSkillDescription(intent)}
 
 \`\`\`bash
 # Run the workflow
-npx pop-skills run-${workflowName} "<prompt>"
+npx agents-cli run-${workflowName} "<prompt>"
 
 # Or import as module
 import { execute } from './workflow/${workflowName}-agent';

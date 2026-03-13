@@ -243,6 +243,64 @@ export function scoreTrigger(description: string): number {
 }
 
 /**
+ * Score CLI-first quality of a SKILL.md (0-1).
+ * Skills should prefer CLI commands over MCP tools.
+ */
+export function cliFirstScore(skillMd: string): { score: number; issues: string[] } {
+  const issues: string[] = [];
+  let score = 0;
+
+  // +0.3 bash/shell code blocks with CLI commands
+  const shellBlocks = skillMd.match(/```(?:bash|sh|shell|zsh)\b[\s\S]*?```/g) ?? [];
+  if (shellBlocks.length > 0) {
+    score += 0.3;
+  } else {
+    issues.push("No bash/shell code blocks found");
+  }
+
+  // +0.3 allowed-tools includes Bash (or is absent/default)
+  const allowedTools = skillMd.match(/^allowed-tools:\s*(.+)$/m);
+  if (!allowedTools || /\bBash\b/.test(allowedTools[1] ?? "")) {
+    score += 0.3;
+  } else {
+    issues.push("allowed-tools does not include Bash");
+  }
+
+  // +0.2 references CLI binary names (commands in code blocks)
+  const hasCliCommands = shellBlocks.some(block =>
+    /\b\w+\s+(--?\w|[a-z])/i.test(block)
+  );
+  if (hasCliCommands) {
+    score += 0.2;
+  } else if (shellBlocks.length > 0) {
+    issues.push("Shell blocks don't contain CLI commands with flags");
+  }
+
+  // +0.1 contains --help, --version, or flag documentation
+  if (/--help|--version|flags?:|options?:/i.test(skillMd)) {
+    score += 0.1;
+  }
+
+  // -0.3 references mcp__ tools without CLI alternative mentioned
+  const mcpRefs = skillMd.match(/mcp__\w+/g) ?? [];
+  if (mcpRefs.length > 0) {
+    const hasCliFallback = /\bcli\b.*\bfallback\b|\bfallback\b.*\bcli\b|use (?:the )?cli|prefer (?:the )?cli/i.test(skillMd);
+    if (!hasCliFallback) {
+      score -= 0.3;
+      issues.push(`References ${mcpRefs.length} MCP tool(s) without CLI fallback`);
+    }
+  }
+
+  // -0.2 says "use MCP" without fallback justification
+  if (/use mcp/i.test(skillMd) && !/fallback|alternative|when.*unavailable/i.test(skillMd)) {
+    score -= 0.2;
+    issues.push("Mentions 'use MCP' without fallback justification");
+  }
+
+  return { score: Math.round(Math.max(0, Math.min(1, score)) * 100) / 100, issues };
+}
+
+/**
  * Test a single SKILL.md file synchronously. Returns structural quality results.
  */
 export function testSkillSync(skillPath: string, preloadedContent?: string): SkillTestResult {

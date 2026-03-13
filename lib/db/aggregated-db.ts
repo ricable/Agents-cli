@@ -19,6 +19,39 @@ const DB_DIR = path.resolve("db");
 let _aggregatedDb: DatabaseInstance | null = null;
 
 /**
+ * Discover all domain SQLite databases by scanning the db/ directory.
+ * Falls back to ALL_DOMAINS for known domains, but also picks up
+ * dynamically created domain databases.
+ */
+function discoverDomainDbs(): Array<{ domain: string; dbPath: string }> {
+  const results: Array<{ domain: string; dbPath: string }> = [];
+  const seen = new Set<string>();
+
+  // Scan db/ directory for *.sqlite files
+  if (fs.existsSync(DB_DIR)) {
+    for (const file of fs.readdirSync(DB_DIR)) {
+      if (!file.endsWith(".sqlite")) continue;
+      const domain = file.replace(/\.sqlite$/, "");
+      if (seen.has(domain)) continue;
+      seen.add(domain);
+      results.push({ domain, dbPath: path.join(DB_DIR, file) });
+    }
+  }
+
+  // Also check ALL_DOMAINS for any that might be at non-standard paths
+  for (const domain of ALL_DOMAINS) {
+    if (seen.has(domain)) continue;
+    const dp = domainDbPath(domain);
+    if (fs.existsSync(dp)) {
+      seen.add(domain);
+      results.push({ domain, dbPath: dp });
+    }
+  }
+
+  return results;
+}
+
+/**
  * Returns the open aggregated database, attaching all existing domain DBs.
  */
 export async function getAggregatedDb(): Promise<DatabaseInstance> {
@@ -31,18 +64,17 @@ export async function getAggregatedDb(): Promise<DatabaseInstance> {
   applyWalPragmas(db);
   db.exec(RVF_SCHEMA);
 
-  // Attach all existing domain DBs
-  for (const domain of ALL_DOMAINS) {
-    const dp = domainDbPath(domain);
-    if (fs.existsSync(dp)) {
-      const alias = domain.replace(/-/g, "_");
-      try {
-        db.exec(
-          `ATTACH DATABASE '${dp.replace(/'/g, "''")}' AS "${alias}"`
-        );
-      } catch {
-        // Already attached or not available — continue
-      }
+  // Attach all existing domain DBs — scan db/ directory instead of static list
+  // to catch dynamically created domain databases
+  const discoveredDomains = discoverDomainDbs();
+  for (const { domain, dbPath } of discoveredDomains) {
+    const alias = domain.replace(/-/g, "_");
+    try {
+      db.exec(
+        `ATTACH DATABASE '${dbPath.replace(/'/g, "''")}' AS "${alias}"`
+      );
+    } catch {
+      // Already attached or not available — continue
     }
   }
 
@@ -119,9 +151,9 @@ export async function mergeAllDomainsToAggregated(
   );
 
   // Phase 1: bulk-insert all chunks (skip FTS5 for now)
-  for (const domain of ALL_DOMAINS) {
-    const dbPath = domainDbPath(domain);
-    if (!fs.existsSync(dbPath)) continue;
+  // Scan db/ directory for all domain databases instead of static list
+  const discoveredDomains = discoverDomainDbs();
+  for (const { domain, dbPath } of discoveredDomains) {
 
     const src = new Database(dbPath, { readonly: true });
     src.pragma("busy_timeout = 5000");

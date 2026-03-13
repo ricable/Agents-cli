@@ -5,34 +5,36 @@
  * This is the CLI entry point. Mode-specific logic lives in forge/*.ts modules.
  *
  * Modes:
- *   --tool <source>          Direct tool → skill generation
- *   "prompt text"            NL discovery → multi-registry search → skills
- *   --trending               GitHub trending → CLI filter → skills
- *   --curated                Curated registry → skills
- *   --workflow "prompt"      NL prompt → agent code from templates
- *   --audit                  Quality audit of existing skills
- *   --search <query>         Search indexed skills (FTS/hybrid/vector)
- *   --index                  Rebuild search index
- *   --plugin                 Build domain plugins
- *   --agent-defs             Generate agent definitions
- *   --marketplace            Generate marketplace catalog
- *   --freeze                 Generate lockfile from skills
- *   --verify                 Verify lockfile integrity
- *   --mcp                    Start MCP server exposing skills
+ *   --full-pipeline           Full end-to-end: generate → skills → plugins → marketplace
+ *   --cli-anything <app>      Generate agent-native harness for an app
+ *   --cli-anything-batch      Batch generate all registered apps
+ *   --orchestrate             Run recipe with agent teams
+ *   --tool <source>           Direct tool → skill generation
+ *   "prompt text"             NL discovery → multi-registry search → skills
+ *   --trending                GitHub trending → CLI filter → skills
+ *   --curated                 Curated registry → skills
+ *   --workflow "prompt"       NL prompt → agent code from templates
+ *   --audit                   Quality audit of existing skills
+ *   --search <query>          Search indexed skills (FTS/hybrid/vector)
+ *   --index                   Rebuild search index
+ *   --plugin                  Build domain plugins
+ *   --agent-defs              Generate agent definitions
+ *   --marketplace             Generate marketplace catalog (v1)
+ *   --marketplace-v2          Bundle + catalog + pricing (v2)
+ *   --freeze / --verify       Lockfile ops
+ *   --companion --serve       Start web service
+ *   --mcp                     Start MCP server exposing skills
  *
  * Common flags:
  *   --deep, --dry-run, --json, --strict, --force, --no-cache
  *   --limit N, --domain X, --ai, --factory, --monorepo
  *   --search-mode fts|hybrid|vector, --pkg <name>
- *   --skill-output (workflow mode)
  *
  * Usage:
- *   npx tsx examples/skill-forge.ts "build a RAG pipeline with vector search"
+ *   npx tsx examples/skill-forge.ts --full-pipeline --dry-run --limit 3
+ *   npx tsx examples/skill-forge.ts --cli-anything ffmpeg
  *   npx tsx examples/skill-forge.ts --tool pypi:ruff --deep
- *   npx tsx examples/skill-forge.ts --search "python linting"
- *   npx tsx examples/skill-forge.ts --index
- *   npx tsx examples/skill-forge.ts --plugin --dry-run
- *   npx tsx examples/skill-forge.ts --freeze && npx tsx examples/skill-forge.ts --verify
+ *   npx tsx examples/skill-forge.ts --orchestrate --recipe creative-suite
  */
 
 import { setQuiet } from "./forge/helpers.js";
@@ -102,6 +104,12 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (args.marketplaceV2) {
+    const { marketplaceV2Mode } = await import("./forge/mode-marketplace-v2.js");
+    await marketplaceV2Mode(args, startTime);
+    return;
+  }
+
   if (args.marketplace) {
     const { marketplaceMode } = await import("./forge/mode-plugin.js");
     await marketplaceMode(args, startTime);
@@ -128,7 +136,7 @@ async function main(): Promise<void> {
 
   if (args.workflow) {
     const { workflowMode } = await import("./forge/mode-workflow.js");
-    workflowMode(args, startTime);
+    await workflowMode(args, startTime);
     return;
   }
 
@@ -170,6 +178,24 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (args.fullPipeline) {
+    const { fullPipelineMode } = await import("./forge/mode-full-pipeline.js");
+    await fullPipelineMode(args, startTime);
+    return;
+  }
+
+  if (args.cliAnything || args.cliAnythingBatch) {
+    const { cliAnythingMode } = await import("./forge/mode-cli-anything.js");
+    await cliAnythingMode(args, startTime);
+    return;
+  }
+
+  if (args.orchestrate) {
+    const { orchestrateMode } = await import("./forge/mode-orchestrate.js");
+    await orchestrateMode(args, startTime);
+    return;
+  }
+
   if (args.audit) {
     const { auditMode } = await import("./forge/mode-audit.js");
     await auditMode(args, startTime);
@@ -192,23 +218,43 @@ async function main(): Promise<void> {
 
   // ── Usage ──
   log("  Usage:");
-  log('    npx tsx examples/skill-forge.ts "build a RAG pipeline"');
-  log("    npx tsx examples/skill-forge.ts --tool ruff --deep");
-  log("    npx tsx examples/skill-forge.ts --audit [--domain X] [--ai]");
-  log("    npx tsx examples/skill-forge.ts --trending [--language rust] [--since weekly]");
-  log("    npx tsx examples/skill-forge.ts --curated [--category ai-ml] [--skip-installed]");
-  log('    npx tsx examples/skill-forge.ts --workflow "build a code review council"');
-  log("    npx tsx examples/skill-forge.ts --workflow --list");
-  log('    npx tsx examples/skill-forge.ts --search "python linting"');
-  log("    npx tsx examples/skill-forge.ts --index [--domain X]");
-  log("    npx tsx examples/skill-forge.ts --plugin [--domain X] [--dry-run]");
-  log("    npx tsx examples/skill-forge.ts --agent-defs [--domain X] [--ai]");
-  log("    npx tsx examples/skill-forge.ts --freeze");
-  log("    npx tsx examples/skill-forge.ts --verify");
-  log("    npx tsx examples/skill-forge.ts --system [--limit 20] [--dry-run]");
-  log('    npx tsx examples/skill-forge.ts --companion "FastAPI + PostgreSQL + React" [--dry-run]');
-  log("    npx tsx examples/skill-forge.ts --companion --serve [--port 3100]");
-  log("    npx tsx examples/skill-forge.ts --mcp");
+  log("");
+  log("  Generation:");
+  log("    --cli-anything <app>       Generate harness for a single app");
+  log("    --cli-anything-batch       Batch generate all registered apps");
+  log("    --full-pipeline            Full end-to-end: generate → skills → plugins → marketplace");
+  log("    --refine                   Gap analysis on existing harness");
+  log("");
+  log("  Orchestration:");
+  log("    --orchestrate              Run recipe with agent teams");
+  log("    --recipe <name>            Recipe: creative-suite, office-suite, devops-kit");
+  log("");
+  log("  Skills & Tools:");
+  log("    --tool <source>            Generate skill from tool");
+  log('    "prompt text"              NL discovery → skills');
+  log("    --trending                 GitHub trending → skills");
+  log("    --curated                  Curated registry → skills");
+  log('    --workflow "prompt"         NL prompt → agent code from templates');
+  log("");
+  log("  Plugins & Marketplace:");
+  log("    --plugin                   Build domain plugins");
+  log("    --agent-defs               Generate agent definitions");
+  log("    --marketplace              Generate marketplace (v1)");
+  log("    --marketplace-v2           Bundle + catalog (v2)");
+  log("");
+  log("  Quality & Search:");
+  log("    --audit                    Quality audit of skills");
+  log('    --search <query>           Search indexed skills');
+  log("    --index                    Rebuild search index");
+  log("");
+  log("  Infrastructure:");
+  log("    --freeze / --verify        Lockfile ops");
+  log("    --system                   System PATH discovery");
+  log("    --companion --serve        Start web service");
+  log("    --mcp                      Start MCP server");
+  log("");
+  log("  Common flags:");
+  log("    --deep --dry-run --json --force --limit N --domain X --ai");
   log("");
 }
 

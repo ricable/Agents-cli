@@ -1,0 +1,70 @@
+[
+  {
+    "id": "cli-anything-shotcut-harness",
+    "name": "cli-anything-shotcut CLI Harness",
+    "version": "0.1.0",
+    "productType": "harness",
+    "contents": [
+      "README.md",
+      "cli_anything_shotcut/__init__.py",
+      "cli_anything_shotcut/backend.py",
+      "cli_anything_shotcut/cli.py",
+      "cli_anything_shotcut/output.py",
+      "pyproject.toml",
+      "tests/__init__.py",
+      "tests/conftest.py"
+    ],
+    "checksum": "38ffcd0783b494454d2e7bf7cdb36ae79fc1edf8a5121a278bfc52ea7fb19744",
+    "createdAt": "2026-03-13T12:35:26.323Z"
+  },
+  {
+    "id": "cli-anything-shotcut-skill",
+    "name": "cli-anything-shotcut Skill",
+    "version": "0.1.0",
+    "productType": "skill",
+    "contents": [
+      "SKILL.md",
+      "references/api-coverage.md",
+      "references/commands.md",
+      "references/examples.md",
+      "references/troubleshooting.md"
+    ],
+    "checksum": "dba89f652640c01b5405ef0b00f0daa557fc45b6f70780f564ae525aac768f34",
+    "createdAt": "2026-03-13T12:35:26.323Z"
+  },
+  {
+    "id": "cli-anything-shotcut-plugin",
+    "name": "cli-anything-shotcut Plugin",
+    "version": "1.0.0",
+    "productType": "plugin",
+    "contents": [
+      ".claude-plugin/plugin.json",
+      "skills/cli-anything-shotcut/SKILL.md",
+      "commands/search.md"
+    ],
+    "checksum": "34bf4de23cee761c2a8b095e407e7d3c1b6348d87d75e88e78a05cd5530abc1e",
+    "createdAt": "2026-03-13T12:35:26.323Z"
+  },
+  {
+    "id": "cli-anything-shotcut-hooks",
+    "name": "cli-anything-shotcut Hooks",
+    "version": "1.0.0",
+    "productType": "hook-bundle",
+    "contents": [
+      "hooks.json"
+    ],
+    "checksum": "eef93519e1d9ff5b22dde151858eea01907ba3e500ab58f85eb3d507ededffa1",
+    "createdAt": "2026-03-13T12:35:26.323Z"
+  },
+  {
+    "id": "cli-anything-shotcut-agents",
+    "name": "cli-anything-shotcut Agent Definitions",
+    "version": "1.0.0",
+    "productType": "agent-def",
+    "contents": [
+      "cli-anything-shotcut-expert.md"
+    ],
+    "checksum": "8242704afd55d7b47b5777ed4da4fb4725d36248933b9fd80b0b697f0f8ff849",
+    "createdAt": "2026-03-13T12:35:26.323Z"
+  }
+]

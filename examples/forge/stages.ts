@@ -42,6 +42,7 @@ import {
 // Quality testing
 import {
   testSkillSync,
+  cliFirstScore,
   generateTriggerQueries,
   generateNonTriggerQueries,
 } from "../../lib/skill-tester.js";
@@ -81,6 +82,7 @@ import type {
   SkillDirectory,
   Manifest,
   ManifestEntry,
+  StepQuality,
 } from "../../lib/types.js";
 import type {
   ChunkStats,
@@ -562,20 +564,68 @@ export function assessQuality(skillMd: string, name: string): QualityResult {
   const triggerQueries = generateTriggerQueries(description, name);
   const nonTriggerQueries = generateNonTriggerQueries(description);
 
+  // CLI-first score (Phase 2)
+  const cfs = cliFirstScore(skillMd);
+
   // Validate SKILL.md content (Gap 8) — validateFullFrontmatter includes base validation
   const validationErrors = validateFullFrontmatter(skillMd);
 
   const passed = result.passed && validationErrors.length === 0;
 
+  const allIssues = [...result.issues, ...validationErrors];
+  if (cfs.score < 0.5) {
+    allIssues.push(`CLI-first score: ${cfs.score.toFixed(2)} (advisory, threshold 0.50)`);
+    allIssues.push(...cfs.issues.map(i => `CLI-first: ${i}`));
+  }
+
   return {
     triggerScore: result.triggerScore,
     qualityScore: result.qualityScore,
     passed,
-    issues: [...result.issues, ...validationErrors],
+    issues: allIssues,
     triggerQueries,
     nonTriggerQueries,
     validationErrors,
   };
+}
+
+// ── Step Quality Scoring (Phase 2) ─────────────────────────────────────
+
+/**
+ * Score a pipeline step for quality tracking.
+ */
+export function scoreResolveStep(tool: Tool): StepQuality {
+  const start = Date.now();
+  let score = 0;
+  const issues: string[] = [];
+
+  // Metadata completeness
+  if (tool.meta.name) score += 0.25;
+  else issues.push("Missing name");
+  if (tool.meta.version && tool.meta.version !== "0.0.0") score += 0.25;
+  else issues.push("Missing/default version");
+  if (tool.meta.description && tool.meta.description.length > 10) score += 0.25;
+  else issues.push("Missing/short description");
+  if (tool.meta.license) score += 0.15;
+  if (tool.meta.tags.length > 0) score += 0.10;
+
+  return { step: "resolve", score: Math.min(1, score), issues, durationMs: Date.now() - start };
+}
+
+export function scoreAnalyzeStep(tool: Tool, smoke: SmokeTestResult): StepQuality {
+  const start = Date.now();
+  let score = 0;
+  const issues: string[] = [];
+
+  if (tool.capabilities.commands.length > 0) score += 0.4;
+  else issues.push("No commands found");
+  if (tool.capabilities.globalFlags.length > 0) score += 0.2;
+  if (smoke.helpOk) score += 0.2;
+  else issues.push("--help failed");
+  if (smoke.versionOk) score += 0.1;
+  if (smoke.commandsVerified > 0) score += 0.1;
+
+  return { step: "analyze", score: Math.min(1, score), issues, durationMs: Date.now() - start };
 }
 
 // ── Stage 8: Indexing ──────────────────────────────────────────────────

@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cli-anything-gimp"
+version = "0.1.0"
+description = "Agent-native CLI wrapper for GIMP"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = [
+    "click>=8.0",
+    "cli-anything-core>=0.1.0",
+    "Pillow",
+    "gi.repository.Gimp",
+]
+
+[project.scripts]
+cli-anything-gimp = "cli_anything_gimp.cli:main"
+
+[tool.pytest.ini_options]
+markers = [
+    "unit: Unit tests (no app required)",
+    "integration: Integration tests (app required)",
+    "e2e: End-to-end tests",
+    "docker: Docker-based tests",
+]

@@ -1,0 +1,19 @@
+{
+  "name": "creative-tools",
+  "version": "1.0.0",
+  "description": "Tools for creative-tools workflows including cli-anything-audacity, cli-anything-blender, cli-anything-gimp, cli-anything-inkscape, cli-anything-kdenlive and 3 more",
+  "keywords": [
+    "creative-tools",
+    "cli-anything-audacity",
+    "cli-anything-blender",
+    "cli-anything-gimp",
+    "cli-anything-inkscape",
+    "cli-anything-kdenlive",
+    "cli-anything-obs-studio",
+    "cli-anything-shotcut",
+    "cli-anything-vlc",
+    "claude-code",
+    "plugin"
+  ],
+  "license": "MIT"
+}

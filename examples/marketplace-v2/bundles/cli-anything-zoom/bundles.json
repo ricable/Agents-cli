@@ -1,0 +1,70 @@
+[
+  {
+    "id": "cli-anything-zoom-harness",
+    "name": "cli-anything-zoom CLI Harness",
+    "version": "0.1.0",
+    "productType": "harness",
+    "contents": [
+      "README.md",
+      "cli_anything_zoom/__init__.py",
+      "cli_anything_zoom/backend.py",
+      "cli_anything_zoom/cli.py",
+      "cli_anything_zoom/output.py",
+      "pyproject.toml",
+      "tests/__init__.py",
+      "tests/conftest.py"
+    ],
+    "checksum": "1910f31627e56e770d62083cfa165a925cd8745651cf4660a8e78558ca7c0742",
+    "createdAt": "2026-03-13T12:35:26.331Z"
+  },
+  {
+    "id": "cli-anything-zoom-skill",
+    "name": "cli-anything-zoom Skill",
+    "version": "0.1.0",
+    "productType": "skill",
+    "contents": [
+      "SKILL.md",
+      "references/api-coverage.md",
+      "references/commands.md",
+      "references/examples.md",
+      "references/troubleshooting.md"
+    ],
+    "checksum": "8c44249c5b28bf6a9392314cddcd8ae1be68db9b0b839fe5964effcd8ac39c3c",
+    "createdAt": "2026-03-13T12:35:26.331Z"
+  },
+  {
+    "id": "cli-anything-zoom-plugin",
+    "name": "cli-anything-zoom Plugin",
+    "version": "1.0.0",
+    "productType": "plugin",
+    "contents": [
+      ".claude-plugin/plugin.json",
+      "skills/cli-anything-zoom/SKILL.md",
+      "commands/search.md"
+    ],
+    "checksum": "e7e04db629148fe0b7aac954b3945525126c50235f38786383a5cc73e62b5974",
+    "createdAt": "2026-03-13T12:35:26.331Z"
+  },
+  {
+    "id": "cli-anything-zoom-hooks",
+    "name": "cli-anything-zoom Hooks",
+    "version": "1.0.0",
+    "productType": "hook-bundle",
+    "contents": [
+      "hooks.json"
+    ],
+    "checksum": "c789b5e5925ba12d704567426e72325ef5d6d5adb5576e505a3f6f6c202145ce",
+    "createdAt": "2026-03-13T12:35:26.331Z"
+  },
+  {
+    "id": "cli-anything-zoom-agents",
+    "name": "cli-anything-zoom Agent Definitions",
+    "version": "1.0.0",
+    "productType": "agent-def",
+    "contents": [
+      "cli-anything-zoom-expert.md"
+    ],
+    "checksum": "601e49c747627b3a44dfc6f13e445991a78c7404d6acd1d2fe773438d5467db8",
+    "createdAt": "2026-03-13T12:35:26.331Z"
+  }
+]

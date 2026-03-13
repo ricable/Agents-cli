@@ -12,11 +12,14 @@ import { parsePrompt } from "../../lib/pipeline/prompt-parser.js";
 import { generateFromTemplate } from "../../lib/pipeline/templates/template-engine.js";
 import { getAllTemplates } from "../../lib/pipeline/templates/index.js";
 import { generateSkillFromWorkflow } from "../../lib/pipeline/workflow-gen.js";
+import { composeWorkflows } from "../../lib/pipeline/workflow-composer.js";
+import { generateWorkflowSkillDirectory } from "../../lib/pipeline/workflow-skill-gen.js";
 import type { WorkflowIntent, GeneratedWorkflow } from "../../lib/types.js";
 import type { CliArgs } from "./types.js";
+import { OUTPUT_DIR } from "./types.js";
 import { log, atomicWrite } from "./helpers.js";
 
-export function workflowMode(args: CliArgs, startTime: number): void {
+export async function workflowMode(args: CliArgs, startTime: number): Promise<void> {
   if (args.out) rejectPathTraversal(args.out, "--out path");
   const outDir = resolve(args.out || "examples/generated-workflows");
 
@@ -85,8 +88,50 @@ export function workflowMode(args: CliArgs, startTime: number): void {
   );
 
   if (!result) {
-    log(`\n  No matching workflow template for intent "${intent.intent}".`);
-    log(`  Available: ${getAllTemplates().map(t => t.name).join(", ")}`);
+    // Fallback: try autonomous workflow composition from existing skills
+    log(`\n  No template match — trying autonomous workflow composition...`);
+    const { existsSync, readdirSync, readFileSync } = await import("node:fs");
+    if (existsSync(OUTPUT_DIR)) {
+      const skillMds: Array<{ name: string; skillMd: string }> = [];
+      for (const dir of readdirSync(OUTPUT_DIR, { withFileTypes: true })) {
+        if (!dir.isDirectory() || dir.name.startsWith("_")) continue;
+        const skillMdPath = join(OUTPUT_DIR, dir.name, "SKILL.md");
+        if (existsSync(skillMdPath)) {
+          skillMds.push({ name: dir.name, skillMd: readFileSync(skillMdPath, "utf-8") });
+        }
+      }
+
+      if (skillMds.length > 0) {
+        const composed = composeWorkflows(skillMds);
+        if (composed.length > 0) {
+          log(`  Composed ${composed.length} workflow(s) from ${skillMds.length} existing skills:`);
+          for (const wf of composed) {
+            log(`    - ${wf.name}: ${wf.steps.map(s => s.name).join(" → ")}`);
+            const wfDir = join(outDir, wf.name);
+            mkdirSync(wfDir, { recursive: true });
+            const dir = generateWorkflowSkillDirectory(wf);
+            atomicWrite(join(wfDir, "SKILL.md"), dir.skillMd);
+            for (const [relPath, content] of Object.entries(dir.files)) {
+              const fullPath = join(wfDir, relPath);
+              mkdirSync(join(wfDir, relPath.split("/").slice(0, -1).join("/")), { recursive: true });
+              atomicWrite(fullPath, content);
+            }
+          }
+
+          if (args.json) {
+            emit(success("skill-forge:workflow", {
+              mode: "autonomous",
+              workflows: composed.map(w => ({ name: w.name, steps: w.steps.length, triggers: w.triggers })),
+              output: outDir,
+            }, startTime), true);
+          }
+          return;
+        }
+      }
+    }
+
+    log(`  No workflows could be composed.`);
+    log(`  Available templates: ${getAllTemplates().map(t => t.name).join(", ")}`);
     log(`  Try: "code review council", "content publishing", "e-commerce", "personal assistant"\n`);
     return;
   }

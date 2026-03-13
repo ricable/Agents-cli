@@ -1,0 +1,18 @@
+{
+  "hooks": [
+    {
+      "event": "PreToolUse",
+      "pattern": "cli-anything-gimp",
+      "command": "echo \"Pre-check: validating cli-anything-gimp state\""
+    },
+    {
+      "event": "PostToolUse",
+      "pattern": "cli-anything-gimp",
+      "command": "echo \"Post-check: cli-anything-gimp operation complete\""
+    },
+    {
+      "event": "SessionStart",
+      "command": "echo \"Loading creative-tools domain context for cli-anything-gimp\""
+    }
+  ]
+}

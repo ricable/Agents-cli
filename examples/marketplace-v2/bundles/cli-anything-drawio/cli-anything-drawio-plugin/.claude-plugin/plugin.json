@@ -1,0 +1,12 @@
+{
+  "name": "cli-anything-drawio",
+  "version": "1.0.0",
+  "description": "Claude Code plugin for cli-anything-drawio — 0 commands, 0 groups",
+  "keywords": [
+    "office-tools",
+    "subprocess",
+    "cli-anything",
+    "cli-anything-drawio"
+  ],
+  "license": "MIT"
+}

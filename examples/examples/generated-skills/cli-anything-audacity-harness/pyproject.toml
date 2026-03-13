@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cli-anything-audacity"
+version = "0.1.0"
+description = "Agent-native CLI wrapper for Audacity"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = [
+    "click>=8.0",
+    "cli-anything-core>=0.1.0",
+    "pydub",
+    "soundfile",
+    "scipy.io.wavfile",
+]
+
+[project.scripts]
+cli-anything-audacity = "cli_anything_audacity.cli:main"
+
+[tool.pytest.ini_options]
+markers = [
+    "unit: Unit tests (no app required)",
+    "integration: Integration tests (app required)",
+    "e2e: End-to-end tests",
+    "docker: Docker-based tests",
+]

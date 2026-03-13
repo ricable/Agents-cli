@@ -1,0 +1,12 @@
+{
+  "name": "cli-anything-gimp",
+  "version": "1.0.0",
+  "description": "Claude Code plugin for cli-anything-gimp — 0 commands, 0 groups",
+  "keywords": [
+    "creative-tools",
+    "subprocess",
+    "cli-anything",
+    "cli-anything-gimp"
+  ],
+  "license": "MIT"
+}

@@ -1,0 +1,22 @@
+{
+  "repos": [
+    {
+      "name": "uv",
+      "repo": "uv",
+      "domain": "python",
+      "description": "Ultra-fast Python package manager and resolver"
+    },
+    {
+      "name": "ruff",
+      "repo": "ruff",
+      "domain": "python",
+      "description": "Blazing fast Python linter and formatter"
+    },
+    {
+      "name": "uvicorn",
+      "repo": "uvicorn",
+      "domain": "general",
+      "description": "The lightning-fast ASGI server."
+    }
+  ]
+}

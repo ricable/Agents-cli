@@ -1,0 +1,13 @@
+{
+  "name": "office-tools",
+  "version": "1.0.0",
+  "description": "Tools for office-tools workflows including cli-anything-drawio, cli-anything-libreoffice",
+  "keywords": [
+    "office-tools",
+    "cli-anything-drawio",
+    "cli-anything-libreoffice",
+    "claude-code",
+    "plugin"
+  ],
+  "license": "MIT"
+}

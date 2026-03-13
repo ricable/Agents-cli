@@ -81,6 +81,17 @@ export interface CliArgs {
   companion: boolean;
   serve: boolean;
   port: number;
+  // CLI-Anything mode
+  cliAnything: string;
+  cliAnythingBatch: boolean;
+  refine: boolean;
+  // Orchestration mode
+  orchestrate: boolean;
+  recipe: string;
+  // Marketplace v2 mode
+  marketplaceV2: boolean;
+  // Full pipeline mode
+  fullPipeline: boolean;
 }
 
 export interface ChunkStats {

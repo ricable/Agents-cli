@@ -38,6 +38,17 @@ export function parseArgs(): CliArgs {
     companion: false,
     serve: false,
     port: 3100,
+    // CLI-Anything mode
+    cliAnything: "",
+    cliAnythingBatch: false,
+    refine: false,
+    // Orchestration mode
+    orchestrate: false,
+    recipe: "",
+    // Marketplace v2 mode
+    marketplaceV2: false,
+    // Full pipeline mode
+    fullPipeline: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -153,6 +164,17 @@ export function parseArgs(): CliArgs {
       }
       opts.port = parsed;
     }
+    // CLI-Anything mode
+    else if (a === "--cli-anything" && argv[i+1]) { opts.cliAnything = argv[++i]!; }
+    else if (a === "--cli-anything-batch")    { opts.cliAnythingBatch = true; }
+    else if (a === "--refine")               { opts.refine = true; }
+    // Orchestration mode
+    else if (a === "--orchestrate")           { opts.orchestrate = true; }
+    else if (a === "--recipe" && argv[i+1])   { opts.recipe = argv[++i]!; }
+    // Marketplace v2 mode
+    else if (a === "--marketplace-v2")        { opts.marketplaceV2 = true; }
+    // Full pipeline mode
+    else if (a === "--full-pipeline")         { opts.fullPipeline = true; }
     // Positional → prompt
     else if (!a.startsWith("--"))             { opts.prompt += (opts.prompt ? " " : "") + a; }
   }

@@ -1,0 +1,108 @@
+/**
+ * AppStore — reactive state management with localStorage persistence.
+ * Simple pub/sub pattern for UI updates.
+ */
+
+const STORAGE_KEY = 'agents-cli-store';
+
+export class AppStore {
+  constructor() {
+    this.state = {
+      user: null,
+      tier: 'free',
+      catalog: [],
+      installed: [],
+      searchQuery: '',
+      searchFilters: { productType: 'all', pricingModel: 'all', sort: 'relevance', minRating: 0, minQuality: 0 },
+      currentProduct: null,
+      currentPane: 'discover',
+      usage: null,
+      serverStatus: null,
+      jobs: [],
+    };
+    this._listeners = new Map();
+    this.restore();
+  }
+
+  get(key) {
+    return this.state[key];
+  }
+
+  set(key, value) {
+    const old = this.state[key];
+    this.state[key] = value;
+    this._notify(key, value, old);
+    this._autoPersist(key);
+  }
+
+  update(key, fn) {
+    this.set(key, fn(this.state[key]));
+  }
+
+  subscribe(key, callback) {
+    if (!this._listeners.has(key)) this._listeners.set(key, new Set());
+    this._listeners.get(key).add(callback);
+    return () => this._listeners.get(key)?.delete(callback);
+  }
+
+  _notify(key, value, old) {
+    const listeners = this._listeners.get(key);
+    if (listeners) listeners.forEach(fn => fn(value, old));
+    // Also notify wildcard listeners
+    const wildcards = this._listeners.get('*');
+    if (wildcards) wildcards.forEach(fn => fn(key, value, old));
+  }
+
+  // Persist only certain keys to localStorage
+  _autoPersist(key) {
+    const persistKeys = ['user', 'tier', 'installed', 'searchFilters'];
+    if (persistKeys.includes(key)) this.persist();
+  }
+
+  persist() {
+    try {
+      const data = {
+        user: this.state.user,
+        tier: this.state.tier,
+        installed: this.state.installed,
+        searchFilters: this.state.searchFilters,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch { /* quota exceeded or private browsing */ }
+  }
+
+  restore() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (data.user) this.state.user = data.user;
+      if (data.tier) this.state.tier = data.tier;
+      if (data.installed) this.state.installed = data.installed;
+      if (data.searchFilters) this.state.searchFilters = { ...this.state.searchFilters, ...data.searchFilters };
+    } catch { /* corrupted data */ }
+  }
+
+  isInstalled(productId) {
+    return this.state.installed.includes(productId);
+  }
+
+  install(productId) {
+    if (!this.isInstalled(productId)) {
+      this.update('installed', list => [...list, productId]);
+    }
+  }
+
+  uninstall(productId) {
+    this.update('installed', list => list.filter(id => id !== productId));
+  }
+
+  clear() {
+    localStorage.removeItem(STORAGE_KEY);
+    this.state.user = null;
+    this.state.tier = 'free';
+    this.state.installed = [];
+    this._notify('user', null);
+    this._notify('tier', 'free');
+  }
+}

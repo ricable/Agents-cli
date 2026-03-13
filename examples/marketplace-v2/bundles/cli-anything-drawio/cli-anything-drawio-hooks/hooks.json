@@ -1,0 +1,18 @@
+{
+  "hooks": [
+    {
+      "event": "PreToolUse",
+      "pattern": "cli-anything-drawio",
+      "command": "echo \"Pre-check: validating cli-anything-drawio state\""
+    },
+    {
+      "event": "PostToolUse",
+      "pattern": "cli-anything-drawio",
+      "command": "echo \"Post-check: cli-anything-drawio operation complete\""
+    },
+    {
+      "event": "SessionStart",
+      "command": "echo \"Loading office-tools domain context for cli-anything-drawio\""
+    }
+  ]
+}

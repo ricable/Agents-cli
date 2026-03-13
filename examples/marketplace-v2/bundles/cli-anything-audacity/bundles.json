@@ -1,0 +1,70 @@
+[
+  {
+    "id": "cli-anything-audacity-harness",
+    "name": "cli-anything-audacity CLI Harness",
+    "version": "0.1.0",
+    "productType": "harness",
+    "contents": [
+      "README.md",
+      "cli_anything_audacity/__init__.py",
+      "cli_anything_audacity/backend.py",
+      "cli_anything_audacity/cli.py",
+      "cli_anything_audacity/output.py",
+      "pyproject.toml",
+      "tests/__init__.py",
+      "tests/conftest.py"
+    ],
+    "checksum": "d8ac8e85cd40fc9e813aad9be4cc4e1f734d4c6abf098665b65550ccbbcf3b61",
+    "createdAt": "2026-03-13T12:35:26.282Z"
+  },
+  {
+    "id": "cli-anything-audacity-skill",
+    "name": "cli-anything-audacity Skill",
+    "version": "0.1.0",
+    "productType": "skill",
+    "contents": [
+      "SKILL.md",
+      "references/api-coverage.md",
+      "references/commands.md",
+      "references/examples.md",
+      "references/troubleshooting.md"
+    ],
+    "checksum": "324ca918e9c0d0fda88b904cfe89ff64c885b1d6e67aa8640e774941b607e9f4",
+    "createdAt": "2026-03-13T12:35:26.282Z"
+  },
+  {
+    "id": "cli-anything-audacity-plugin",
+    "name": "cli-anything-audacity Plugin",
+    "version": "1.0.0",
+    "productType": "plugin",
+    "contents": [
+      ".claude-plugin/plugin.json",
+      "skills/cli-anything-audacity/SKILL.md",
+      "commands/search.md"
+    ],
+    "checksum": "7ceb1323f8c2084157e5c3abbd146ef4417a5d745700e87760adc2907aa02343",
+    "createdAt": "2026-03-13T12:35:26.282Z"
+  },
+  {
+    "id": "cli-anything-audacity-hooks",
+    "name": "cli-anything-audacity Hooks",
+    "version": "1.0.0",
+    "productType": "hook-bundle",
+    "contents": [
+      "hooks.json"
+    ],
+    "checksum": "ba463772579ab067553b526d7c24a1dd271650d44132e54167c232a8fc2daa4c",
+    "createdAt": "2026-03-13T12:35:26.282Z"
+  },
+  {
+    "id": "cli-anything-audacity-agents",
+    "name": "cli-anything-audacity Agent Definitions",
+    "version": "1.0.0",
+    "productType": "agent-def",
+    "contents": [
+      "cli-anything-audacity-expert.md"
+    ],
+    "checksum": "9476fb61a3e6f2ec7b53883fc36c1236657ac8e8883c6efaa6f528732097e718",
+    "createdAt": "2026-03-13T12:35:26.282Z"
+  }
+]

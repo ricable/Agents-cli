@@ -1,0 +1,70 @@
+[
+  {
+    "id": "cli-anything-drawio-harness",
+    "name": "cli-anything-drawio CLI Harness",
+    "version": "0.1.0",
+    "productType": "harness",
+    "contents": [
+      "README.md",
+      "cli_anything_drawio/__init__.py",
+      "cli_anything_drawio/backend.py",
+      "cli_anything_drawio/cli.py",
+      "cli_anything_drawio/output.py",
+      "pyproject.toml",
+      "tests/__init__.py",
+      "tests/conftest.py"
+    ],
+    "checksum": "cd758576f60c9dac27fcc5e552b97761db76379b50acb52c522b153a15778f1c",
+    "createdAt": "2026-03-13T12:35:26.300Z"
+  },
+  {
+    "id": "cli-anything-drawio-skill",
+    "name": "cli-anything-drawio Skill",
+    "version": "0.1.0",
+    "productType": "skill",
+    "contents": [
+      "SKILL.md",
+      "references/api-coverage.md",
+      "references/commands.md",
+      "references/examples.md",
+      "references/troubleshooting.md"
+    ],
+    "checksum": "722fe1fb21b88ec74116e488ccd642f7b37734631b455530f3f2b189fae7e245",
+    "createdAt": "2026-03-13T12:35:26.300Z"
+  },
+  {
+    "id": "cli-anything-drawio-plugin",
+    "name": "cli-anything-drawio Plugin",
+    "version": "1.0.0",
+    "productType": "plugin",
+    "contents": [
+      ".claude-plugin/plugin.json",
+      "skills/cli-anything-drawio/SKILL.md",
+      "commands/search.md"
+    ],
+    "checksum": "cf49a09e54ecd412f094e70da7369d2a4ab940fb7e5720c5b9c0351dbbe51c6d",
+    "createdAt": "2026-03-13T12:35:26.300Z"
+  },
+  {
+    "id": "cli-anything-drawio-hooks",
+    "name": "cli-anything-drawio Hooks",
+    "version": "1.0.0",
+    "productType": "hook-bundle",
+    "contents": [
+      "hooks.json"
+    ],
+    "checksum": "ea5729cc3aff5b86e59c6423507f385cbf1a7a987ebce66fd0072ad86ba1da56",
+    "createdAt": "2026-03-13T12:35:26.300Z"
+  },
+  {
+    "id": "cli-anything-drawio-agents",
+    "name": "cli-anything-drawio Agent Definitions",
+    "version": "1.0.0",
+    "productType": "agent-def",
+    "contents": [
+      "cli-anything-drawio-expert.md"
+    ],
+    "checksum": "4781d82ced1335b7f41f762b19c21d09c25584450ea2a74dd2fe8bf095e80787",
+    "createdAt": "2026-03-13T12:35:26.300Z"
+  }
+]

@@ -1,0 +1,70 @@
+[
+  {
+    "id": "cli-anything-inkscape-harness",
+    "name": "cli-anything-inkscape CLI Harness",
+    "version": "0.1.0",
+    "productType": "harness",
+    "contents": [
+      "README.md",
+      "cli_anything_inkscape/__init__.py",
+      "cli_anything_inkscape/backend.py",
+      "cli_anything_inkscape/cli.py",
+      "cli_anything_inkscape/output.py",
+      "pyproject.toml",
+      "tests/__init__.py",
+      "tests/conftest.py"
+    ],
+    "checksum": "7c644cd1619f6cb8852e6bfa007b2588ae89d1ed5c75e6e27a02b59f94377b0e",
+    "createdAt": "2026-03-13T12:35:26.306Z"
+  },
+  {
+    "id": "cli-anything-inkscape-skill",
+    "name": "cli-anything-inkscape Skill",
+    "version": "0.1.0",
+    "productType": "skill",
+    "contents": [
+      "SKILL.md",
+      "references/api-coverage.md",
+      "references/commands.md",
+      "references/examples.md",
+      "references/troubleshooting.md"
+    ],
+    "checksum": "69818a6917437552a40cf8d98976197f1c208927dcc039513b41bafeb8f47355",
+    "createdAt": "2026-03-13T12:35:26.306Z"
+  },
+  {
+    "id": "cli-anything-inkscape-plugin",
+    "name": "cli-anything-inkscape Plugin",
+    "version": "1.0.0",
+    "productType": "plugin",
+    "contents": [
+      ".claude-plugin/plugin.json",
+      "skills/cli-anything-inkscape/SKILL.md",
+      "commands/search.md"
+    ],
+    "checksum": "ff69d906cf6e837365125fb42a8fdd76de0a7e63417455c940b8d5cb017f9272",
+    "createdAt": "2026-03-13T12:35:26.306Z"
+  },
+  {
+    "id": "cli-anything-inkscape-hooks",
+    "name": "cli-anything-inkscape Hooks",
+    "version": "1.0.0",
+    "productType": "hook-bundle",
+    "contents": [
+      "hooks.json"
+    ],
+    "checksum": "4bdccc845f830d58f5738b211750dcc6068450958ecdca085ac9168e297ed90a",
+    "createdAt": "2026-03-13T12:35:26.306Z"
+  },
+  {
+    "id": "cli-anything-inkscape-agents",
+    "name": "cli-anything-inkscape Agent Definitions",
+    "version": "1.0.0",
+    "productType": "agent-def",
+    "contents": [
+      "cli-anything-inkscape-expert.md"
+    ],
+    "checksum": "fd8f0d20983d0953330a51490c5e08614542edc3590629e04574356d03748d85",
+    "createdAt": "2026-03-13T12:35:26.306Z"
+  }
+]

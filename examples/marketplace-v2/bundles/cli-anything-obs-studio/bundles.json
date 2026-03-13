@@ -1,0 +1,70 @@
+[
+  {
+    "id": "cli-anything-obs-studio-harness",
+    "name": "cli-anything-obs-studio CLI Harness",
+    "version": "0.1.0",
+    "productType": "harness",
+    "contents": [
+      "README.md",
+      "cli_anything_obs_studio/__init__.py",
+      "cli_anything_obs_studio/backend.py",
+      "cli_anything_obs_studio/cli.py",
+      "cli_anything_obs_studio/output.py",
+      "pyproject.toml",
+      "tests/__init__.py",
+      "tests/conftest.py"
+    ],
+    "checksum": "ce40d51c552ce799fe8f4682c891460c1ce75c329adfb407dd69873c5ab24e32",
+    "createdAt": "2026-03-13T12:35:26.320Z"
+  },
+  {
+    "id": "cli-anything-obs-studio-skill",
+    "name": "cli-anything-obs-studio Skill",
+    "version": "0.1.0",
+    "productType": "skill",
+    "contents": [
+      "SKILL.md",
+      "references/api-coverage.md",
+      "references/commands.md",
+      "references/examples.md",
+      "references/troubleshooting.md"
+    ],
+    "checksum": "97f0b9fb831a5746c158bc07e845a312be6ec01b9f61f5c4cd885f94fd3633cb",
+    "createdAt": "2026-03-13T12:35:26.320Z"
+  },
+  {
+    "id": "cli-anything-obs-studio-plugin",
+    "name": "cli-anything-obs-studio Plugin",
+    "version": "1.0.0",
+    "productType": "plugin",
+    "contents": [
+      ".claude-plugin/plugin.json",
+      "skills/cli-anything-obs-studio/SKILL.md",
+      "commands/search.md"
+    ],
+    "checksum": "b4da4bab4541841e627687750a0926f6c1ae78316463c3032de46a680cd8f03e",
+    "createdAt": "2026-03-13T12:35:26.320Z"
+  },
+  {
+    "id": "cli-anything-obs-studio-hooks",
+    "name": "cli-anything-obs-studio Hooks",
+    "version": "1.0.0",
+    "productType": "hook-bundle",
+    "contents": [
+      "hooks.json"
+    ],
+    "checksum": "7b432f3cc73c9eb05a5b250b66043120c5503db5eb0d25431400817b9adc243d",
+    "createdAt": "2026-03-13T12:35:26.320Z"
+  },
+  {
+    "id": "cli-anything-obs-studio-agents",
+    "name": "cli-anything-obs-studio Agent Definitions",
+    "version": "1.0.0",
+    "productType": "agent-def",
+    "contents": [
+      "cli-anything-obs-studio-expert.md"
+    ],
+    "checksum": "e63ec360721717df494a6ea1f31348a5099cced50157f1e1971a6fed6a7b2987",
+    "createdAt": "2026-03-13T12:35:26.320Z"
+  }
+]

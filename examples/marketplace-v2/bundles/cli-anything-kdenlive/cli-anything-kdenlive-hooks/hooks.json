@@ -1,0 +1,18 @@
+{
+  "hooks": [
+    {
+      "event": "PreToolUse",
+      "pattern": "cli-anything-kdenlive",
+      "command": "echo \"Pre-check: validating cli-anything-kdenlive state\""
+    },
+    {
+      "event": "PostToolUse",
+      "pattern": "cli-anything-kdenlive",
+      "command": "echo \"Post-check: cli-anything-kdenlive operation complete\""
+    },
+    {
+      "event": "SessionStart",
+      "command": "echo \"Loading creative-tools domain context for cli-anything-kdenlive\""
+    }
+  ]
+}

@@ -1,0 +1,70 @@
+[
+  {
+    "id": "cli-anything-libreoffice-harness",
+    "name": "cli-anything-libreoffice CLI Harness",
+    "version": "0.1.0",
+    "productType": "harness",
+    "contents": [
+      "README.md",
+      "cli_anything_libreoffice/__init__.py",
+      "cli_anything_libreoffice/backend.py",
+      "cli_anything_libreoffice/cli.py",
+      "cli_anything_libreoffice/output.py",
+      "pyproject.toml",
+      "tests/__init__.py",
+      "tests/conftest.py"
+    ],
+    "checksum": "3218a208c2bc047665aef0f06550a7835dc3b6bccc1be0b0ff0b490cac9d7921",
+    "createdAt": "2026-03-13T12:35:26.316Z"
+  },
+  {
+    "id": "cli-anything-libreoffice-skill",
+    "name": "cli-anything-libreoffice Skill",
+    "version": "0.1.0",
+    "productType": "skill",
+    "contents": [
+      "SKILL.md",
+      "references/api-coverage.md",
+      "references/commands.md",
+      "references/examples.md",
+      "references/troubleshooting.md"
+    ],
+    "checksum": "20fe17504060451525583a9e73c24f8757986cfe6cd9dddfa41fd83c5c1dfe3e",
+    "createdAt": "2026-03-13T12:35:26.316Z"
+  },
+  {
+    "id": "cli-anything-libreoffice-plugin",
+    "name": "cli-anything-libreoffice Plugin",
+    "version": "1.0.0",
+    "productType": "plugin",
+    "contents": [
+      ".claude-plugin/plugin.json",
+      "skills/cli-anything-libreoffice/SKILL.md",
+      "commands/search.md"
+    ],
+    "checksum": "83e4ad1e21e4b472bf9907f046475d033984fc6b96d00b0c7113c842f2e66d7a",
+    "createdAt": "2026-03-13T12:35:26.316Z"
+  },
+  {
+    "id": "cli-anything-libreoffice-hooks",
+    "name": "cli-anything-libreoffice Hooks",
+    "version": "1.0.0",
+    "productType": "hook-bundle",
+    "contents": [
+      "hooks.json"
+    ],
+    "checksum": "8e461e9d3850a9a5d6d6462685df6789efd0541da7d98f448b121c9b39ff4ff0",
+    "createdAt": "2026-03-13T12:35:26.316Z"
+  },
+  {
+    "id": "cli-anything-libreoffice-agents",
+    "name": "cli-anything-libreoffice Agent Definitions",
+    "version": "1.0.0",
+    "productType": "agent-def",
+    "contents": [
+      "cli-anything-libreoffice-expert.md"
+    ],
+    "checksum": "ab632f0cb82be8e693183c4ce53e837ffdf0fce66d010bbffb9b61e3cb4d7752",
+    "createdAt": "2026-03-13T12:35:26.316Z"
+  }
+]

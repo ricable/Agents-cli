@@ -1,0 +1,70 @@
+[
+  {
+    "id": "cli-anything-gimp-harness",
+    "name": "cli-anything-gimp CLI Harness",
+    "version": "0.1.0",
+    "productType": "harness",
+    "contents": [
+      "README.md",
+      "cli_anything_gimp/__init__.py",
+      "cli_anything_gimp/backend.py",
+      "cli_anything_gimp/cli.py",
+      "cli_anything_gimp/output.py",
+      "pyproject.toml",
+      "tests/__init__.py",
+      "tests/conftest.py"
+    ],
+    "checksum": "29b1949db9f221e26ab598b5c7ba1153b43dbeedf006afb17fa44b96e19c36b1",
+    "createdAt": "2026-03-13T12:35:26.303Z"
+  },
+  {
+    "id": "cli-anything-gimp-skill",
+    "name": "cli-anything-gimp Skill",
+    "version": "0.1.0",
+    "productType": "skill",
+    "contents": [
+      "SKILL.md",
+      "references/api-coverage.md",
+      "references/commands.md",
+      "references/examples.md",
+      "references/troubleshooting.md"
+    ],
+    "checksum": "60088a60424ade54d95c3e64708ce57d7cde638d32068896e3ac90a58dacc2fe",
+    "createdAt": "2026-03-13T12:35:26.303Z"
+  },
+  {
+    "id": "cli-anything-gimp-plugin",
+    "name": "cli-anything-gimp Plugin",
+    "version": "1.0.0",
+    "productType": "plugin",
+    "contents": [
+      ".claude-plugin/plugin.json",
+      "skills/cli-anything-gimp/SKILL.md",
+      "commands/search.md"
+    ],
+    "checksum": "37cc655d3cce818747a707767aaf5fa1c93ba07a2a44a3e55309ae33f5be8f73",
+    "createdAt": "2026-03-13T12:35:26.303Z"
+  },
+  {
+    "id": "cli-anything-gimp-hooks",
+    "name": "cli-anything-gimp Hooks",
+    "version": "1.0.0",
+    "productType": "hook-bundle",
+    "contents": [
+      "hooks.json"
+    ],
+    "checksum": "e3c615d8c086c141a22a60ce7278e65628bf52910a80285b938a3b09fd06888d",
+    "createdAt": "2026-03-13T12:35:26.303Z"
+  },
+  {
+    "id": "cli-anything-gimp-agents",
+    "name": "cli-anything-gimp Agent Definitions",
+    "version": "1.0.0",
+    "productType": "agent-def",
+    "contents": [
+      "cli-anything-gimp-expert.md"
+    ],
+    "checksum": "b23c792acb62e42ea6a8612b283c8d6bd0c8ff775ae42e8fc2ec6bb446734566",
+    "createdAt": "2026-03-13T12:35:26.303Z"
+  }
+]

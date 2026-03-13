@@ -90,9 +90,9 @@ function buildConfig(
         triggers: ["cli", "webhook"] as Array<"webhook" | "cli" | "schedule">,
         steps: [
           { name: "fetch", action: "npx opensrc {repo}" },
-          { name: "index", action: "npx pop-skills index" },
-          { name: "embed", action: "npx pop-skills embed" },
-          { name: "skill", action: "npx pop-skills skill --ai" },
+          { name: "index", action: "npx agents-cli index" },
+          { name: "embed", action: "npx agents-cli embed" },
+          { name: "skill", action: "npx agents-cli skill --ai" },
         ],
         notify: { email: undefined },
       };

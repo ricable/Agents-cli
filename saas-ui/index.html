@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agents-CLI SaaS Platform</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Ambient Animated Background -->
+    <div class="ambient-bg">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="navbar glass">
+        <div class="nav-container">
+            <div class="brand">
+                <div class="logo-wrapper">
+                    <div class="logo-icon">&#x2728;</div>
+                    <div class="logo-glow"></div>
+                </div>
+                <span class="brand-text">Agents<span class="text-gradient">-CLI</span></span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="#features" class="nav-link">Features</a></li>
+                <li><a href="#marketplace" class="nav-link">Marketplace</a></li>
+                <li><a href="#pricing" class="nav-link">Pricing</a></li>
+                <li><a href="#docs" class="nav-link">Documentation</a></li>
+            </ul>
+            <div class="nav-actions">
+                <div class="extension-status disconnected">
+                    <span class="status-indicator"></span>
+                    Checking...
+                </div>
+                <button class="btn btn-ghost" id="loginBtn">Log In</button>
+                <button class="btn btn-primary shine" id="getStartedBtn">Get Started</button>
+
+                <!-- User Profile (hidden until login) -->
+                <div class="user-profile" id="userProfile" style="display: none;">
+                    <span class="user-name">User</span>
+                    <div class="user-avatar">U</div>
+                    <!-- Dropdown -->
+                    <div class="user-dropdown" id="userDropdown">
+                        <button class="dropdown-item" id="dashboardNavBtn">Dashboard</button>
+                        <button class="dropdown-item" id="logoutBtn">Log Out</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Product Detail Overlay -->
+    <div id="productDetailOverlay" class="product-detail-overlay"></div>
+    <div id="productDetailPanel" class="product-detail-panel glass-card"></div>
+
+    <!-- Main Content -->
+    <main>
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="container text-center">
+                <div class="launch-badge glass">
+                    <span class="pulse-dot"></span>
+                    Launch Promo: 50% Off Lifetime Access to Founders Tier
+                </div>
+                <h1 class="hero-title">The Operating System for <span class="text-gradient">Autonomous Intelligence</span></h1>
+                <p class="hero-subtitle">Transform any CLI tool, script, or binary into a production-grade agentic workflow. Orchestrate multi-agent teams with zero configuration and local-first security.</p>
+                <div class="hero-actions">
+                    <button class="btn btn-primary btn-lg shine" onclick="document.getElementById('marketplace').scrollIntoView({behavior: 'smooth'})">Build Your First Agent</button>
+                    <button class="btn btn-secondary btn-lg" onclick="document.getElementById('marketplace').scrollIntoView({behavior: 'smooth'})">Explore Marketplace</button>
+                </div>
+
+                <!-- Terminal Preview -->
+                <div class="terminal-preview glass-card">
+                    <div class="terminal-header">
+                        <div class="mac-btns">
+                            <span class="close"></span>
+                            <span class="min"></span>
+                            <span class="max"></span>
+                        </div>
+                        <div class="terminal-title">agent-run --ai="opus-4.6"</div>
+                    </div>
+                    <div class="terminal-body type-writer">
+                        <p><span class="prompt">$</span> agents-cli add astral-sh/ruff</p>
+                        <p class="success">&#x2714; Tool astral-sh/ruff installed and indexed.</p>
+                        <p><span class="prompt">$</span> skill-forge --tool pypi:ruff --full</p>
+                        <p class="info">&#x27A1; Generating Claude Code hooks and doctrine...</p>
+                        <p class="success">&#x2714; Plugin generated successfully with 7 event hooks.</p>
+                        <p><span class="prompt">$</span> agents-cli run ruff -- check .</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section id="features" class="features-section">
+            <div class="container">
+                <div class="section-header text-center">
+                    <h2 class="section-title">Deep Lifecycle Intelligence</h2>
+                    <p class="section-description">A fully integrated environment transforming raw CLI outputs into structured, deterministic, and scalable agent deployments.</p>
+                </div>
+                <div class="features-grid">
+                    <div class="feature-card glass-card">
+                        <div class="feature-icon">&#x1F50D;</div>
+                        <h3>Intelligent Introspection</h3>
+                        <p>Automatically map and execute CLI binaries up to depth-3 nested commands, mapping outputs strictly to structured JSON schemas.</p>
+                    </div>
+                    <div class="feature-card glass-card">
+                        <div class="feature-icon">&#x1F6E1;</div>
+                        <h3>Enterprise Hooks</h3>
+                        <p>Write PreToolUse, PostToolUse, and Stop gates. Enforce vulnerability scanning, compliance checks, and safe IP dry-runs before execution.</p>
+                    </div>
+                    <div class="feature-card glass-card">
+                        <div class="feature-icon">&#x1F91D;</div>
+                        <h3>Team Orchestration</h3>
+                        <p>Deploy specialized subagents (Haiku &amp; Sonnet) to handle specific domains while a primary Agent (Opus) coordinates the overarching memory graph.</p>
+                    </div>
+                    <div class="feature-card glass-card">
+                        <div class="feature-icon">&#x26A1;</div>
+                        <h3>Global MCP Bridge</h3>
+                        <p>Seamlessly expose your forged skills to any MCP-compliant client (Claude Desktop, VS Code, specialized IDEs) with one click.</p>
+                    </div>
+                    <div class="feature-card glass-card">
+                        <div class="feature-icon">&#x1F4E6;</div>
+                        <h3>6 Product Types</h3>
+                        <p>Skills, Plugins, Hook Bundles, Agent Definitions, Agent Teams, and Harnesses. Publish to the marketplace with 80/20 revenue split.</p>
+                    </div>
+                    <div class="feature-card glass-card">
+                        <div class="feature-icon">&#x1F4C8;</div>
+                        <h3>Autonomous Auditing</h3>
+                        <p>Every agent action is recorded, audited, and evaluated against safety policies in real-time, ensuring zero hallucination damage.</p>
+                    </div>
+                </div>
+
+                <!-- Pipeline visualization -->
+                <div class="pipeline-viz glass-card mt-5">
+                    <div class="viz-header">
+                        <h4>The Agent Forge Pipeline</h4>
+                        <p class="text-sm">From raw CLI to Autonomous Agent in 4 steps</p>
+                    </div>
+                    <div class="viz-steps">
+                        <div class="viz-step">
+                            <div class="step-num">1</div>
+                            <div class="step-text"><strong>Ingest</strong><br>Import any binary (npm, pip, cargo, go)</div>
+                        </div>
+                        <div class="viz-arrow">&#x27A1;</div>
+                        <div class="viz-step">
+                            <div class="step-num">2</div>
+                            <div class="step-text"><strong>Introspect</strong><br>Auto-generate schemas &amp; flags</div>
+                        </div>
+                        <div class="viz-arrow">&#x27A1;</div>
+                        <div class="viz-step">
+                            <div class="step-num">3</div>
+                            <div class="step-text"><strong>Forge</strong><br>Inject safety hooks &amp; context</div>
+                        </div>
+                        <div class="viz-arrow">&#x27A1;</div>
+                        <div class="viz-step">
+                            <div class="step-num">4</div>
+                            <div class="step-text"><strong>Deploy</strong><br>Live MCP Bridge connection</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Chrome Extension Section -->
+        <section id="extension" class="extension-section">
+            <div class="container">
+                <div class="extension-card glass-card">
+                    <div class="extension-content">
+                        <div class="badge badge-haiku mb-2">Browser Control Plane</div>
+                        <h2 class="section-title">The <span class="text-gradient">Chrome Extension</span> Bridge</h2>
+                        <p class="section-description" style="text-align: left; margin-left: 0;">Connect your browser directly to your local CLI agents. Preview DOM states, record interactions, and debug agentic vision in real-time.</p>
+                        <ul class="feature-list" style="margin-top: 16px;">
+                            <li><i class="icon-check">&#x2713;</i> Real-time DOM element introspection</li>
+                            <li><i class="icon-check">&#x2713;</i> Secure WebSocket bridge to local MCP</li>
+                            <li><i class="icon-check">&#x2713;</i> Session recording for agent training</li>
+                        </ul>
+                        <button class="btn btn-primary mt-4 shine" id="installExtensionBtn">Install Chrome Extension</button>
+                    </div>
+                    <div class="extension-visual">
+                        <div class="extension-mockup">
+                            <div class="mockup-browser glass">
+                                <div class="mockup-header">
+                                    <div class="mockup-dots"><span></span><span></span><span></span></div>
+                                    <div class="mockup-url">agents-cli.com/debug</div>
+                                </div>
+                                <div class="mockup-body">
+                                    <div class="mockup-overlay">
+                                        <div class="mockup-popup glass-card pop">
+                                            <div class="popup-header">
+                                                <span>Agents-CLI Bridge</span>
+                                                <span class="status-dot green"></span>
+                                            </div>
+                                            <div class="popup-body">
+                                                <div class="code-block" style="font-size: 10px; padding: 10px;">
+                                                    <pre><code>Target: button#submit
+State: Visible
+Action: Click()
+Result: Success 200 OK</code></pre>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Marketplace Section -->
+        <section id="marketplace" class="marketplace-section">
+            <div class="container">
+                <div class="section-header text-center">
+                    <h2 class="section-title">The Agent Marketplace</h2>
+                    <p class="section-description">Discover, install, and monetize pre-packaged domains and agents. One click to deploy advanced multi-agent teams directly to your local MCP bridge.</p>
+                </div>
+
+                <div class="marketplace-dashboard">
+                    <div class="dashboard-sidebar">
+                        <div class="sidebar-item active" data-pane="discover"><i class="icon">&#x1F50D;</i> Discover</div>
+                        <div class="sidebar-item" data-pane="dashboard" style="display:none"><i class="icon">&#x1F4CA;</i> Dashboard</div>
+                        <div class="sidebar-item" data-pane="installed"><i class="icon">&#x1F4E6;</i> Installed</div>
+                        <div class="sidebar-item" data-pane="mcp"><i class="icon">&#x26A1;</i> MCP Bridge <span class="status-dot green"></span></div>
+                        <div class="sidebar-item" data-pane="forge"><i class="icon">&#x1F6E0;</i> Skill Forge</div>
+                        <div class="sidebar-title">Registries</div>
+                        <div class="sidebar-item" data-pane="registry-git"><span class="registry-badge github">Git</span> GitHub</div>
+                        <div class="sidebar-item" data-pane="registry-npm"><span class="registry-badge npm">npm</span> npm</div>
+                        <div class="sidebar-item" data-pane="registry-pypi"><span class="registry-badge pypi">pip</span> PyPI</div>
+                        <div class="sidebar-item" data-pane="registry-crates"><span class="registry-badge crates">rs</span> crates.io</div>
+                    </div>
+                    <div class="dashboard-content">
+
+                        <!-- Pane: Discover -->
+                        <div class="pane active" id="pane-discover">
+                            <div class="search-bar glass">
+                                <input type="text" id="marketplaceSearch" placeholder="Search products (e.g., 'python linting', 'database migration')..." />
+                                <select id="sortSelect" class="filter-select">
+                                    <option value="relevance">Relevance</option>
+                                    <option value="quality">Quality</option>
+                                    <option value="rating">Rating</option>
+                                    <option value="downloads">Downloads</option>
+                                    <option value="newest">Newest</option>
+                                </select>
+                                <select id="priceFilter" class="filter-select">
+                                    <option value="all">All Prices</option>
+                                    <option value="free">Free</option>
+                                    <option value="paid">Paid</option>
+                                </select>
+                            </div>
+
+                            <!-- Product Type Tabs -->
+                            <div class="product-type-tabs">
+                                <button class="product-type-tab active" data-type="all">All</button>
+                                <button class="product-type-tab" data-type="skill">Skills</button>
+                                <button class="product-type-tab" data-type="plugin">Plugins</button>
+                                <button class="product-type-tab" data-type="hook-bundle">Hook Bundles</button>
+                                <button class="product-type-tab" data-type="agent-def">Agent Defs</button>
+                                <button class="product-type-tab" data-type="agent-team">Agent Teams</button>
+                                <button class="product-type-tab" data-type="harness">Harnesses</button>
+                            </div>
+
+                            <div class="result-bar">
+                                <span id="resultCount">Loading...</span>
+                            </div>
+
+                            <div class="plugin-grid" id="productGrid">
+                                <!-- Dynamic product cards rendered by marketplace.js -->
+                            </div>
+                        </div>
+
+                        <!-- Pane: Dashboard (logged-in users) -->
+                        <div class="pane" id="pane-dashboard">
+                            <!-- Rendered dynamically by dashboard.js -->
+                        </div>
+
+                        <!-- Pane: Installed -->
+                        <div class="pane" id="pane-installed">
+                            <h3>&#x1F4E6; Installed Products</h3>
+                            <p class="text-muted mt-2">Manage your currently active domains and agents.</p>
+                            <div class="plugin-grid mt-4" id="installedGrid">
+                                <div class="empty-state">
+                                    <div class="empty-icon">&#x1F4E6;</div>
+                                    <p>No products installed yet. Browse the Discover tab to get started.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pane: MCP Bridge -->
+                        <div class="pane" id="pane-mcp">
+                            <h3>&#x26A1; MCP Bridge</h3>
+                            <div class="mcp-status glass mt-4" style="padding: 24px; border-radius: 12px; border-left: 4px solid var(--accent-green);">
+                                <h4 id="mcpBridgeTitle">Checking Bridge Status...</h4>
+                                <p class="text-muted" id="mcpBridgeDesc">Connecting to companion server...</p>
+                                <div class="mcp-stats-grid mt-4" id="mcpStatsGrid">
+                                    <div class="mcp-stat">
+                                        <span class="mcp-stat-value" id="mcpActiveJobs">--</span>
+                                        <span class="mcp-stat-label">Active Jobs</span>
+                                    </div>
+                                    <div class="mcp-stat">
+                                        <span class="mcp-stat-value" id="mcpQueuedJobs">--</span>
+                                        <span class="mcp-stat-label">Queued</span>
+                                    </div>
+                                    <div class="mcp-stat">
+                                        <span class="mcp-stat-value" id="mcpTotalJobs">--</span>
+                                        <span class="mcp-stat-label">Total</span>
+                                    </div>
+                                    <div class="mcp-stat">
+                                        <span class="mcp-stat-value" id="mcpUptime">--</span>
+                                        <span class="mcp-stat-label">Uptime</span>
+                                    </div>
+                                </div>
+                                <div class="code-block type-writer mt-2"><pre><code>Port: 3100
+Protocol: HTTP REST
+Authorization: Bearer ***</code></pre></div>
+                            </div>
+                        </div>
+
+                        <!-- Pane: Skill Forge -->
+                        <div class="pane" id="pane-forge">
+                            <div class="forge-container">
+                                <div class="forge-header">
+                                    <h3>&#x1F6E0; Skill Forge</h3>
+                                    <p class="text-muted mt-2">Transform any command-line tool into a contextual AI skill.</p>
+                                </div>
+                                <div class="forge-layout">
+                                    <div class="forge-form glass">
+                                        <div class="form-group">
+                                            <label>Target Tool URI</label>
+                                            <input type="text" class="form-control" id="forgeToolInput" placeholder="e.g. pypi:pytest or npm:prettier">
+                                            <span class="form-hint" id="forgeAnalyzeResult"></span>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Domain Archetype</label>
+                                            <select class="form-control" id="forgeDomainSelect">
+                                                <option value="">Auto-detect</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Description (optional)</label>
+                                            <textarea class="form-control" id="forgeDescription" rows="3" placeholder="Describe what you want to build..."></textarea>
+                                        </div>
+                                        <button class="btn btn-primary btn-block shine" id="forgeGenerateBtn">Generate</button>
+
+                                        <!-- Progress -->
+                                        <div id="forgeProgress" class="forge-progress" style="display:none">
+                                            <div class="progress-bar-track">
+                                                <div class="progress-bar-fill" id="forgeProgressBar" style="width:0%"></div>
+                                            </div>
+                                            <span class="progress-stage" id="forgeProgressStage"></span>
+                                        </div>
+                                    </div>
+                                    <div class="forge-preview glass">
+                                        <div class="preview-header">
+                                            <span>Output</span>
+                                            <span class="badge">Live</span>
+                                        </div>
+                                        <div class="preview-body terminal-body" id="forgeTerminal">
+                                            <p class="info">Waiting for input...</p>
+                                        </div>
+                                        <button class="btn btn-secondary btn-block mt-2" id="forgeDownloadBtn" style="display:none">Download Bundle</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pane: Registries -->
+                        <div class="pane" id="pane-registry-git">
+                            <h3>GitHub Registry</h3>
+                            <p class="text-muted">Browse tools sourced directly from GitHub repositories.</p>
+                            <div class="empty-state">
+                                <div class="empty-icon">&#x1F419;</div>
+                                <p>Connect your companion server to browse GitHub tools.</p>
+                            </div>
+                        </div>
+                        <div class="pane" id="pane-registry-npm">
+                            <h3>npm Registry</h3>
+                            <p class="text-muted">Browse Node.js CLI tools and frameworks.</p>
+                            <div class="empty-state">
+                                <div class="empty-icon">&#x1F4E6;</div>
+                                <p>Connect your companion server to browse npm packages.</p>
+                            </div>
+                        </div>
+                        <div class="pane" id="pane-registry-pypi">
+                            <h3>PyPI Registry</h3>
+                            <p class="text-muted">Browse Python utilities and agents.</p>
+                            <div class="empty-state">
+                                <div class="empty-icon">&#x1F40D;</div>
+                                <p>Connect your companion server to browse PyPI packages.</p>
+                            </div>
+                        </div>
+                        <div class="pane" id="pane-registry-crates">
+                            <h3>Crates.io Registry</h3>
+                            <p class="text-muted">Browse Rust binaries.</p>
+                            <div class="empty-state">
+                                <div class="empty-icon">&#x1F980;</div>
+                                <p>Connect your companion server to browse crates.io packages.</p>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Testimonials Section -->
+        <section class="testimonials-section">
+            <div class="container text-center">
+                <div class="section-header">
+                    <h2 class="section-title">Trusted by <span class="text-gradient">Agentic Teams</span></h2>
+                    <p class="section-description">Join the founders and developers building the next generation of autonomous software.</p>
+                </div>
+                <div class="testimonials-grid">
+                    <div class="testimonial-card glass-card">
+                        <div class="testimonial-content">"Agents-CLI cut our automation development time by 80%. Transforming our legacy CLIs into MCP-ready tools was a breeze."</div>
+                        <div class="testimonial-author">
+                            <div class="author-avatar" style="background: var(--accent-blue)">S</div>
+                            <div class="author-info"><strong>Sarah Chen</strong><span>CTO at CloudForge</span></div>
+                        </div>
+                    </div>
+                    <div class="testimonial-card glass-card">
+                        <div class="testimonial-content">"The Skill Forge is magic. It introspected our 10-year old internal CLI and generated perfect schemas in seconds."</div>
+                        <div class="testimonial-author">
+                            <div class="author-avatar" style="background: var(--accent-purple)">M</div>
+                            <div class="author-info"><strong>Marcus Thorne</strong><span>Lead Architect at SecOps Inc</span></div>
+                        </div>
+                    </div>
+                    <div class="testimonial-card glass-card">
+                        <div class="testimonial-content">"Finally, a local-first way to orchestrate agents without leaking IP. The Pre/Post hooks are essential for our security."</div>
+                        <div class="testimonial-author">
+                            <div class="author-avatar" style="background: var(--accent-green)">D</div>
+                            <div class="author-info"><strong>David Miller</strong><span>Senior DevOps at FinTech OS</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Testimonials Section -->
+        <section class="testimonials-section">
+            <div class="container text-center">
+                <div class="section-header">
+                    <h2 class="section-title">Trusted by <span class="text-gradient">Agentic Teams</span></h2>
+                    <p class="section-description">Join the founders and developers building the next generation of autonomous software.</p>
+                </div>
+                <div class="testimonials-grid">
+                    <div class="testimonial-card glass-card">
+                        <div class="testimonial-content">
+                            "Agents-CLI cut our automation development time by 80%. Transforming our legacy CLIs into MCP-ready tools was a breeze."
+                        </div>
+                        <div class="testimonial-author">
+                            <div class="author-avatar" style="background: var(--accent-blue)">S</div>
+                            <div class="author-info">
+                                <strong>Sarah Chen</strong>
+                                <span>CTO at CloudForge</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="testimonial-card glass-card">
+                        <div class="testimonial-content">
+                            "The Skill Forge is magic. It introspected our 10-year old internal CLI and generated perfect schemas in seconds."
+                        </div>
+                        <div class="testimonial-author">
+                            <div class="author-avatar" style="background: var(--accent-purple)">M</div>
+                            <div class="author-info">
+                                <strong>Marcus Thorne</strong>
+                                <span>Lead Architect at SecOps Inc</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="testimonial-card glass-card">
+                        <div class="testimonial-content">
+                            "Finally, a local-first way to orchestrate agents without leaking IP. The Pre/Post hooks are essential for our security."
+                        </div>
+                        <div class="testimonial-author">
+                            <div class="author-avatar" style="background: var(--accent-green)">D</div>
+                            <div class="author-info">
+                                <strong>David Miller</strong>
+                                <span>Senior DevOps at FinTech OS</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Pricing Section -->
+        <section id="pricing" class="pricing-section">
+            <div class="container">
+                <div class="section-header text-center">
+                    <h2 class="section-title">Unlock Agentic Scale</h2>
+                    <p class="section-description">Choose the intelligence tier that fits your workflow. From pure exploration to full architectural rewriting.</p>
+
+                    <div class="billing-toggle glass">
+                        <button class="toggle-btn active" data-billing="monthly">Monthly</button>
+                        <button class="toggle-btn" data-billing="yearly">Yearly <span class="discount-badge">Save 20%</span></button>
+                    </div>
+                </div>
+
+                <div class="pricing-grid">
+                    <div class="pricing-card glass-card">
+                        <div class="tier-header">
+                            <h3 class="tier-name">Free</h3>
+                            <p class="tier-desc">Core CLI tools &amp; discovery</p>
+                            <div class="tier-price">
+                                <span class="currency">$</span><span class="amount">0</span><span class="period">/mo</span>
+                            </div>
+                        </div>
+                        <div class="tier-body">
+                            <button class="btn btn-secondary btn-block">Download Free</button>
+                            <ul class="feature-list">
+                                <li><i class="icon-check">&#x2713;</i> 5 tools, 3 daily generations</li>
+                                <li><i class="icon-check">&#x2713;</i> Install from public registries</li>
+                                <li><i class="icon-check">&#x2713;</i> Manual Skill Forge</li>
+                                <li><i class="icon-check">&#x2713;</i> View public skills &amp; MCP tools</li>
+                                <li><i class="icon-cross">&#x2717;</i> No deep analysis or AI</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="pricing-card glass-card pop">
+                        <div class="tier-header">
+                            <div class="tier-badge">Most Popular</div>
+                            <h3 class="tier-name">Starter</h3>
+                            <p class="tier-desc">Fast daily automation</p>
+                            <div class="tier-price">
+                                <span class="currency">$</span><span class="amount" data-monthly="29" data-yearly="24">29</span><span class="period">/mo</span>
+                            </div>
+                        </div>
+                        <div class="tier-body">
+                            <button class="btn btn-primary btn-block shine" data-price-id="price_starter">Subscribe Now</button>
+                            <ul class="feature-list">
+                                <li><i class="icon-check">&#x2713;</i> 15 tools, 20 daily generations</li>
+                                <li><i class="icon-check">&#x2713;</i> Natural language tool discovery</li>
+                                <li><i class="icon-check">&#x2713;</i> Auto-generated SKILL.md files</li>
+                                <li><i class="icon-check">&#x2713;</i> Plugin publishing</li>
+                                <li><i class="icon-check">&#x2713;</i> MCP Bridge (up to 15 tools)</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="pricing-card glass-card premium">
+                        <div class="tier-header">
+                            <h3 class="tier-name">Pro</h3>
+                            <p class="tier-desc">Complex multi-tool workflows</p>
+                            <div class="tier-price">
+                                <span class="currency">$</span><span class="amount" data-monthly="99" data-yearly="79">99</span><span class="period">/mo</span>
+                            </div>
+                        </div>
+                        <div class="tier-body">
+                            <button class="btn btn-primary btn-block" data-price-id="price_pro">Start Pro Trial</button>
+                            <ul class="feature-list">
+                                <li><i class="icon-check">&#x2713;</i> 50 tools, 100 daily generations</li>
+                                <li><i class="icon-check">&#x2713;</i> Deep analysis &amp; AI generation</li>
+                                <li><i class="icon-check">&#x2713;</i> Multi-Agent Team Orchestration</li>
+                                <li><i class="icon-check">&#x2713;</i> Bundle publishing</li>
+                                <li><i class="icon-check">&#x2713;</i> Automated quality auditing</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="pricing-card glass-card enterprise border-gradient">
+                        <div class="tier-header">
+                            <h3 class="tier-name text-gradient">Enterprise</h3>
+                            <p class="tier-desc">Scale your agentic workforce</p>
+                            <div class="tier-price">
+                                <span class="currency">$</span><span class="amount" data-monthly="399" data-yearly="299">399</span><span class="period">/mo</span>
+                            </div>
+                        </div>
+                        <div class="tier-body">
+                            <button class="btn btn-block btn-gradient shine" data-price-id="price_enterprise">Get Enterprise</button>
+                            <ul class="feature-list">
+                                <li><i class="icon-check">&#x2713;</i> 200 tools, unlimited generations</li>
+                                <li><i class="icon-check">&#x2713;</i> Unlimited MCP Bridge scale</li>
+                                <li><i class="icon-check">&#x2713;</i> Advanced enterprise security</li>
+                                <li><i class="icon-check">&#x2713;</i> Private registry integration</li>
+                                <li><i class="icon-check">&#x2713;</i> Full marketplace monetization</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Documentation Section -->
+        <section id="docs" class="docs-section">
+            <div class="container">
+                <div class="docs-layout glass-card">
+                    <div class="docs-sidebar">
+                        <h4>Getting Started</h4>
+                        <ul>
+                            <li class="doc-link active" data-doc="quickstart">Quickstart</li>
+                            <li class="doc-link" data-doc="installation">Installation</li>
+                            <li class="doc-link" data-doc="supabase">Authentication</li>
+                        </ul>
+                        <h4 class="mt-4">Core Concepts</h4>
+                        <ul>
+                            <li class="doc-link" data-doc="skillforge">Skill Forge</li>
+                            <li class="doc-link" data-doc="mcp">MCP Bridge</li>
+                            <li class="doc-link" data-doc="teams">Team Skills</li>
+                            <li class="doc-link" data-doc="hooks">Pre/Post Hooks</li>
+                        </ul>
+                    </div>
+                    <div class="docs-content">
+                        <div class="doc-pane active" id="doc-quickstart">
+                            <h2>Quickstart: Your First Agent</h2>
+                            <p>The Agents-CLI ecosystem allows for zero-configuration deployments of any Command Line Interface.</p>
+                            <div class="code-block type-writer">
+                                <div class="code-header">
+                                    <span class="lang-badge">bash</span>
+                                </div>
+                                <pre><code># 1. Install tool from PyPI
+agents-cli add pypi:ruff
+
+# 2. Forge Claude Code plugin
+skill-forge --tool pypi:ruff --full
+
+# 3. Expose to local context
+agents-cli mcp start</code></pre>
+                            </div>
+                            <p class="mt-4">This wraps your selected binary with intelligent dry-run safety and context-aware flags.</p>
+                        </div>
+                        <div class="doc-pane" id="doc-installation">
+                            <h2>Installation &amp; Setup</h2>
+                            <p>Install agents-cli globally via npm:</p>
+                            <div class="code-block type-writer"><pre><code>npm install -g agents-cli</code></pre></div>
+                        </div>
+                        <div class="doc-pane" id="doc-supabase">
+                            <h2>Authentication</h2>
+                            <p>OAuth support for Google and GitHub via the companion web service. Set environment variables for your OAuth credentials.</p>
+                        </div>
+                        <div class="doc-pane" id="doc-skillforge">
+                            <h2>Skill Forge (Deep Introspection)</h2>
+                            <p>The Skill Forge deep-probes tool --help flags up to 3 levels, extracting all schema variables for agent use.</p>
+                        </div>
+                        <div class="doc-pane" id="doc-mcp">
+                            <h2>The Local MCP Bridge</h2>
+                            <p>Expose 100+ vetted tools securely back to Claude Desktop instantly via the Model Context Protocol.</p>
+                        </div>
+                        <div class="doc-pane" id="doc-teams">
+                            <h2>Team Skill Orchestration</h2>
+                            <p>Combine cheap Haiku workers for routing and expensive Opus workers for high-reasoning synthesis tasks.</p>
+                        </div>
+                        <div class="doc-pane" id="doc-hooks">
+                            <h2>Enterprise Pre/Post Hooks</h2>
+                            <p>Ensure DROP DATABASE or rm -rf / is intercepted before LLM hallucination applies action.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <div class="brand">
+                        <div class="logo-icon">&#x2728;</div>
+                        <span class="brand-text">Agents<span class="text-gradient">-CLI</span></span>
+                    </div>
+                    <p class="mt-3 text-sm text-muted">The ultimate operating system for AI Agents. Local-first, enterprise-ready, autonomous by design.</p>
+                    <div class="social-links mt-4">
+                        <a href="#" class="social-link" title="Twitter/X">&#x1D54F;</a>
+                        <a href="#" class="social-link" title="GitHub">&#x1F419;</a>
+                        <a href="#" class="social-link" title="Discord">&#x1F4AC;</a>
+                    </div>
+                </div>
+                <div class="footer-links">
+                    <h4>Product</h4>
+                    <ul>
+                        <li><a href="#features">Features</a></li>
+                        <li><a href="#marketplace">Marketplace</a></li>
+                        <li><a href="#pricing">Pricing</a></li>
+                        <li><a href="#" id="footerSkillForge">Skill Forge</a></li>
+                    </ul>
+                </div>
+                <div class="footer-links">
+                    <h4>Resources</h4>
+                    <ul>
+                        <li><a href="#docs">Documentation</a></li>
+                        <li><a href="#">API Reference</a></li>
+                        <li><a href="#">Community</a></li>
+                    </ul>
+                </div>
+                <div class="footer-links">
+                    <h4>Company</h4>
+                    <ul>
+                        <li><a href="#" id="footerAboutUs">About Us</a></li>
+                        <li><a href="#" id="footerPrivacy">Privacy Policy</a></li>
+                        <li><a href="#" id="footerTerms">Terms of Service</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom mt-5">
+                <p>&copy; 2026 Agents-CLI. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Plugin Installer Modal -->
+    <div id="installerModal" class="modal-overlay">
+        <div class="modal-content glass-card pop">
+            <div class="modal-header">
+                <h3>Install Agent Plugin</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="install-progress">
+                    <div class="progress-step active" id="step-resolve">1. Resolve Source</div>
+                    <div class="progress-step" id="step-build">2. Forge Skills</div>
+                    <div class="progress-step" id="step-mcp">3. MCP Expose</div>
+                </div>
+                <div class="terminal-preview mini">
+                    <div class="terminal-body type-writer" id="installTerminal">
+                        <p class="info">&#x27A1; Initializing installation pipeline...</p>
+                    </div>
+                </div>
+                <div class="install-actions mt-4">
+                    <button class="btn btn-secondary btn-block" id="startInstallBtn">Confirm Installation</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal-overlay">
+        <div class="modal-content glass-card auth-modal">
+            <div class="modal-header">
+                <h3>Welcome Back</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted text-center mb-4">Log in to manage your agent deployments.</p>
+                <button class="btn btn-outline btn-block mb-2 auth-submit"><i class="icon">G</i> Continue with Google</button>
+                <button class="btn btn-outline btn-block auth-submit"><i class="icon">🐙</i> Continue with GitHub</button>
+                <div class="auth-divider"><span>or with Email</span></div>
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" class="form-control" placeholder="agent@example.com">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" class="form-control" placeholder="••••••••">
+                </div>
+                <button class="btn btn-primary btn-block shine mt-2 auth-submit">Log In</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Get Started Modal (Signup) -->
+    <div id="signupModal" class="modal-overlay">
+        <div class="modal-content glass-card auth-modal">
+            <div class="modal-header">
+                <h3>Create Account</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted text-center mb-4">Claim your 50% Founders Tier discount instantly.</p>
+                <button class="btn btn-primary btn-block mb-2 shine auth-submit"><i class="icon">G</i> Sign up with Google (Default)</button>
+                <button class="btn btn-outline btn-block auth-submit"><i class="icon">🐙</i> Sign up with GitHub</button>
+                <div class="auth-divider"><span>or with Email</span></div>
+                <div class="form-group">
+                    <label>Work Email</label>
+                    <input type="email" class="form-control" placeholder="agent@startup.inc">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" class="form-control" placeholder="••••••••">
+                </div>
+                <button class="btn btn-gradient btn-block shine mt-2 auth-submit">Claim Founders Promo & Register</button>
+                <p class="auth-footer mt-4 text-center">Powered securely by <strong>Supabase Auth</strong>.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stripe Modal -->
+    <div id="stripeModal" class="modal-overlay">
+        <div class="modal-content glass-card auth-modal text-center" style="max-width: 450px;">
+            <div class="modal-header" style="justify-content: center; position: relative;">
+                <h3>Secure Checkout</h3>
+                <button class="close-modal" style="position: absolute; right: 0;">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="payment-loader">
+                    <div class="pulse-dot" style="margin: 0 auto 16px; width: 40px; height: 40px; background: #6772e5; box-shadow: 0 0 20px #6772e5;"></div>
+                    <h4 style="margin-bottom: 8px;">Connecting to Payment Provider...</h4>
+                    <p class="text-muted mb-4 text-sm">Setting up end-to-end encrypted session.</p>
+                </div>
+                <div id="payment-success" style="display: none;">
+                    <h4 style="color: var(--accent-green); margin-bottom: 8px;">Payment Successful</h4>
+                    <p class="text-muted mb-4 text-sm">Your agents-cli environment is now upgraded.</p>
+                    <button class="btn btn-primary btn-block checkout-done">Go to Dashboard</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Privacy Policy Modal -->
+    <div id="privacyModal" class="modal-overlay">
+        <div class="modal-content glass-card" style="max-width:600px">
+            <div class="modal-header"><h3>Privacy Policy</h3><button class="close-modal">&times;</button></div>
+            <div class="modal-body"><p class="text-muted">Agents-CLI is a local-first tool. Your data stays on your machine. We collect only anonymized usage metrics when the companion server is active. OAuth tokens are stored locally and never transmitted to our servers.</p></div>
+        </div>
+    </div>
+
+    <!-- Terms Modal -->
+    <div id="termsModal" class="modal-overlay">
+        <div class="modal-content glass-card" style="max-width:600px">
+            <div class="modal-header"><h3>Terms of Service</h3><button class="close-modal">&times;</button></div>
+            <div class="modal-body"><p class="text-muted">By using Agents-CLI, you agree to use the tool responsibly. Marketplace products are provided as-is. Revenue splits are 80% creator / 20% platform. Enterprise customers have custom SLAs.</p></div>
+        </div>
+    </div>
+
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>

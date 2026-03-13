@@ -1,0 +1,70 @@
+[
+  {
+    "id": "cli-anything-blender-harness",
+    "name": "cli-anything-blender CLI Harness",
+    "version": "0.1.0",
+    "productType": "harness",
+    "contents": [
+      "README.md",
+      "cli_anything_blender/__init__.py",
+      "cli_anything_blender/backend.py",
+      "cli_anything_blender/cli.py",
+      "cli_anything_blender/output.py",
+      "pyproject.toml",
+      "tests/__init__.py",
+      "tests/conftest.py"
+    ],
+    "checksum": "e35675612e6f7ef08f6963f1ae808cc61e3b3a55c7de3f2a14f3b7eda09806ed",
+    "createdAt": "2026-03-13T12:35:26.296Z"
+  },
+  {
+    "id": "cli-anything-blender-skill",
+    "name": "cli-anything-blender Skill",
+    "version": "0.1.0",
+    "productType": "skill",
+    "contents": [
+      "SKILL.md",
+      "references/api-coverage.md",
+      "references/commands.md",
+      "references/examples.md",
+      "references/troubleshooting.md"
+    ],
+    "checksum": "7b803751484ce7670ca996584bdba14cb305f05ca042fa32c99902ad6cfd6b1c",
+    "createdAt": "2026-03-13T12:35:26.296Z"
+  },
+  {
+    "id": "cli-anything-blender-plugin",
+    "name": "cli-anything-blender Plugin",
+    "version": "1.0.0",
+    "productType": "plugin",
+    "contents": [
+      ".claude-plugin/plugin.json",
+      "skills/cli-anything-blender/SKILL.md",
+      "commands/search.md"
+    ],
+    "checksum": "f766c7043c29e7f61fe68d1febd58e618a73ad0d952c67a3a662388a064a90f6",
+    "createdAt": "2026-03-13T12:35:26.296Z"
+  },
+  {
+    "id": "cli-anything-blender-hooks",
+    "name": "cli-anything-blender Hooks",
+    "version": "1.0.0",
+    "productType": "hook-bundle",
+    "contents": [
+      "hooks.json"
+    ],
+    "checksum": "4ae5e2f719a03bac4e9b9cdfc54d42e0bbbfb0538af50da2c298037a7ce2ba56",
+    "createdAt": "2026-03-13T12:35:26.296Z"
+  },
+  {
+    "id": "cli-anything-blender-agents",
+    "name": "cli-anything-blender Agent Definitions",
+    "version": "1.0.0",
+    "productType": "agent-def",
+    "contents": [
+      "cli-anything-blender-expert.md"
+    ],
+    "checksum": "c7b50debeffbee18afb1c7383d0a2559d2d72553239e4346e01f7512b433dbc1",
+    "createdAt": "2026-03-13T12:35:26.296Z"
+  }
+]

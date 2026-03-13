@@ -1,0 +1,70 @@
+[
+  {
+    "id": "cli-anything-vlc-harness",
+    "name": "cli-anything-vlc CLI Harness",
+    "version": "0.1.0",
+    "productType": "harness",
+    "contents": [
+      "README.md",
+      "cli_anything_vlc/__init__.py",
+      "cli_anything_vlc/backend.py",
+      "cli_anything_vlc/cli.py",
+      "cli_anything_vlc/output.py",
+      "pyproject.toml",
+      "tests/__init__.py",
+      "tests/conftest.py"
+    ],
+    "checksum": "7ace7eba14f6192fe49743f8be2633a34c9803da0427981ec75bf1112c2c98f3",
+    "createdAt": "2026-03-13T12:35:26.327Z"
+  },
+  {
+    "id": "cli-anything-vlc-skill",
+    "name": "cli-anything-vlc Skill",
+    "version": "0.1.0",
+    "productType": "skill",
+    "contents": [
+      "SKILL.md",
+      "references/api-coverage.md",
+      "references/commands.md",
+      "references/examples.md",
+      "references/troubleshooting.md"
+    ],
+    "checksum": "6988ad9b5fa8b56d8909f37136581e6b35297fec72efd171d10ddee381c27278",
+    "createdAt": "2026-03-13T12:35:26.327Z"
+  },
+  {
+    "id": "cli-anything-vlc-plugin",
+    "name": "cli-anything-vlc Plugin",
+    "version": "1.0.0",
+    "productType": "plugin",
+    "contents": [
+      ".claude-plugin/plugin.json",
+      "skills/cli-anything-vlc/SKILL.md",
+      "commands/search.md"
+    ],
+    "checksum": "b778191d165fcc9f1828b1bd46fbfbd394f7a01a9be24e15b2cfef65253a37c3",
+    "createdAt": "2026-03-13T12:35:26.327Z"
+  },
+  {
+    "id": "cli-anything-vlc-hooks",
+    "name": "cli-anything-vlc Hooks",
+    "version": "1.0.0",
+    "productType": "hook-bundle",
+    "contents": [
+      "hooks.json"
+    ],
+    "checksum": "2f4ce983f2891cda79b39613adb83a65602706eab4e59d03b08ef217c051bc07",
+    "createdAt": "2026-03-13T12:35:26.327Z"
+  },
+  {
+    "id": "cli-anything-vlc-agents",
+    "name": "cli-anything-vlc Agent Definitions",
+    "version": "1.0.0",
+    "productType": "agent-def",
+    "contents": [
+      "cli-anything-vlc-expert.md"
+    ],
+    "checksum": "313e8d0ce2102f21da683ed54487efb2b5fa8b17653c9a59d2561889b45c85c6",
+    "createdAt": "2026-03-13T12:35:26.327Z"
+  }
+]

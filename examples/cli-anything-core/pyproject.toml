@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cli-anything-core"
+version = "0.1.0"
+description = "Shared foundation for CLI-Anything harnesses: JSON output, REPL, testing utilities"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = [
+    "click>=8.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+]

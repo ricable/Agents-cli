@@ -1,0 +1,18 @@
+{
+  "hooks": [
+    {
+      "event": "PreToolUse",
+      "pattern": "cli-anything-audacity",
+      "command": "echo \"Pre-check: validating cli-anything-audacity state\""
+    },
+    {
+      "event": "PostToolUse",
+      "pattern": "cli-anything-audacity",
+      "command": "echo \"Post-check: cli-anything-audacity operation complete\""
+    },
+    {
+      "event": "SessionStart",
+      "command": "echo \"Loading creative-tools domain context for cli-anything-audacity\""
+    }
+  ]
+}

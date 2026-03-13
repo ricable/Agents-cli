@@ -13,6 +13,9 @@ import { mapToTools } from "../../lib/companion/mapper.js";
 import type { ToolRecommendation } from "../../lib/companion/mapper.js";
 import { processBatch, buildIndexes } from "./stages.js";
 import { buildPlugins } from "../../lib/plugin/builder.js";
+import { composeWorkflows } from "../../lib/pipeline/workflow-composer.js";
+import { generateWorkflowSkillDirectory } from "../../lib/pipeline/workflow-skill-gen.js";
+import { validatePlugin } from "../../lib/plugin/validator.js";
 import type { CliArgs, BatchItem } from "./types.js";
 import { OUTPUT_DIR } from "./types.js";
 import { log, fmtTable, toolToManifestEntry, atomicWrite } from "./helpers.js";
@@ -112,6 +115,31 @@ export async function companionMode(args: CliArgs, startTime: number): Promise<v
     await buildIndexes(tools, false);
   }
 
+  // 7b. Compose workflows from generated skills
+  const skillMds: Array<{ name: string; skillMd: string }> = [];
+  for (const r of outcome.results) {
+    if (r.forged.skillMd) {
+      skillMds.push({ name: r.tool.meta.name, skillMd: r.forged.skillMd });
+    }
+  }
+
+  const workflows = composeWorkflows(skillMds, profile);
+  if (workflows.length > 0) {
+    log(`\n  Composed ${workflows.length} workflow(s): ${workflows.map(w => w.name).join(", ")}`);
+    for (const wf of workflows) {
+      const wfDir = resolve(OUTPUT_DIR, `src-workflow-${wf.name}`);
+      mkdirSync(wfDir, { recursive: true });
+      const dir = generateWorkflowSkillDirectory(wf);
+      atomicWrite(resolve(wfDir, "SKILL.md"), dir.skillMd);
+      for (const [relPath, content] of Object.entries(dir.files)) {
+        const fullPath = resolve(wfDir, relPath);
+        const parentDir = resolve(wfDir, relPath.split("/").slice(0, -1).join("/"));
+        mkdirSync(parentDir, { recursive: true });
+        atomicWrite(fullPath, content);
+      }
+    }
+  }
+
   // 8. Build plugin bundle — generate a manifest from batch results first
   log("\n  Building plugin bundle...");
   const pluginsDir = resolve("examples/plugins");
@@ -128,7 +156,7 @@ export async function companionMode(args: CliArgs, startTime: number): Promise<v
     atomicWrite(manifestPath, JSON.stringify({ repos: manifestEntries }, null, 2));
 
     try {
-      const pluginResult = buildPlugins({
+      const pluginResult = await buildPlugins({
         full: args.full,
         manifestPath,
         skillsSourceDir: OUTPUT_DIR,
@@ -140,6 +168,45 @@ export async function companionMode(args: CliArgs, startTime: number): Promise<v
     }
   } else {
     log("  WARN: No skills generated — skipping plugin build");
+  }
+
+  // 8b. Validate plugin bundle
+  const companionPluginDirValidate = resolve(pluginsDir, "companion");
+  if (existsSync(companionPluginDirValidate)) {
+    try {
+      const validation = validatePlugin(companionPluginDirValidate);
+      log(`  Plugin validation: ${validation.overall.passed ? "PASS" : "FAIL"} (score: ${validation.overall.score})`);
+      if (validation.overall.issues.length > 0) {
+        for (const issue of validation.overall.issues.slice(0, 5)) {
+          log(`    → ${issue}`);
+        }
+      }
+
+      // Write quality report
+      const qualityReport = {
+        generated: outcome.results.length,
+        passed: outcome.results.filter(r => r.quality.passed).length,
+        failed: outcome.results.filter(r => !r.quality.passed).length,
+        avgTriggerScore: outcome.results.length > 0
+          ? Math.round(outcome.results.reduce((s, r) => s + r.quality.triggerScore, 0) / outcome.results.length * 100) / 100
+          : 0,
+        avgQualityScore: outcome.results.length > 0
+          ? Math.round(outcome.results.reduce((s, r) => s + r.quality.qualityScore, 0) / outcome.results.length * 10) / 10
+          : 0,
+        workflows: workflows.length,
+        overallReadiness: validation.overall.passed ? "ready" : "needs-review",
+        pluginValidation: validation.overall,
+      };
+      atomicWrite(resolve(companionPluginDirValidate, "quality-report.json"), JSON.stringify(qualityReport, null, 2));
+    } catch (err) {
+      log(`  WARN: Plugin validation failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    // Generate install.sh
+    try {
+      const installScript = generateInstallScript(outcome.results.map(r => r.tool));
+      atomicWrite(resolve(companionPluginDirValidate, "install.sh"), installScript);
+    } catch { /* non-fatal */ }
   }
 
   // 9. Generate project-specific CLAUDE.md
@@ -161,6 +228,7 @@ export async function companionMode(args: CliArgs, startTime: number): Promise<v
     generated: outcome.results.length,
     failures: outcome.failures.length,
     failedTools: outcome.failures.map(f => f.label),
+    workflows: workflows.map(w => w.name),
   };
 
   log("\n  Companion mode complete.");
@@ -186,6 +254,49 @@ function filterRecommendations(
   }
 
   return result.slice(0, args.limit);
+}
+
+function generateInstallScript(tools: Array<{ source: { format: string }; meta: { name: string } }>): string {
+  const pypiTools: string[] = [];
+  const npmTools: string[] = [];
+  const cratesTools: string[] = [];
+
+  for (const tool of tools) {
+    const name = tool.meta.name;
+    switch (tool.source.format) {
+      case "pypi": pypiTools.push(name); break;
+      case "npm": npmTools.push(name); break;
+      case "crates": cratesTools.push(name); break;
+    }
+  }
+
+  const sections: string[] = [
+    '#!/usr/bin/env bash',
+    'set -euo pipefail',
+    '# Auto-generated by agents-cli companion',
+    '',
+  ];
+
+  if (pypiTools.length > 0) {
+    sections.push(`# Python tools`);
+    sections.push(`pip install ${pypiTools.join(" ")} 2>/dev/null || uv pip install ${pypiTools.join(" ")}`);
+    sections.push('');
+  }
+
+  if (npmTools.length > 0) {
+    sections.push(`# Node tools`);
+    sections.push(`npm install -g ${npmTools.join(" ")} 2>/dev/null || true`);
+    sections.push('');
+  }
+
+  if (cratesTools.length > 0) {
+    sections.push(`# Rust tools`);
+    sections.push(`cargo install ${cratesTools.join(" ")} 2>/dev/null || true`);
+    sections.push('');
+  }
+
+  sections.push('echo "All tools installed."');
+  return sections.join("\n") + "\n";
 }
 
 function generateProjectClaudeMd(

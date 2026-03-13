@@ -9,12 +9,23 @@
 
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 import { createHash, randomUUID } from "node:crypto";
-import { createReadStream, statSync } from "node:fs";
+import { createReadStream, statSync, readFileSync, existsSync } from "node:fs";
+import { join, normalize, resolve, extname } from "node:path";
 import { success, failure, toErrorMessage } from "../output.js";
 import { analyzeProject } from "./analyzer.js";
 import { mapToTools } from "./mapper.js";
+import { executePipeline } from "./pipeline.js";
+import { UsageMeter } from "./metering.js";
+import { getTierLimits } from "./tiers.js";
+import { OAuthManager, buildDefaultConfigs } from "./oauth.js";
+import { createBillingProvider } from "./billing.js";
+
+function getOAuthConfigs() {
+  return buildDefaultConfigs();
+}
 import type { TechStackProfile } from "./analyzer.js";
 import type { CompanionToolPlan } from "./mapper.js";
+import type { PipelineReport } from "../types.js";
 import type { CliOutput } from "../types.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -46,12 +57,15 @@ type JobStatus = "queued" | "running" | "completed" | "failed";
 interface Job {
   id: string;
   status: JobStatus;
+  stage: string;
   description: string;
+  tier: string;
   profile?: TechStackProfile;
   plan?: CompanionToolPlan;
   progress: number;
   error?: string;
   bundlePath?: string;
+  report?: PipelineReport;
   createdAt: number;
   updatedAt: number;
 }
@@ -192,6 +206,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
   const jobQueue: string[] = [];
   const serverStartTime = Date.now();
   const maxQueueDepth = config.maxQueueDepth ?? 100;
+  const usageMeter = new UsageMeter();
 
   const keyLimiter = new TokenBucket(config.rateLimitPerKey, config.rateLimitPerKey / 60_000);
   const ipLimiter = new TokenBucket(config.rateLimitPerIp, config.rateLimitPerIp / 60_000);
@@ -249,14 +264,26 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
 
   async function executeJob(job: Job): Promise<void> {
     try {
-      job.progress = 10;
-      job.profile = analyzeProject(job.description);
-      job.updatedAt = Date.now();
+      const jobOutputDir = join(config.outputDir, "jobs", job.id);
 
-      job.progress = 30;
-      job.plan = mapToTools(job.profile, config.projectRoot);
-      job.updatedAt = Date.now();
+      const result = await executePipeline(
+        job.description,
+        {
+          tier: job.tier,
+          projectRoot: config.projectRoot,
+          outputDir: jobOutputDir,
+        },
+        (stage, pct) => {
+          job.stage = stage;
+          job.progress = pct;
+          job.updatedAt = Date.now();
+        },
+      );
 
+      job.profile = result.profile;
+      job.plan = result.plan;
+      job.bundlePath = result.bundlePath;
+      job.report = result.report;
       job.progress = 100;
       job.status = "completed";
       job.updatedAt = Date.now();
@@ -333,6 +360,11 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
       if (authed.keyRecord.tier === "free") {
         sendError(res, 403, "TIER_REQUIRED", "Generation requires starter tier or above"); return;
       }
+      const keyHash = hashKey(req.headers.authorization!.slice(7));
+      const tierLimits = getTierLimits(authed.keyRecord.tier);
+      if (!usageMeter.recordUsage(keyHash, tierLimits.dailyGens)) {
+        sendError(res, 429, "DAILY_LIMIT", `Daily generation limit (${tierLimits.dailyGens}) exceeded`); return;
+      }
       if (jobQueue.length >= maxQueueDepth) {
         sendError(res, 503, "QUEUE_FULL", "Job queue is full — try again later"); return;
       }
@@ -340,7 +372,9 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
       const job: Job = {
         id: randomUUID(),
         status: "queued",
+        stage: "queued",
         description: authed.description,
+        tier: authed.keyRecord.tier,
         progress: 0,
         createdAt: Date.now(),
         updatedAt: Date.now(),
@@ -365,6 +399,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
       sendJson(res, 200, success("status", {
         id: job.id,
         status: job.status,
+        stage: job.stage,
         progress: job.progress,
         error: job.error,
         profile: job.profile ? {
@@ -373,6 +408,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
           complexity: job.profile.complexity,
         } : undefined,
         recommendations: job.plan ? job.plan.summary : undefined,
+        report: job.report,
       }, Date.now()));
       return;
     }
@@ -408,6 +444,202 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
       return;
     }
 
+    // ── GET /api/usage ──────────────────────────────────────────
+    if (method === "GET" && path === "/api/usage") {
+      const keyRecord = authenticate(req);
+      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      const keyHash = hashKey(req.headers.authorization!.slice(7));
+      const usage = usageMeter.getUsage(keyHash);
+      const tierLimits = getTierLimits(keyRecord.tier);
+      sendJson(res, 200, success("usage", {
+        tier: keyRecord.tier,
+        dailyLimit: tierLimits.dailyGens,
+        used: usage.count,
+        remaining: tierLimits.dailyGens < 0 ? -1 : tierLimits.dailyGens - usage.count,
+        resetsAt: new Date(usage.resetAt).toISOString(),
+      }, Date.now()));
+      return;
+    }
+
+    // ── Auth endpoints ────────────────────────────────────────
+
+    // GET /api/auth/init?provider=X&redirect_uri=Y
+    if (method === "GET" && path === "/api/auth/init") {
+      const provider = url.searchParams.get("provider");
+      const redirectUri = url.searchParams.get("redirect_uri");
+      if (!provider || !redirectUri) {
+        sendError(res, 400, "INVALID_INPUT", "Missing provider or redirect_uri"); return;
+      }
+      try {
+        const oauthMgr = new OAuthManager(getOAuthConfigs());
+        const flow = oauthMgr.initiateFlow(provider as "google" | "github" | "slack" | "zoom", redirectUri);
+        sendJson(res, 200, success("auth-init", flow, Date.now()));
+      } catch (err) {
+        sendError(res, 400, "AUTH_ERROR", toErrorMessage(err));
+      }
+      return;
+    }
+
+    // POST /api/auth/callback
+    if (method === "POST" && path === "/api/auth/callback") {
+      try {
+        const body = await parseBody(req, config.maxBodySize);
+        const parsed = JSON.parse(body) as { provider?: string; code?: string; state?: string; codeVerifier?: string };
+        if (!parsed.provider || !parsed.code || !parsed.codeVerifier) {
+          sendError(res, 400, "INVALID_INPUT", "Missing provider, code, or codeVerifier"); return;
+        }
+        const oauthMgr = new OAuthManager(getOAuthConfigs());
+        const redirectUri = url.searchParams.get("redirect_uri") || "";
+        const tokenRes = await oauthMgr.completeFlow(
+          parsed.provider as "google" | "github" | "slack" | "zoom",
+          parsed.code, parsed.codeVerifier, redirectUri,
+        );
+        // Generate a session token for the UI
+        const sessionToken = randomUUID();
+        sendJson(res, 200, success("auth-callback", {
+          token: sessionToken,
+          user: { email: `user@${parsed.provider}.com`, name: parsed.provider, provider: parsed.provider },
+          tier: "free",
+          accessToken: tokenRes.accessToken,
+        }, Date.now()));
+      } catch (err) {
+        sendError(res, 400, "AUTH_ERROR", toErrorMessage(err));
+      }
+      return;
+    }
+
+    // GET /api/auth/me
+    if (method === "GET" && path === "/api/auth/me") {
+      const keyRecord = authenticate(req);
+      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      sendJson(res, 200, success("auth-me", {
+        email: "user@example.com",
+        tier: keyRecord.tier,
+      }, Date.now()));
+      return;
+    }
+
+    // ── Billing endpoints ──────────────────────────────────────
+
+    // POST /api/billing/checkout
+    if (method === "POST" && path === "/api/billing/checkout") {
+      const keyRecord = authenticate(req);
+      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      try {
+        const body = await parseBody(req, config.maxBodySize);
+        const parsed = JSON.parse(body) as { priceId?: string };
+        const billing = createBillingProvider("stripe");
+        const result = await billing.createCheckoutSession("cus_mock", parsed.priceId || "price_default", "http://127.0.0.1:3100/");
+        sendJson(res, 200, success("billing-checkout", result, Date.now()));
+      } catch (err) {
+        sendError(res, 400, "BILLING_ERROR", toErrorMessage(err));
+      }
+      return;
+    }
+
+    // GET /api/billing/portal
+    if (method === "GET" && path === "/api/billing/portal") {
+      const keyRecord = authenticate(req);
+      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      try {
+        const billing = createBillingProvider("stripe");
+        const result = await billing.getPortalUrl("cus_mock");
+        sendJson(res, 200, success("billing-portal", result, Date.now()));
+      } catch (err) {
+        sendError(res, 400, "BILLING_ERROR", toErrorMessage(err));
+      }
+      return;
+    }
+
+    // GET /api/billing/invoices
+    if (method === "GET" && path === "/api/billing/invoices") {
+      const keyRecord = authenticate(req);
+      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      try {
+        const billing = createBillingProvider("stripe");
+        const result = await billing.listInvoices("cus_mock");
+        sendJson(res, 200, success("billing-invoices", result, Date.now()));
+      } catch (err) {
+        sendError(res, 400, "BILLING_ERROR", toErrorMessage(err));
+      }
+      return;
+    }
+
+    // ── Catalog endpoint ───────────────────────────────────────
+
+    // GET /api/catalog
+    if (method === "GET" && path === "/api/catalog") {
+      try {
+        const marketplacePath = join(config.projectRoot, "marketplace.json");
+        if (existsSync(marketplacePath)) {
+          const data = JSON.parse(readFileSync(marketplacePath, "utf-8"));
+          sendJson(res, 200, success("catalog", data, Date.now()));
+        } else {
+          sendJson(res, 200, success("catalog", { products: [] }, Date.now()));
+        }
+      } catch (err) {
+        sendError(res, 500, "CATALOG_ERROR", toErrorMessage(err));
+      }
+      return;
+    }
+
+    // ── Static file serving for saas-ui/ ───────────────────────
+
+    if (!path.startsWith("/api/")) {
+      const saasUiDir = resolve(config.projectRoot, "saas-ui");
+      let filePath = path === "/" ? "/index.html" : path;
+      const resolved = resolve(saasUiDir, normalize(filePath).replace(/^\//, ""));
+
+      // Path traversal check — must be within saas-ui/
+      if (!resolved.startsWith(saasUiDir + "/") && resolved !== saasUiDir) {
+        sendError(res, 403, "FORBIDDEN", "Path traversal denied");
+        return;
+      }
+
+      try {
+        const stat = statSync(resolved);
+        if (!stat.isFile()) { sendError(res, 404, "NOT_FOUND", "Not a file"); return; }
+        if (stat.size > 10_000_000) { sendError(res, 413, "TOO_LARGE", "File too large"); return; }
+
+        const ext = extname(resolved).toLowerCase();
+        const mimeTypes: Record<string, string> = {
+          ".html": "text/html",
+          ".css": "text/css",
+          ".js": "application/javascript",
+          ".json": "application/json",
+          ".png": "image/png",
+          ".jpg": "image/jpeg",
+          ".svg": "image/svg+xml",
+          ".ico": "image/x-icon",
+          ".woff2": "font/woff2",
+          ".woff": "font/woff",
+        };
+
+        res.writeHead(200, {
+          "Content-Type": mimeTypes[ext] || "application/octet-stream",
+          "Content-Length": stat.size,
+          "X-Content-Type-Options": "nosniff",
+          "Cache-Control": "no-cache",
+        });
+        createReadStream(resolved).pipe(res);
+      } catch {
+        // File not found — try index.html for SPA routing
+        try {
+          const indexPath = join(saasUiDir, "index.html");
+          const indexStat = statSync(indexPath);
+          res.writeHead(200, {
+            "Content-Type": "text/html",
+            "Content-Length": indexStat.size,
+            "X-Content-Type-Options": "nosniff",
+          });
+          createReadStream(indexPath).pipe(res);
+        } catch {
+          sendError(res, 404, "NOT_FOUND", "File not found");
+        }
+      }
+      return;
+    }
+
     // ── 404 ─────────────────────────────────────────────────────
     sendError(res, 404, "NOT_FOUND", `Unknown endpoint: ${method} ${path}`);
   }
@@ -423,12 +655,21 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
   server.listen(config.port, config.host, () => {
     console.log(`\n  Companion web service listening on http://${config.host}:${config.port}`);
     console.log("  Endpoints:");
-    console.log("    GET  /api/health          — Service status");
+    console.log("    GET  /api/health           — Service status");
     console.log("    POST /api/analyze          — Description → TechStackProfile");
     console.log("    POST /api/plan             — Description → ToolRecommendations");
     console.log("    POST /api/generate         — Description → async job");
     console.log("    GET  /api/status/:id       — Poll job status");
     console.log("    GET  /api/download/:id     — Download bundle");
+    console.log("    GET  /api/usage            — Check daily usage");
+    console.log("    GET  /api/auth/init        — OAuth flow init");
+    console.log("    POST /api/auth/callback    — OAuth callback");
+    console.log("    GET  /api/auth/me          — Current user");
+    console.log("    POST /api/billing/checkout — Stripe checkout");
+    console.log("    GET  /api/billing/portal   — Billing portal");
+    console.log("    GET  /api/billing/invoices — Invoice history");
+    console.log("    GET  /api/catalog          — Marketplace catalog");
+    console.log("    *    /*                    — Static files (saas-ui/)");
     console.log("");
   });
 

@@ -1,0 +1,18 @@
+{
+  "hooks": [
+    {
+      "event": "PreToolUse",
+      "pattern": "cli-anything-blender",
+      "command": "echo \"Pre-check: validating cli-anything-blender state\""
+    },
+    {
+      "event": "PostToolUse",
+      "pattern": "cli-anything-blender",
+      "command": "echo \"Post-check: cli-anything-blender operation complete\""
+    },
+    {
+      "event": "SessionStart",
+      "command": "echo \"Loading creative-tools domain context for cli-anything-blender\""
+    }
+  ]
+}

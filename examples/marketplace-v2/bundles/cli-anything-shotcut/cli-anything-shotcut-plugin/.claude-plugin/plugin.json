@@ -1,0 +1,12 @@
+{
+  "name": "cli-anything-shotcut",
+  "version": "1.0.0",
+  "description": "Claude Code plugin for cli-anything-shotcut — 0 commands, 0 groups",
+  "keywords": [
+    "creative-tools",
+    "subprocess",
+    "cli-anything",
+    "cli-anything-shotcut"
+  ],
+  "license": "MIT"
+}

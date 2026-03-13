@@ -1,0 +1,12 @@
+{
+  "name": "communication",
+  "version": "1.0.0",
+  "description": "Tools for communication workflows including cli-anything-zoom",
+  "keywords": [
+    "communication",
+    "cli-anything-zoom",
+    "claude-code",
+    "plugin"
+  ],
+  "license": "MIT"
+}

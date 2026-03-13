@@ -1,0 +1,1089 @@
+{
+  "version": "2.0.0",
+  "generatedAt": "2026-03-13T12:35:26.342Z",
+  "totalProducts": 49,
+  "byType": {
+    "skill": 11,
+    "plugin": 38
+  },
+  "products": [
+    {
+      "id": "skill-cli-anything-audacity",
+      "name": "cli-anything-audacity",
+      "productType": "skill",
+      "version": "0.1.0",
+      "description": "Use when managing projects, managing audio tracks, applying effects in Audacity. Do NOT use for manual GUI interaction or unsupported Audacity plugins. Wraps Audacity, pydub, soundfile via subprocess backend.",
+      "app": "cli-anything-audacity",
+      "category": "creative-tools",
+      "commands": 7,
+      "quality": 10,
+      "pricing": {
+        "productType": "skill",
+        "model": "free",
+        "basePrice": 0,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/examples/generated-skills/cli-anything-audacity"
+    },
+    {
+      "id": "skill-cli-anything-blender",
+      "name": "cli-anything-blender",
+      "productType": "skill",
+      "version": "0.1.0",
+      "description": "Use when managing 3D scenes, managing object, managing mesh in Blender. Do NOT use for manual GUI interaction or unsupported Blender plugins. Wraps Blender, bpy via python-binding backend.",
+      "app": "cli-anything-blender",
+      "category": "creative-tools",
+      "commands": 7,
+      "quality": 10,
+      "pricing": {
+        "productType": "skill",
+        "model": "free",
+        "basePrice": 0,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/examples/generated-skills/cli-anything-blender"
+    },
+    {
+      "id": "skill-cli-anything-drawio",
+      "name": "cli-anything-drawio",
+      "productType": "skill",
+      "version": "0.1.0",
+      "description": "Use when creating diagrams, managing shape, managing connection in Draw.io. Do NOT use for manual GUI interaction or unsupported Draw.io plugins. Wraps Draw.io, lxml via subprocess backend.",
+      "app": "cli-anything-drawio",
+      "category": "office-tools",
+      "commands": 7,
+      "quality": 10,
+      "pricing": {
+        "productType": "skill",
+        "model": "free",
+        "basePrice": 0,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/examples/generated-skills/cli-anything-drawio"
+    },
+    {
+      "id": "skill-cli-anything-gimp",
+      "name": "cli-anything-gimp",
+      "productType": "skill",
+      "version": "0.1.0",
+      "description": "Use when managing projects, editing images and layers, editing images and layers in GIMP. Do NOT use for manual GUI interaction or unsupported GIMP plugins. Wraps GIMP, Pillow, gi.repository.Gimp via python-binding backend.",
+      "app": "cli-anything-gimp",
+      "category": "creative-tools",
+      "commands": 7,
+      "quality": 10,
+      "pricing": {
+        "productType": "skill",
+        "model": "free",
+        "basePrice": 0,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/examples/generated-skills/cli-anything-gimp"
+    },
+    {
+      "id": "skill-cli-anything-inkscape",
+      "name": "cli-anything-inkscape",
+      "productType": "skill",
+      "version": "0.1.0",
+      "description": "Use when editing documents, managing object, managing path in Inkscape. Do NOT use for manual GUI interaction or unsupported Inkscape plugins. Wraps Inkscape, lxml, svgwrite via subprocess backend.",
+      "app": "cli-anything-inkscape",
+      "category": "creative-tools",
+      "commands": 7,
+      "quality": 10,
+      "pricing": {
+        "productType": "skill",
+        "model": "free",
+        "basePrice": 0,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/examples/generated-skills/cli-anything-inkscape"
+    },
+    {
+      "id": "skill-cli-anything-kdenlive",
+      "name": "cli-anything-kdenlive",
+      "productType": "skill",
+      "version": "0.1.0",
+      "description": "Use when managing projects, managing timeline, managing clip in Kdenlive. Do NOT use for manual GUI interaction or unsupported Kdenlive plugins. Wraps Kdenlive, lxml via subprocess backend.",
+      "app": "cli-anything-kdenlive",
+      "category": "creative-tools",
+      "commands": 7,
+      "quality": 10,
+      "pricing": {
+        "productType": "skill",
+        "model": "free",
+        "basePrice": 0,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/examples/generated-skills/cli-anything-kdenlive"
+    },
+    {
+      "id": "skill-cli-anything-libreoffice",
+      "name": "cli-anything-libreoffice",
+      "productType": "skill",
+      "version": "0.1.0",
+      "description": "Use when editing documents, managing spreadsheet, managing presentation in LibreOffice. Do NOT use for manual GUI interaction or unsupported LibreOffice plugins. Wraps LibreOffice, python-docx, openpyxl via subprocess backend.",
+      "app": "cli-anything-libreoffice",
+      "category": "office-tools",
+      "commands": 7,
+      "quality": 10,
+      "pricing": {
+        "productType": "skill",
+        "model": "free",
+        "basePrice": 0,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/examples/generated-skills/cli-anything-libreoffice"
+    },
+    {
+      "id": "skill-cli-anything-obs-studio",
+      "name": "cli-anything-obs-studio",
+      "productType": "skill",
+      "version": "0.1.0",
+      "description": "Use when managing 3D scenes, managing source, managing stream in OBS Studio. Do NOT use for manual GUI interaction or unsupported OBS Studio plugins. Wraps OBS Studio, obsws-python, obs-websocket-py via rest-api backend.",
+      "app": "cli-anything-obs-studio",
+      "category": "creative-tools",
+      "commands": 7,
+      "quality": 10,
+      "pricing": {
+        "productType": "skill",
+        "model": "free",
+        "basePrice": 0,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/examples/generated-skills/cli-anything-obs-studio"
+    },
+    {
+      "id": "skill-cli-anything-shotcut",
+      "name": "cli-anything-shotcut",
+      "productType": "skill",
+      "version": "0.1.0",
+      "description": "Use when managing projects, managing timeline, managing clip in Shotcut. Do NOT use for manual GUI interaction or unsupported Shotcut plugins. Wraps Shotcut, lxml via subprocess backend.",
+      "app": "cli-anything-shotcut",
+      "category": "creative-tools",
+      "commands": 7,
+      "quality": 10,
+      "pricing": {
+        "productType": "skill",
+        "model": "free",
+        "basePrice": 0,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/examples/generated-skills/cli-anything-shotcut"
+    },
+    {
+      "id": "skill-cli-anything-vlc",
+      "name": "cli-anything-vlc",
+      "productType": "skill",
+      "version": "0.1.0",
+      "description": "Use when managing playback, managing playlist, managing stream in VLC. Do NOT use for manual GUI interaction or unsupported VLC plugins. Wraps VLC, python-vlc via subprocess backend.",
+      "app": "cli-anything-vlc",
+      "category": "creative-tools",
+      "commands": 7,
+      "quality": 10,
+      "pricing": {
+        "productType": "skill",
+        "model": "free",
+        "basePrice": 0,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/examples/generated-skills/cli-anything-vlc"
+    },
+    {
+      "id": "skill-cli-anything-zoom",
+      "name": "cli-anything-zoom",
+      "productType": "skill",
+      "version": "0.1.0",
+      "description": "Use when scheduling meetings, managing user, managing recording in Zoom. Do NOT use for manual GUI interaction or unsupported Zoom plugins. Wraps Zoom, requests via rest-api backend.",
+      "app": "cli-anything-zoom",
+      "category": "communication",
+      "commands": 7,
+      "quality": 10,
+      "pricing": {
+        "productType": "skill",
+        "model": "free",
+        "basePrice": 0,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/examples/generated-skills/cli-anything-zoom"
+    },
+    {
+      "id": "plugin-agents",
+      "name": "agents",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Tools for agents workflows including swe-agent, agency-swarm, agent-browser, autogen, bee-agent-framework and 3 more",
+      "app": "agents",
+      "category": "agents",
+      "commands": 8,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/agents"
+    },
+    {
+      "id": "plugin-ai-ml",
+      "name": "ai-ml",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Machine learning and AI tools for training models, running inference, and building ML pipelines",
+      "app": "ai-ml",
+      "category": "ai-ml",
+      "commands": 2,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/ai-ml"
+    },
+    {
+      "id": "plugin-ai-ml-ai-agents",
+      "name": "ai-ml-ai-agents",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Machine learning and AI tools for training models, running inference, and building ML pipelines",
+      "app": "ai-ml-ai-agents",
+      "category": "ai-ml/ai-agents",
+      "commands": 3,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/ai-ml-ai-agents"
+    },
+    {
+      "id": "plugin-ai-ml-ai-apis",
+      "name": "ai-ml-ai-apis",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Machine learning and AI tools for training models, running inference, and building ML pipelines",
+      "app": "ai-ml-ai-apis",
+      "category": "ai-ml/ai-apis",
+      "commands": 2,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/ai-ml-ai-apis"
+    },
+    {
+      "id": "plugin-ai-ml-ai-coding",
+      "name": "ai-ml-ai-coding",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Machine learning and AI tools for training models, running inference, and building ML pipelines",
+      "app": "ai-ml-ai-coding",
+      "category": "ai-ml/ai-coding",
+      "commands": 1,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/ai-ml-ai-coding"
+    },
+    {
+      "id": "plugin-ai-ml-ai-security",
+      "name": "ai-ml-ai-security",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Machine learning and AI tools for training models, running inference, and building ML pipelines",
+      "app": "ai-ml-ai-security",
+      "category": "ai-ml/ai-security",
+      "commands": 1,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/ai-ml-ai-security"
+    },
+    {
+      "id": "plugin-ai-ml-audio-speech",
+      "name": "ai-ml-audio-speech",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Machine learning and AI tools for training models, running inference, and building ML pipelines",
+      "app": "ai-ml-audio-speech",
+      "category": "ai-ml/audio/speech",
+      "commands": 1,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/ai-ml-audio-speech"
+    },
+    {
+      "id": "plugin-ai-ml-automl",
+      "name": "ai-ml-automl",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Machine learning and AI tools for training models, running inference, and building ML pipelines",
+      "app": "ai-ml-automl",
+      "category": "ai-ml/automl",
+      "commands": 1,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/ai-ml-automl"
+    },
+    {
+      "id": "plugin-ai-ml-data-labeling",
+      "name": "ai-ml-data-labeling",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Machine learning and AI tools for training models, running inference, and building ML pipelines",
+      "app": "ai-ml-data-labeling",
+      "category": "ai-ml/data-labeling",
+      "commands": 2,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/ai-ml-data-labeling"
+    },
+    {
+      "id": "plugin-ai-ml-llm-inference",
+      "name": "ai-ml-llm-inference",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Machine learning and AI tools for training models, running inference, and building ML pipelines",
+      "app": "ai-ml-llm-inference",
+      "category": "ai-ml/llm-inference",
+      "commands": 2,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/ai-ml-llm-inference"
+    },
+    {
+      "id": "plugin-ai-ml-ml-experiment-tracking",
+      "name": "ai-ml-ml-experiment-tracking",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Machine learning and AI tools for training models, running inference, and building ML pipelines",
+      "app": "ai-ml-ml-experiment-tracking",
+      "category": "ai-ml/ml-experiment-tracking",
+      "commands": 2,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/ai-ml-ml-experiment-tracking"
+    },
+    {
+      "id": "plugin-ai-ml-model-monitoring",
+      "name": "ai-ml-model-monitoring",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Machine learning and AI tools for training models, running inference, and building ML pipelines",
+      "app": "ai-ml-model-monitoring",
+      "category": "ai-ml/model-monitoring",
+      "commands": 2,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/ai-ml-model-monitoring"
+    },
+    {
+      "id": "plugin-ai-ml-model-optimization",
+      "name": "ai-ml-model-optimization",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Machine learning and AI tools for training models, running inference, and building ML pipelines",
+      "app": "ai-ml-model-optimization",
+      "category": "ai-ml/model-optimization",
+      "commands": 1,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/ai-ml-model-optimization"
+    },
+    {
+      "id": "plugin-ai-ml-model-serving",
+      "name": "ai-ml-model-serving",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Machine learning and AI tools for training models, running inference, and building ML pipelines",
+      "app": "ai-ml-model-serving",
+      "category": "ai-ml/model-serving",
+      "commands": 2,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/ai-ml-model-serving"
+    },
+    {
+      "id": "plugin-ai-ml-prompt-engineering",
+      "name": "ai-ml-prompt-engineering",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Machine learning and AI tools for training models, running inference, and building ML pipelines",
+      "app": "ai-ml-prompt-engineering",
+      "category": "ai-ml/prompt-engineering",
+      "commands": 2,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/ai-ml-prompt-engineering"
+    },
+    {
+      "id": "plugin-ai-ml-rag-and-embeddings",
+      "name": "ai-ml-rag-and-embeddings",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Machine learning and AI tools for training models, running inference, and building ML pipelines",
+      "app": "ai-ml-rag-and-embeddings",
+      "category": "ai-ml/rag-and-embeddings",
+      "commands": 2,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/ai-ml-rag-and-embeddings"
+    },
+    {
+      "id": "plugin-automation",
+      "name": "automation",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Tools for automation workflows including just",
+      "app": "automation",
+      "category": "automation",
+      "commands": 1,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/automation"
+    },
+    {
+      "id": "plugin-cloud",
+      "name": "cloud",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Cloud infrastructure tools for deploying, managing, and monitoring cloud resources",
+      "app": "cloud",
+      "category": "cloud",
+      "commands": 9,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/cloud"
+    },
+    {
+      "id": "plugin-code-search",
+      "name": "code-search",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Code search and analysis tools for finding patterns, counting lines, and navigating codebases",
+      "app": "code-search",
+      "category": "code-search",
+      "commands": 3,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/code-search"
+    },
+    {
+      "id": "plugin-containers",
+      "name": "containers",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Tools for containers workflows including bodywork-core, helm, kubectl, seldon-deploy-sdk",
+      "app": "containers",
+      "category": "containers",
+      "commands": 4,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/containers"
+    },
+    {
+      "id": "plugin-data",
+      "name": "data",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Tools for data workflows including cli-anything-gimp, csvkit, doccano, fx, gron and 8 more",
+      "app": "data",
+      "category": "data",
+      "commands": 13,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/data"
+    },
+    {
+      "id": "plugin-data-processing",
+      "name": "data-processing",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Tools for data-processing workflows including jq",
+      "app": "data-processing",
+      "category": "data-processing",
+      "commands": 1,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/data-processing"
+    },
+    {
+      "id": "plugin-database",
+      "name": "database",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Database tools for querying, migrating, and managing SQL/NoSQL databases with ORMs",
+      "app": "database",
+      "category": "database",
+      "commands": 2,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/database"
+    },
+    {
+      "id": "plugin-devops",
+      "name": "devops",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "DevOps tools for CI/CD, container orchestration, infrastructure-as-code, and deployment",
+      "app": "devops",
+      "category": "devops",
+      "commands": 2,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/devops"
+    },
+    {
+      "id": "plugin-documentation",
+      "name": "documentation",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Documentation tools for generating, building, and publishing project docs",
+      "app": "documentation",
+      "category": "documentation",
+      "commands": 1,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/documentation"
+    },
+    {
+      "id": "plugin-general",
+      "name": "general",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Tools for general workflows including uvicorn",
+      "app": "general",
+      "category": "general",
+      "commands": 251,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/general"
+    },
+    {
+      "id": "plugin-git",
+      "name": "git",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Git tools for version control workflows, repository management, and code review",
+      "app": "git",
+      "category": "git",
+      "commands": 14,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/git"
+    },
+    {
+      "id": "plugin-http",
+      "name": "http",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Tools for http workflows including aws-cli, curl, groq-sdk, neptune-client, portkey-ai and 5 more",
+      "app": "http",
+      "category": "http",
+      "commands": 10,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/http"
+    },
+    {
+      "id": "plugin-javascript",
+      "name": "javascript",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "JavaScript ecosystem tools for bundling, linting, formatting, and package management",
+      "app": "javascript",
+      "category": "javascript",
+      "commands": 2,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/javascript"
+    },
+    {
+      "id": "plugin-linter",
+      "name": "linter",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Tools for linter workflows including biome, eslint, label-studio, miller, oxlint and 3 more",
+      "app": "linter",
+      "category": "linter",
+      "commands": 8,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/linter"
+    },
+    {
+      "id": "plugin-llm",
+      "name": "llm",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Tools for llm workflows including awesome-text2sql, deepspeed, adk-python, aider-chat, aim and 36 more",
+      "app": "llm",
+      "category": "llm",
+      "commands": 35,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/llm"
+    },
+    {
+      "id": "plugin-ml",
+      "name": "ml",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Tools for ml workflows including comfyui, autogluon, autotrain-advanced, bentoctl, brain-js and 21 more",
+      "app": "ml",
+      "category": "ml",
+      "commands": 24,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/ml"
+    },
+    {
+      "id": "plugin-package-manager",
+      "name": "package-manager",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Tools for package-manager workflows including ai, artillery, cheerio, drizzle-kit, elysiajs and 17 more",
+      "app": "package-manager",
+      "category": "package-manager",
+      "commands": 23,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/package-manager"
+    },
+    {
+      "id": "plugin-python",
+      "name": "python",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Python ecosystem tools for package management, linting, formatting, and virtual environments",
+      "app": "python",
+      "category": "python",
+      "commands": 4,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/python"
+    },
+    {
+      "id": "plugin-rag",
+      "name": "rag",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Tools for rag workflows including faiss, fastembed, neo4j-graphrag-python, qdrant, semantic-kernel and 1 more",
+      "app": "rag",
+      "category": "rag",
+      "commands": 6,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/rag"
+    },
+    {
+      "id": "plugin-search",
+      "name": "search",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Tools for search workflows including annoy, ast-grep, dasel, fd, fd-find and 2 more",
+      "app": "search",
+      "category": "search",
+      "commands": 6,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/search"
+    },
+    {
+      "id": "plugin-security",
+      "name": "security",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Security tools for vulnerability scanning, secret detection, and dependency auditing",
+      "app": "security",
+      "category": "security",
+      "commands": 8,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/security"
+    },
+    {
+      "id": "plugin-testing",
+      "name": "testing",
+      "productType": "plugin",
+      "version": "1.0.0",
+      "description": "Testing tools for unit tests, integration tests, coverage, and test automation",
+      "app": "testing",
+      "category": "testing",
+      "commands": 8,
+      "quality": 7,
+      "pricing": {
+        "productType": "plugin",
+        "model": "paid",
+        "basePrice": 4.99,
+        "currency": "USD",
+        "revenueSplit": {
+          "creator": 80,
+          "platform": 20
+        }
+      },
+      "path": "/Users/cedric/dev/2026/Agents-cli/examples/plugins/testing"
+    }
+  ]
+}

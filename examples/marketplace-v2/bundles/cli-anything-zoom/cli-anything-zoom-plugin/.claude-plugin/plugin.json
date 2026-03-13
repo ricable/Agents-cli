@@ -1,0 +1,12 @@
+{
+  "name": "cli-anything-zoom",
+  "version": "1.0.0",
+  "description": "Claude Code plugin for cli-anything-zoom — 0 commands, 0 groups",
+  "keywords": [
+    "communication",
+    "subprocess",
+    "cli-anything",
+    "cli-anything-zoom"
+  ],
+  "license": "MIT"
+}

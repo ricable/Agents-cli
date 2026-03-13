@@ -1,0 +1,81 @@
+{
+  "repos": [
+    {
+      "name": "cli-anything-audacity",
+      "repo": "",
+      "domain": "creative-tools",
+      "description": "Use when managing projects, managing audio tracks, applying effects in Audacity. Do NOT use for manual GUI interaction or unsupported Audacity plugins. Wraps Audacity, pydub, soundfile via subprocess backend.",
+      "dirName": "cli-anything-audacity"
+    },
+    {
+      "name": "cli-anything-blender",
+      "repo": "",
+      "domain": "creative-tools",
+      "description": "Use when managing 3D scenes, managing object, managing mesh in Blender. Do NOT use for manual GUI interaction or unsupported Blender plugins. Wraps Blender, bpy via python-binding backend.",
+      "dirName": "cli-anything-blender"
+    },
+    {
+      "name": "cli-anything-drawio",
+      "repo": "",
+      "domain": "office-tools",
+      "description": "Use when creating diagrams, managing shape, managing connection in Draw.io. Do NOT use for manual GUI interaction or unsupported Draw.io plugins. Wraps Draw.io, lxml via subprocess backend.",
+      "dirName": "cli-anything-drawio"
+    },
+    {
+      "name": "cli-anything-gimp",
+      "repo": "",
+      "domain": "creative-tools",
+      "description": "Use when managing projects, editing images and layers, editing images and layers in GIMP. Do NOT use for manual GUI interaction or unsupported GIMP plugins. Wraps GIMP, Pillow, gi.repository.Gimp via python-binding backend.",
+      "dirName": "cli-anything-gimp"
+    },
+    {
+      "name": "cli-anything-inkscape",
+      "repo": "",
+      "domain": "creative-tools",
+      "description": "Use when editing documents, managing object, managing path in Inkscape. Do NOT use for manual GUI interaction or unsupported Inkscape plugins. Wraps Inkscape, lxml, svgwrite via subprocess backend.",
+      "dirName": "cli-anything-inkscape"
+    },
+    {
+      "name": "cli-anything-kdenlive",
+      "repo": "",
+      "domain": "creative-tools",
+      "description": "Use when managing projects, managing timeline, managing clip in Kdenlive. Do NOT use for manual GUI interaction or unsupported Kdenlive plugins. Wraps Kdenlive, lxml via subprocess backend.",
+      "dirName": "cli-anything-kdenlive"
+    },
+    {
+      "name": "cli-anything-libreoffice",
+      "repo": "",
+      "domain": "office-tools",
+      "description": "Use when editing documents, managing spreadsheet, managing presentation in LibreOffice. Do NOT use for manual GUI interaction or unsupported LibreOffice plugins. Wraps LibreOffice, python-docx, openpyxl via subprocess backend.",
+      "dirName": "cli-anything-libreoffice"
+    },
+    {
+      "name": "cli-anything-obs-studio",
+      "repo": "",
+      "domain": "creative-tools",
+      "description": "Use when managing 3D scenes, managing source, managing stream in OBS Studio. Do NOT use for manual GUI interaction or unsupported OBS Studio plugins. Wraps OBS Studio, obsws-python, obs-websocket-py via rest-api backend.",
+      "dirName": "cli-anything-obs-studio"
+    },
+    {
+      "name": "cli-anything-shotcut",
+      "repo": "",
+      "domain": "creative-tools",
+      "description": "Use when managing projects, managing timeline, managing clip in Shotcut. Do NOT use for manual GUI interaction or unsupported Shotcut plugins. Wraps Shotcut, lxml via subprocess backend.",
+      "dirName": "cli-anything-shotcut"
+    },
+    {
+      "name": "cli-anything-vlc",
+      "repo": "",
+      "domain": "creative-tools",
+      "description": "Use when managing playback, managing playlist, managing stream in VLC. Do NOT use for manual GUI interaction or unsupported VLC plugins. Wraps VLC, python-vlc via subprocess backend.",
+      "dirName": "cli-anything-vlc"
+    },
+    {
+      "name": "cli-anything-zoom",
+      "repo": "",
+      "domain": "communication",
+      "description": "Use when scheduling meetings, managing user, managing recording in Zoom. Do NOT use for manual GUI interaction or unsupported Zoom plugins. Wraps Zoom, requests via rest-api backend.",
+      "dirName": "cli-anything-zoom"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "cli-anything-inkscape",
+  "version": "1.0.0",
+  "description": "Claude Code plugin for cli-anything-inkscape — 0 commands, 0 groups",
+  "keywords": [
+    "creative-tools",
+    "subprocess",
+    "cli-anything",
+    "cli-anything-inkscape"
+  ],
+  "license": "MIT"
+}
