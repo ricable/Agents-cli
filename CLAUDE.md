@@ -171,14 +171,18 @@ examples/
   generated-skills/   — auto-generated skills (trigger ≥ 0.80)
   data/
     ai-ml-tools.json  — 502 AI/ML tool entries (was at project root, now here)
-  saas-ui/            — SaaS marketplace UI (was at root saas-ui/, moved here)
+  saas-ui/            — SaaS marketplace UI, deployed to https://ui.spectredve.com
     index.html        — main app (Agent Economy pane, API Keys pane, Forge enhancements)
     css/styles.css    — design system + economy / heatmap / bulk-select styles
+    vercel.json       — Vercel static deploy config (SPA rewrites, no-cache HTML, long-cache assets)
+    registry-data.json — static data for marketplace: github/npm/pypi/crates/agent_defs/harnesses/cli_anything/generated_skills
     js/
-      app.js          — bootstrap + economy module init
-      store.js        — state (earnings, agentKeys, invocationFeed, agentMetrics)
-      api.js          — AgentsApi (+ streamInvocations, getEarnings, agent key CRUD)
-      marketplace.js  — product grid, agent-native filter, bulk select, Try button
+      app.js          — bootstrap, router, auth wiring, nav state, modal logic
+      store.js        — AppStore pub/sub + localStorage (searchFilters excluded — session-only)
+      api.js          — AgentsApi; auto-detects baseUrl (localhost:3100 dev, '' prod)
+      auth.js         — AuthManager: loginWithGoogle/Github/Email, logout, onAuthChange, mock fallback
+      marketplace.js  — product grid, agent-native filter, bulk select, Try button, catalog-updated event
+      registries.js   — registry panes (GitHub/npm/PyPI/crates/cli-anything); injects agent_defs+generated_skills into catalog
       dashboard.js    — revenue tracker, agent wallet, heatmap, API keys section
       product-detail.js — 3-tab detail (overview/pricing/changelog), SSE feed
       forge-ui.js     — cost estimator, quality preview, persona selector, batch CSV
@@ -212,6 +216,63 @@ tests/                — 19 test files, 369 tests
 **Rules** — no non-standard plugin.json fields, skills self-contained, domains flattened (`ai-ml/x`→`ai-ml-x`), no external path refs, `$ARGUMENTS` for user input in commands.
 
 **Key functions**: `buildPlugins(opts)`, `generateHooksJson(domain, entries)`, `generatePluginCommands(domain, entries)`, `auditPlugin(dir)`, `generateMarketplace(opts)`, `publishPlugin(domain, dryRun)`, `computePluginHash(dir)`, `bumpVersion(current, type)`
+
+## SaaS UI Deployment
+
+Linked Vercel project: `saas-ui` (in `examples/saas-ui/.vercel/project.json`). Domain: `ui.spectredve.com` → Cloudflare CNAME → Vercel.
+
+```bash
+# Deploy production (run from examples/saas-ui/)
+cd examples/saas-ui && vercel --prod
+
+# Redeploy after changes
+vercel --prod
+
+# Check deployments
+vercel ls
+```
+
+**Key rules:**
+- `vercel.json` rewrites all non-asset paths to `index.html` (SPA routing)
+- HTML served with `no-cache, no-store` — assets (js/css/woff/png/svg) cached 1 year immutable
+- `registry-data.json` is the static data source for all marketplace tabs — edit to add/update products
+- `api.js` auto-detects API base: `localhost:3100` when running locally, `''` (relative) in production
+- `AuthManager` falls back to mock OAuth when server unavailable — always works offline
+- `searchFilters` is **session-only state** (not persisted to localStorage) — stale filters caused 0 products bug
+- Marketplace re-renders on `catalog-updated` custom event fired by `registries.js` after async inject
+
+## SaaS UI Auth (examples/saas-ui/js/auth.js)
+
+`AuthManager` — wire in `app.js` via `new AuthManager(api, store)`.
+
+```javascript
+import { AuthManager } from './auth.js';
+const auth = new AuthManager(api, store);
+
+auth.loginWithGoogle()         // PKCE OAuth popup → mock fallback
+auth.loginWithGithub()         // PKCE OAuth popup → mock fallback
+auth.loginWithEmail(email, pw) // mock always succeeds
+auth.signupWithEmail(email, pw)
+auth.logout()                  // clears store user/tier, fires onAuthChange(null)
+auth.isLoggedIn()              // → boolean
+auth.getUser()                 // → {email, name, avatar, provider, token} | null
+auth.getTier()                 // → 'free' | 'starter' | 'pro' | 'enterprise'
+auth.onAuthChange(cb)          // → unsubscribe fn; cb(user | null)
+auth.checkout(priceId)         // opens billing portal or mock
+```
+
+`AppStore` — reactive pub/sub with localStorage persistence.
+
+```javascript
+import { AppStore } from './store.js';
+store.get(key)               // read state
+store.set(key, value)        // write + notify + autoPersist
+store.update(key, fn)        // set(key, fn(current))
+store.subscribe(key, cb)     // → unsubscribe fn; cb(value, old)
+store.subscribe('*', cb)     // wildcard: cb(key, value, old)
+// Persisted keys: user, tier, installed, earnings, agentKeys
+// NOT persisted: searchFilters (session-only to prevent stale filter bugs)
+```
 
 ## SaaS Companion API (lib/companion/web-service.ts)
 
@@ -313,6 +374,9 @@ generateMasterIndex(manifest, triggers): string
 - `ToolCapabilities.commands` is `readonly` — use spread
 - Cache treats `repoSha: "unknown"` as miss (PyPI installs never get stale-hit)
 - Linter hook may auto-add imports or revert changes — re-read files after edits
+- SaaS UI `searchFilters` must NOT be in localStorage `persistKeys` — stale filter state (e.g. `productType:"agent-def"`) across sessions causes 0 products in all marketplace tabs
+- SaaS UI Vercel: deploy from `examples/saas-ui/` dir (linked to `saas-ui` project). Do NOT deploy from repo root — rootDirectory is not configured on `agents-cli-saas` project
+- `AgentsApi.baseUrl` (not `._base`) is the correct field name for the API base URL
 
 ## Do NOT
 
