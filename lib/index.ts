@@ -142,6 +142,7 @@ export {
   validateSource,
   validateToolName,
   validateRunArgs,
+  shellQuote,
   InputValidationError,
 } from "./guards.js";
 
@@ -221,7 +222,7 @@ export { DOMAIN_TRIGGERS } from "./domains.js";
 // Skill content (structural SKILL.md generation)
 export {
   buildName,
-  buildDescription,
+  buildShortDescription,
   extractKeyTerms,
   generateSearchQueries,
   generateMcpQueries,

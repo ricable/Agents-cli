@@ -10,6 +10,9 @@ import { initMarketplace } from './marketplace.js';
 import { initProductDetail, showToast } from './product-detail.js';
 import { initDashboard } from './dashboard.js';
 import { initForgeUi } from './forge-ui.js';
+import { initEconomy } from './economy.js';
+import { initRegistries } from './registries.js';
+import { initProfile } from './profile.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   // ── Initialize core modules ─────────────────────────────────────
@@ -34,6 +37,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ── Forge UI ────────────────────────────────────────────────────
 
   initForgeUi(api, store, auth);
+
+  // ── Agent Economy ───────────────────────────────────────────────
+  initEconomy(api, store, auth);
+
+  // ── Registries (auto-connect: GitHub, npm, PyPI, crates, cli-anything) ──
+
+  initRegistries(api, store);
+
+  // ── Profile & Settings ──────────────────────────────────────────
+
+  initProfile(api, store);
 
   // ── Ambient Blob Animation ──────────────────────────────────────
 
@@ -161,11 +175,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
   });
 
-  // Restore Session on Load
+  // Restore Session on Load — always show profile avatar
   const restoreAuthSession = () => {
-      if (sessionStorage.getItem('is_authenticated') === 'true') {
-          updateAuthenticatedUI();
-      }
+      updateAuthenticatedUI();
   };
 
   // ── Auth Modals Logic ───────────────────────────────────────────
@@ -213,15 +225,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (navActions) {
           navActions.innerHTML = `
               <div class="extension-status ${isExtensionInstalled ? 'connected' : 'disconnected'}">
-                  <span class="status-indicator"></span> 
+                  <span class="status-indicator"></span>
                   Ext: ${isExtensionInstalled ? 'Active' : 'Missing'}
               </div>
-              <a href="#marketplace" class="user-profile" style="text-decoration:none;">
+              <div class="user-profile user-profile-btn" style="cursor:pointer;" title="Account & Settings">
                   <span class="user-name">Cedric</span>
                   <div class="user-avatar">C</div>
-              </a>
+              </div>
           `;
       }
+      // Show dashboard in sidebar after login
+      const dashboardLink = document.querySelector('[data-pane="discover"]');
+      if (dashboardLink) dashboardLink.closest('.dashboard-sidebar')?.querySelector('[data-pane="dashboard"]')?.classList.add('visible');
   };
 
   authSubmitBtns.forEach(btn => {

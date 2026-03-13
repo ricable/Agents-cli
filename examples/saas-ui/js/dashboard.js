@@ -143,6 +143,83 @@ export function initDashboard(api, store, auth) {
           </div>
         </div>
       </div>
+
+      <!-- Revenue Tracker -->
+      <div class="dash-section">
+        <h3>Revenue Tracker</h3>
+        <div class="revenue-stats-row" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+          <div class="glass-card" style="padding:16px;text-align:center">
+            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Earned</div>
+            <div class="revenue-big" id="dashEarned">$0.00</div>
+          </div>
+          <div class="glass-card" style="padding:16px;text-align:center">
+            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Pending</div>
+            <div class="revenue-big" id="dashPending">$0.00</div>
+          </div>
+          <div class="glass-card" style="padding:16px;text-align:center">
+            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Next Payout</div>
+            <div style="font-size:16px;font-weight:700" id="dashNextPayout">--</div>
+          </div>
+        </div>
+        <!-- Revenue split bar -->
+        <div class="glass-card" style="padding:16px">
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Revenue Split</div>
+          <div style="display:flex;height:8px;border-radius:4px;overflow:hidden">
+            <div style="width:80%;background:var(--accent-green);transition:width 1s ease"></div>
+            <div style="width:10%;background:var(--accent-blue)"></div>
+            <div style="width:10%;background:var(--surface-border)"></div>
+          </div>
+          <div style="display:flex;gap:16px;margin-top:8px;font-size:11px;color:var(--text-secondary)">
+            <span style="color:var(--accent-green)">&#9632; Creator 80%</span>
+            <span style="color:var(--accent-blue)">&#9632; Infra 10%</span>
+            <span>&#9632; Platform 10%</span>
+          </div>
+        </div>
+        <!-- Per-skill table with sparklines -->
+        <div id="dashSkillsRevenue" style="margin-top:12px"></div>
+      </div>
+
+      <!-- Agent Wallet -->
+      <div class="dash-section">
+        <h3>Agent Wallet</h3>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+          <div class="glass-card" style="padding:16px">
+            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Active Agent</div>
+            <div style="font-weight:600;font-size:14px" id="dashActiveAgent">None</div>
+          </div>
+          <div class="glass-card" style="padding:16px;text-align:center">
+            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:8px">Token Budget</div>
+            <!-- SVG arc gauge -->
+            <svg viewBox="0 0 80 50" style="width:80px">
+              <path d="M 10 45 A 30 30 0 0 1 70 45" fill="none" stroke="var(--surface-border)" stroke-width="5" stroke-linecap="round"/>
+              <path d="M 10 45 A 30 30 0 0 1 70 45" fill="none" stroke="var(--accent-blue)" stroke-width="5" stroke-linecap="round" stroke-dasharray="94" stroke-dashoffset="47" id="dashTokenArc"/>
+              <text x="40" y="42" text-anchor="middle" font-size="11" fill="var(--text-primary)" id="dashTokenPct">50%</text>
+            </svg>
+          </div>
+          <div class="glass-card" style="padding:16px">
+            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">Spend Rate</div>
+            <div style="font-weight:600;font-size:18px" id="dashSpendRate">$0.00/hr</div>
+          </div>
+        </div>
+        <!-- 24h heatmap -->
+        <div class="glass-card" style="padding:16px">
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">24h Invocation Heatmap</div>
+          <div class="heatmap-grid" id="dashHeatmap">
+            ${Array.from({length:24}, (_, i) => `<div class="heatmap-cell" title="Hour ${i}:00"></div>`).join('')}
+          </div>
+        </div>
+      </div>
+
+      <!-- Agent API Keys -->
+      <div class="dash-section">
+        <h3>Agent API Keys</h3>
+        <div class="glass-card" style="padding:16px">
+          <div id="dashKeysList">
+            <p style="color:var(--text-muted);font-size:13px">No API keys. <a href="#" id="dashGoToKeys" style="color:var(--accent-blue)">Manage keys</a></p>
+          </div>
+          <button class="btn btn-secondary btn-sm" style="margin-top:12px" id="dashCreateKeyBtn">+ Create Key</button>
+        </div>
+      </div>
     `;
 
     // Attach event listeners
@@ -187,6 +264,16 @@ export function initDashboard(api, store, auth) {
         render();
         showToast('Product uninstalled');
       });
+    });
+
+    pane.querySelector('#dashGoToKeys')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.querySelector('[data-pane="agent-keys"]')?.click();
+    });
+
+    pane.querySelector('#dashCreateKeyBtn')?.addEventListener('click', () => {
+      document.querySelector('[data-pane="agent-keys"]')?.click();
+      setTimeout(() => document.getElementById('createKeyBtn')?.click(), 100);
     });
   }
 

@@ -35,6 +35,129 @@ export function initForgeUi(api, store, auth) {
       DOMAINS.map(d => `<option value="${d}">${d}</option>`).join('');
   }
 
+  // ── Cost estimator ───────────────────────────────────────────────
+
+  function estimateCost(tool, desc) {
+    const tokens = Math.ceil((tool.length + desc.length) * 1.3 + 800);
+    const cost = (tokens / 1000000 * 3).toFixed(4);
+    return { tokens, cost };
+  }
+
+  // ── Quality preview (client-side trigger score) ──────────────────
+
+  function quickScoreTrigger(text) {
+    let score = 0;
+    if (/use when/i.test(text)) score += 0.3;
+    if (/do not use for/i.test(text)) score += 0.2;
+    const verbs = ['analyze', 'generate', 'build', 'run', 'execute', 'search', 'convert', 'check', 'create', 'manage'];
+    const matchedVerbs = verbs.filter(v => new RegExp(v, 'i').test(text));
+    score += Math.min(matchedVerbs.length * 0.12, 0.36);
+    if (/[A-Z][a-z]+[A-Z]|[A-Z]{2,}/.test(text)) score += 0.1; // TechNames
+    if ((text.match(/,/g) || []).length >= 2) score += 0.1;
+    return Math.min(score, 1.0);
+  }
+
+  if (descInput) {
+    descInput.addEventListener('input', () => {
+      const score = quickScoreTrigger(descInput.value);
+      const fill = pane.querySelector('#qualityPreviewFill');
+      const scoreEl = pane.querySelector('#qualityPreviewScore');
+      if (fill) fill.style.width = `${Math.round(score * 100)}%`;
+      if (scoreEl) scoreEl.textContent = `${Math.round(score * 100)}%`;
+    });
+  }
+
+  // ── Persona selector ─────────────────────────────────────────────
+
+  const personaSelector = pane.querySelector('#personaSelector');
+  if (personaSelector) {
+    personaSelector.querySelectorAll('.persona-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        personaSelector.querySelectorAll('.persona-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        store.set('forgePersona', btn.dataset.persona);
+      });
+    });
+  }
+
+  // ── Generation history ───────────────────────────────────────────
+
+  const HISTORY_KEY = 'forge-history';
+
+  function loadHistory() {
+    try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; }
+  }
+
+  function saveHistory(entry) {
+    const history = loadHistory();
+    history.unshift({ ...entry, ts: Date.now() });
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 10)));
+    renderHistory();
+  }
+
+  function renderHistory() {
+    const list = pane.querySelector('#genHistoryList');
+    if (!list) return;
+    const items = loadHistory();
+    if (items.length === 0) {
+      list.innerHTML = '<p style="color:var(--text-muted);font-size:12px">No history yet</p>';
+      return;
+    }
+    list.innerHTML = items.map(item => `
+      <div class="history-item" data-tool="${item.tool || ''}" data-desc="${item.desc || ''}"
+           style="padding:6px 8px;border-radius:6px;background:var(--surface-color);margin-bottom:4px;cursor:pointer;font-size:12px;border:1px solid var(--surface-border)">
+        <span style="color:var(--text-primary)">${item.tool || item.desc || 'Untitled'}</span>
+        <span style="color:var(--text-muted);float:right">${new Date(item.ts).toLocaleDateString()}</span>
+      </div>
+    `).join('');
+    list.querySelectorAll('.history-item').forEach(item => {
+      item.addEventListener('click', () => {
+        if (toolInput && item.dataset.tool) toolInput.value = item.dataset.tool;
+        if (descInput && item.dataset.desc) descInput.value = item.dataset.desc;
+      });
+    });
+  }
+
+  renderHistory();
+
+  // ── Batch CSV drag-and-drop ──────────────────────────────────────
+
+  const dropZone = pane.querySelector('#batchDropZone');
+  const batchFileInput = pane.querySelector('#batchFileInput');
+
+  if (dropZone) {
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('drag-over');
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file) processBatchCsv(file);
+    });
+  }
+
+  if (batchFileInput) {
+    batchFileInput.addEventListener('change', () => {
+      const file = batchFileInput.files[0];
+      if (file) processBatchCsv(file);
+    });
+  }
+
+  function processBatchCsv(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const lines = e.target.result.split('\n').filter(l => l.trim());
+      const tools = lines.map(l => l.split(',')[0].trim()).filter(Boolean);
+      store.set('batchQueue', tools);
+      appendTerminal(`\u2192 Batch loaded: ${tools.length} tools from CSV`);
+      if (dropZone) dropZone.querySelector('span').textContent = `${tools.length} tools loaded from ${file.name}`;
+    };
+    reader.readAsText(file);
+  }
+
   // ── Analyze on blur ─────────────────────────────────────────────
 
   if (toolInput) {
@@ -52,6 +175,15 @@ export function initForgeUi(api, store, auth) {
       } catch {
         analyzeIndicator.textContent = 'Analysis unavailable (server offline)';
         analyzeIndicator.style.color = 'var(--text-muted)';
+      }
+
+      // Cost estimator
+      const costRow = pane.querySelector('#costEstimatorRow');
+      const costEl = pane.querySelector('#costEstimate');
+      if (costEl && costRow) {
+        const { tokens, cost } = estimateCost(toolInput.value.trim(), descInput?.value.trim() || '');
+        costEl.textContent = `~$${cost} / ~${tokens} tokens`;
+        costRow.style.display = '';
       }
     });
   }
@@ -123,6 +255,7 @@ export function initForgeUi(api, store, auth) {
             downloadBtn.style.display = 'inline-flex';
             downloadBtn.onclick = () => downloadBundle(jobId);
           }
+          saveHistory({ tool: toolInput?.value.trim(), desc: descInput?.value.trim() });
           return;
         }
 

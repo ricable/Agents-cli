@@ -1,22 +1,16 @@
 {
   "repos": [
     {
-      "name": "uv",
-      "repo": "uv",
-      "domain": "python",
-      "description": "Ultra-fast Python package manager and resolver"
+      "name": "cli",
+      "repo": "cli/cli",
+      "domain": "companion",
+      "description": "GitHub’s official command line tool"
     },
     {
-      "name": "ruff",
-      "repo": "ruff",
-      "domain": "python",
-      "description": "Blazing fast Python linter and formatter"
-    },
-    {
-      "name": "uvicorn",
-      "repo": "uvicorn",
-      "domain": "general",
-      "description": "The lightning-fast ASGI server."
+      "name": "ripgrep",
+      "repo": "BurntSushi/ripgrep",
+      "domain": "companion",
+      "description": "ripgrep recursively searches directories for a regex pattern while respecting your gitignore"
     }
   ]
 }

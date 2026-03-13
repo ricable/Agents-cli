@@ -10,11 +10,7 @@
 
 import { ManifestEntry, PackageAnalysis, skillDirName } from "./types.js";
 import { DOMAIN_TRIGGERS } from "./domains.js";
-
-// Local shellQuote to avoid circular dependency with skills.ts
-function shellQuote(s: string): string {
-  return "'" + s.replace(/'/g, "'\\''") + "'";
-}
+import { shellQuote } from "./guards.js";
 
 // ── Name + description builders ────────────────────────────────────────
 
@@ -34,7 +30,7 @@ export function buildName(entry: ManifestEntry): string {
  * - Trigger clause is front-loaded for autonomous skill selection
  * - Double quotes sanitized to single quotes to avoid YAML parse errors
  */
-export function buildDescription(entry: ManifestEntry): string {
+export function buildShortDescription(entry: ManifestEntry): string {
   const trigger  = DOMAIN_TRIGGERS[entry.domain] ?? "implementing features with this library";
   const what     = entry.description.trim().replace(/[.!?]$/, "");
   const full     = `${what}. Use when ${trigger}.`;
@@ -124,7 +120,7 @@ export function generateMcpQueries(entry: ManifestEntry, analysis: PackageAnalys
 export function generateStructuralSkill(entry: ManifestEntry, analysis: PackageAnalysis): string {
   const name         = buildName(entry);
   const displayTitle = `Source Intel: ${analysis.pkgName}`;
-  const description  = buildDescription(entry);
+  const description  = buildShortDescription(entry);
   const trigger      = DOMAIN_TRIGGERS[entry.domain] ?? "implementing features with this library";
   const pkg          = entry.name;
   const searchQueries = generateSearchQueries(entry, analysis).join("\n\n");

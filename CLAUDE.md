@@ -2,42 +2,45 @@
 
 Package manager for AI agent tools. Resolves, installs, analyzes, exposes CLI tools from GitHub/npm/PyPI/crates.io/local. Stored in `~/.agents-cli/`. Built on "Rewrite Your CLI for AI Agents" — structured JSON output, schema introspection, context window discipline, input hardening, rich skill generation, multi-surface output, dry-run safety.
 
+> See **README.md** for full usage guide, examples, and architecture overview.
+
 ## Build & Test
 
 ```bash
 npm run build          # tsup (required before running)
 npm run dev            # watch mode
-npm test               # vitest
+npm test               # vitest (369 tests, 19 files)
 npm run lint           # tsc --noEmit
-npx tsx bin/agents-cli.ts <cmd>          # dev mode
-npx tsx score-all.ts                     # score skills
+npx tsx bin/agents-cli.ts <cmd>          # dev mode (no build needed)
+npx tsx score-all.ts                     # score all skills
 npx tsx examples/skill-forge.ts --audit  # quality audit
-bash battle-test-ecosystem.sh --quick    # battle test (34 checks)
+bash battle-test-ecosystem.sh --quick    # battle test (41 checks)
 ```
 
 ## Hard Rules
 
-- **ESM only** — `.js` extensions on imports, named exports, no `require()`, no default exports
-- **Never modify `dist/`** — edit `lib/`+`bin/`, rebuild
-- **Types in `lib/types.ts`** — all shared interfaces/types there
-- **Security** — never bypass SSRF (`isPrivateUrl`), path traversal (`rejectPathTraversal`, `assertWithinDir`), size limits, input validation (`validateSource`, `validateToolName`)
+- **ESM only** — `.js` extensions on all imports, named exports only, no `require()`, no default exports
+- **Never modify `dist/`** — edit `lib/` + `bin/`, then rebuild with `npm run build`
+- **Types in `lib/types.ts`** — all shared interfaces/types defined there
+- **Security** — never bypass SSRF (`isPrivateUrl`), path traversal (`rejectPathTraversal`), size limits, input validation (`validateSource`, `validateToolName`)
 - **SSRF**: `fetchHtml()` github.com only; `fetchJson()` uses `isPrivateUrl()`. New HTTP helpers must check hosts + cap response size (`MAX_RESPONSE_BYTES`)
-- **Shell safety** — `validateToolName()` + `shellQuote()` before interpolating into shell
+- **Shell safety** — `validateToolName()` + `shellQuote()` (from `lib/guards.ts`) before interpolating into shell
 - **Path containment** — `resolve(path).startsWith(resolve(baseDir) + "/")`. Use `rejectPathTraversal()` on user paths
 - **Promise safety** — `settled` flag to prevent double-resolve/reject on streams
 - **Error handling** — `toErrorMessage(err)` from `lib/output.ts`, never `(err as Error).message`
 - **Structured output** — all commands use `success()`/`failure()`/`emit()` via `CliOutput<T>`. `--json` + `OUTPUT_FORMAT=json` everywhere. Error paths use `emit(failure(...))` when `--json` active
 - **Dry-run** — all mutating commands support `--dry-run` (file writes, index gen, lockfile)
 - **No interactive prompts** — CI/agent-friendly
-- **Atomic writes** — temp-file + rename
+- **Atomic writes** — temp-file + rename pattern
 - **No `process.exit()`** — use `process.exitCode`
 - **No fabricated commands** — only from actual `--help` or README code blocks
-- **Ecosystem-aware** — `detectToolLanguage()` checks source→topics→files→category. Never wrong package manager
+- **Ecosystem-aware** — `detectToolLanguage()` checks source→topics→files→category. Never use the wrong package manager
 - **Binary name inference** — `inferBinaryNames()` checks Cargo.toml `[[bin]]`, Go `cmd/`, `go.mod`. Use binary names in templates
-- **Frontmatter** — use `parseFrontmatter()` return values, never regex on full content
+- **Frontmatter** — use `parseFrontmatter()` return values (from `lib/skills/frontmatter.ts`), never regex on full content
 - **Version fallbacks** — GitHub releases→tags→`readSourceVersion()`→package.json→"0.0.0". Set `GITHUB_TOKEN` for higher rate limits
 - **Skill descriptions** — must have "Use when" + action verbs + "Do NOT use for" + TechNames for trigger score ≥ 0.80. Use `CATEGORY_ACTION_MAP` with `%` templates. `DOMAIN_NEGATIVE_TRIGGERS` for negative clauses
-- **Frontmatter fields** — `ALLOWED_FIELDS` in guards.ts: name, description, version, ingredients, tags, domain, allowed-tools, compatibility, license, metadata, context, argument-hint, disable-model-invocation, agent, hooks, user-invocable, model
+- **Frontmatter fields** — `ALLOWED_FIELDS` in `guards.ts`: name, description, version, ingredients, tags, domain, allowed-tools, compatibility, license, metadata, context, argument-hint, disable-model-invocation, agent, hooks, user-invocable, model
+- **shellQuote canonical location** — `lib/guards.ts`. Re-exported from `lib/skills.ts` for compat. In new code always import from `./guards.js`
 
 ## Source Prefixes
 
@@ -69,6 +72,7 @@ agents-cli schema <tool> [--depth 5 --refresh --json]
 # Skills
 agents-cli skills generate [--from-tool <name>]
 agents-cli skills install/list/remove
+agents-cli init --name "my-skill"
 
 # Lockfile
 agents-cli freeze | install | verify
@@ -78,6 +82,9 @@ agents-cli search "query" | scan ./dir [--deep] | info <name>
 
 # MCP
 agents-cli mcp start | list
+
+# Plugin (Claude Code spec)
+agents-cli plugin init | publish <name> | test [dir] | group | factory | pipeline <prompt> | index <source>
 ```
 
 ## Skill Forge (`npx tsx examples/skill-forge.ts`)
@@ -113,54 +120,80 @@ agents-cli mcp start | list
 ## Project Structure
 
 ```
-bin/agents-cli.ts — CLI entry (commander, 14+ commands)
-bin/agent-run.ts  — tool execution engine
+bin/
+  agents-cli.ts       — 67-line dispatcher; all logic in bin/commands/
+  agent-run.ts        — tool execution engine
+  commands/           — 22 command files (one registerXCommand per file)
+    shared.ts         — isJsonMode(), pickFields(), DATA_DIR
+    add.ts / list.ts / describe.ts / schema.ts / run.ts
+    remove.ts / update.ts / search.ts / scan.ts / info.ts
+    freeze.ts / install.ts / verify.ts
+    skills.ts         — skills subcommand group
+    mcp.ts            — mcp subcommand group
+    plugin.ts         — plugin subcommand group
+    generate.ts / init.ts / pipeline.ts / publish.ts / index-cmd.ts
 lib/
-  types.ts        — CliOutput, Tool, ManifestEntry, etc.
-  index.ts        — public SDK entry (re-exports)
-  output.ts       — success(), failure(), emit(), toErrorMessage()
-  guards.ts       — validateSource, validateToolName, rejectPathTraversal
-  resolver.ts     — source detection + metadata (github/npm/pypi/crates/local)
-  installer.ts    — download, extract, build (branch fallback: main→master→develop)
-  analyzer.ts     — --help probing, deepProbe(), detectInteractionMode()
-  store.ts        — flat-file JSON store + CONTEXT.md
-  registry.ts     — 4-layer cascade (local→community→github→npm)
-  skills.ts       — SKILL.md gen, parseFrontmatter(), scoreTrigger(), shellQuote()
-  skill-content.ts — structural gen (scripts, patterns, api docs)
-  skill-tester.ts — quality gate: trigger/quality/content scoring
-  skill-factory.ts — 3-layer pipeline (structural→AI)
-  mcp.ts          — MCP bridge
-  mcp-skill.ts    — opensrc MCP skill bridge
-  chunker.ts      — AST-aware semantic chunking
-  extractor.ts    — README parsing, inferBinaryNames(), readSourceVersion()
-  curated-tools.ts — 91 general + AI/ML tool registry
-  cache.ts        — SkillCache, file hashing
-  search.ts       — hybrid FTS + vector search (lazy sqlite3)
-  indexer.ts      — source indexing (files→chunks→SQLite)
-  indexes.ts      — domain grouping + index generation
-  domains.ts      — DOMAIN_TRIGGERS (28 domains), inferDomainLabel()
-  pkg-utils.ts    — package.json, monorepo walking
-  schemas.ts      — zod schemas
-  classifier/     — npm.ts, github.ts, crates.ts, pypi.ts (all: discoverXPackages(query?, limit?))
-  pipeline/       — intent.ts, entity-extractor.ts, prompt-parser.ts, capability-map.ts, workflow-gen.ts
-  hooks/          — types.ts, generator.ts, validator.ts, templates/ (30+ domain configs)
-  plugin/         — builder.ts, publisher.ts, ai-generator.ts, marketplace.ts, commands-generator.ts, settings-generator.ts, team-generator.ts, runtime-adapters.ts, audit-report.ts, versioning.ts, shared.ts
-  db/             — domain-db.ts, aggregated-db.ts, sqlite.ts
+  types.ts            — CliOutput, Tool, ManifestEntry, etc.
+  index.ts            — public SDK entry (re-exports everything)
+  output.ts           — success(), failure(), emit(), toErrorMessage()
+  guards.ts           — validateSource, validateToolName, rejectPathTraversal, shellQuote
+  resolver.ts         — source detection + metadata (github/npm/pypi/crates/local)
+  installer.ts        — download, extract, build (branch fallback: main→master→develop)
+  analyzer.ts         — --help probing, deepProbe(), detectInteractionMode()
+  store.ts            — flat-file JSON store + CONTEXT.md
+  registry.ts         — 4-layer cascade (local→community→github→npm)
+  skills.ts           — backward-compat barrel → lib/skills/index.ts
+  skills/             — split from monolithic skills.ts (3105 → 5 focused modules)
+    frontmatter.ts    — parseFrontmatter(), discoverResources(), RESOURCE_DIRS
+    lockfile.ts       — computeIntegrity(), parseLockfile(), writeLockfile(), readLockfile()
+    description.ts    — CATEGORY_ACTION_MAP, DOMAIN_NEGATIVE_TRIGGERS, buildDescription(tool)
+                        detectToolLanguage(), inferDomain(), isLikelyCli(), inferLibraryInstallCommand()
+    lifecycle.ts      — installTool(), installSkill(), listSkills(), removeSkill(), buildContext()
+    generators.ts     — generateRichSkillMd(), generateSkillDirectory(), generateInstallScript()
+    index.ts          — re-exports all public symbols
+  skill-content.ts    — structural SKILL.md gen; buildShortDescription(entry: ManifestEntry)
+  skill-tester.ts     — quality gate: scoreTrigger(), testSkillSync()
+  skill-factory.ts    — 3-layer pipeline (structural→AI)
+  mcp.ts              — MCP bridge
+  extractor.ts        — README parsing, inferBinaryNames(), readSourceVersion()
+  curated-tools.ts    — 91 general tools; loadAllTools() reads examples/data/ai-ml-tools.json
+  search.ts / indexer.ts / indexes.ts / domains.ts / cache.ts / chunker.ts
+  classifier/         — npm.ts, github.ts, crates.ts, pypi.ts
+  pipeline/           — intent.ts, entity-extractor.ts, prompt-parser.ts, capability-map.ts
+  hooks/              — types.ts, generator.ts, validator.ts, templates/
+  plugin/             — builder.ts, publisher.ts, marketplace.ts, audit-report.ts, versioning.ts, ...
+  db/                 — domain-db.ts, aggregated-db.ts, sqlite.ts
+  companion/          — web-service.ts, billing.ts, oauth.ts, metering.ts, tiers.ts, ...
 examples/
-  skill-forge.ts  — thin dispatcher → forge/ modules
-  forge/          — types, helpers, parse-args, stages, 15 mode-* modules
+  skill-forge.ts      — thin dispatcher → forge/ modules
+  forge/              — types, helpers, parse-args, stages, 15 mode-* modules
   regenerate-skills.ts — batch regeneration
-  generated-skills/    — auto-generated skills (trigger ≥ 0.80)
-tests/            — 18 test files, 347 tests
+  generated-skills/   — auto-generated skills (trigger ≥ 0.80)
+  data/
+    ai-ml-tools.json  — 502 AI/ML tool entries (was at project root, now here)
+  saas-ui/            — SaaS marketplace UI (was at root saas-ui/, moved here)
+    index.html        — main app (Agent Economy pane, API Keys pane, Forge enhancements)
+    css/styles.css    — design system + economy / heatmap / bulk-select styles
+    js/
+      app.js          — bootstrap + economy module init
+      store.js        — state (earnings, agentKeys, invocationFeed, agentMetrics)
+      api.js          — AgentsApi (+ streamInvocations, getEarnings, agent key CRUD)
+      marketplace.js  — product grid, agent-native filter, bulk select, Try button
+      dashboard.js    — revenue tracker, agent wallet, heatmap, API keys section
+      product-detail.js — 3-tab detail (overview/pricing/changelog), SSE feed
+      forge-ui.js     — cost estimator, quality preview, persona selector, batch CSV
+      economy.js      — agent economy: earnings, leaderboard, sparklines
+    playground.html   — SaaS playground demo
+tests/                — 19 test files, 369 tests
 ```
 
 ## Pipeline Flow
 
 1. **Resolve** — detect format, fetch metadata. GitHub: releases→tags→`readSourceVersion()`. Local: package.json→basename
 2. **Install** — download tarball (branch fallback), extract, install deps. `HUGE_REPOS` skipped
-3. **Analyze** — `--help` parsing, recursive mode. `deepProbe(bin, {maxDepth})` → `{tree, totalCommands}`
+3. **Analyze** — `--help` parsing, recursive. `deepProbe(bin, {maxDepth})` → `{tree, totalCommands}`
 4. **Store** — persist JSON + CONTEXT.md
-5. **Generate** — `generateSkillDirectory()` → SKILL.md + refs/ + scripts/. Uses `_curatedMeta` for triggers, `_readmeSections` for content. `detectToolLanguage()` for ecosystem. `inferBinName()` for binary names. `extractCommandsFromReadme()` fallback when 0 commands
+5. **Generate** — `generateSkillDirectory()` → SKILL.md + refs/ + scripts/. Uses `_curatedMeta` for triggers, `_readmeSections` for content, `detectToolLanguage()` for ecosystem, `inferBinName()` for binary names, `extractCommandsFromReadme()` fallback when 0 commands
 6. **Quality** — `testSkillSync()`: trigger ≥ 0.80, quality ≥ 6, content ≥ 5
 7. **Index** — `groupByDomain()` + `generateMasterIndex()`
 8. **Factory** — `runSkillFactory()` optional 3-layer
@@ -168,65 +201,93 @@ tests/            — 18 test files, 347 tests
 
 ## Skill Quality
 
-`scoreTrigger()` (max 1.0, clamped): +0.3 "Use when", +0.4 action verbs (3×0.15 from 60+ verbs), +0.2 "Do NOT use for", +0.1 comma triggers (≥2 clauses), +0.1 TechNames (≥2 capitalized words). `buildDescription()` auto-generates all via `CATEGORY_ACTION_MAP` (% templates) + `DOMAIN_NEGATIVE_TRIGGERS` + `detectToolLanguage()`.
+`scoreTrigger()` (max 1.0, clamped): +0.3 "Use when", +0.4 action verbs (3×0.15 from 60+ verbs), +0.2 "Do NOT use for", +0.1 comma triggers (≥2 clauses), +0.1 TechNames (≥2 capitalized words). `buildDescription()` in `lib/skills/description.ts` auto-generates via `CATEGORY_ACTION_MAP` + `DOMAIN_NEGATIVE_TRIGGERS` + `detectToolLanguage()`. Note: `buildShortDescription()` in `lib/skill-content.ts` is a separate function for `ManifestEntry` structural content.
 
 ## Plugin System (Claude Code spec)
 
-**Structure** — `.claude-plugin/plugin.json` (official fields: name, version, description, keywords, license), `skills/<name>/SKILL.md+refs+scripts`, `agents/<name>.md` (YAML frontmatter+prompt), `commands/<name>.md`
+**Structure** — `.claude-plugin/plugin.json` (official fields only: name, version, description, keywords, license), `skills/<name>/SKILL.md+refs+scripts`, `agents/<name>.md` (YAML frontmatter+prompt), `commands/<name>.md`
 
 **Basic** (`--plugin`): 2 commands, 1 agent. **Full** (`--plugin --full`): 8 commands, multi-agents, hooks (7 event types), settings.json, CLAUDE.md, team skills. `--multi-runtime` adds pi-mono + opencode adapters.
 
 **Rules** — no non-standard plugin.json fields, skills self-contained, domains flattened (`ai-ml/x`→`ai-ml-x`), no external path refs, `$ARGUMENTS` for user input in commands.
 
-**Key functions**: `buildPlugins(opts)`, `generateHooksJson(domain, entries)`, `generatePluginCommands(domain, entries)` (8 cmds), `defaultMultiAgentMarkdown(domain, pkgs)`, `auditPlugin(dir)`, `generateMarketplace(opts)`, `publishPlugin(domain, dryRun)`, `generateTeamSkill(domain, agents)`, `generateRuntimeAdapters(domain, entries, name)`, `computePluginHash(dir)`, `bumpVersion(current, type)`
+**Key functions**: `buildPlugins(opts)`, `generateHooksJson(domain, entries)`, `generatePluginCommands(domain, entries)`, `auditPlugin(dir)`, `generateMarketplace(opts)`, `publishPlugin(domain, dryRun)`, `computePluginHash(dir)`, `bumpVersion(current, type)`
+
+## SaaS Companion API (lib/companion/web-service.ts)
+
+Served at `:3100`. Static files served from `examples/saas-ui/`. All `/api/*` endpoints require `Authorization: Bearer <token>`.
+
+```
+GET  /api/health
+GET  /api/auth/me
+GET  /api/catalog
+GET  /api/usage
+POST /api/generate                     — async skill generation
+GET  /api/status/:jobId
+GET  /api/download/:jobId
+POST /api/billing/checkout
+GET  /api/billing/portal
+GET  /api/earnings?period=month        — creator revenue summary
+GET  /api/agents/:id/metrics           — call/cost/latency metrics stub
+GET  /api/agents/:id/heatmap           — 24h invocation heatmap stub
+POST /api/agent-keys                   — create key {id, secret, scopes, createdAt}
+DELETE /api/agent-keys/:id             — revoke key
+GET  /api/invocations/stream?skill=X   — SSE: live invocation events (mock every 3-8s)
+```
 
 ## Key Functions
 
 ```typescript
-// Output
+// Output (lib/output.ts)
 success<T>(cmd, data, startTime): CliOutput<T>
 failure(cmd, code, msg, startTime): CliOutput<never>
 emit<T>(result, json): void
 toErrorMessage(err: unknown): string
 
-// Guards
+// Guards (lib/guards.ts)
 validateSource(source): void
 validateToolName(name): void
 rejectPathTraversal(path, label): void
+shellQuote(s): string                  // canonical location
 
-// Analysis
+// Analysis (lib/analyzer.ts)
 deepProbe(bin, {maxDepth}): {tree, totalCommands}
 detectInteractionMode(cmds, flags, help?): "repl"|"subcommand"|"single"
 smokeTest(tool, installDir, cachedBin?): SmokeTestResult
 
-// Skills
-parseFrontmatter(content): SkillFrontmatter | null
-generateRichSkillMd(tool): string
-generateSkillDirectory(tool): {skillMd, files}
-shellQuote(s): string
-writeLockfile(path, tools): void
+// Skills — lib/skills/* modules
+parseFrontmatter(content): SkillFrontmatter | null      // frontmatter.ts
+discoverResources(skillDir): SkillResources             // frontmatter.ts
+computeIntegrity(uri, version): string                  // lockfile.ts
+writeLockfile(path, tools): void                        // lockfile.ts
+buildDescription(tool): string                          // description.ts (Tool)
+buildShortDescription(entry): string                    // skill-content.ts (ManifestEntry)
+detectToolLanguage(tool): ToolLanguage                  // description.ts
+isLikelyCli(tool): boolean                              // description.ts
+installTool(source, dataDir, opts): Promise<Tool>       // lifecycle.ts
+listSkills(dataDir): InstalledSkillMeta[]               // lifecycle.ts
+generateRichSkillMd(tool): string                       // generators.ts
+generateSkillDirectory(tool): SkillDirectory            // generators.ts
+generateInstallScript(tool): string                     // generators.ts
 
-// Quality
+// Quality (lib/skill-tester.ts)
 testSkillSync(path, preloaded?): SkillTestResult
-testAllSkillsSync(dir, domainFilter?): SkillTestResult[]
 scoreTrigger(description): number
 scoreContentQuality(skillMd): {score, issues}
 
-// Classifiers (all same signature)
-discoverNpmPackages(query?, limit?): Promise<ExtendedManifestEntry[]>
-discoverGitHubRepos / discoverCratesPackages / discoverPyPIPackages
+// Classifiers (all: query?, limit?) → Promise<ExtendedManifestEntry[]>
+discoverNpmPackages / discoverGitHubRepos / discoverCratesPackages / discoverPyPIPackages
 
-// Extractor
+// Extractor (lib/extractor.ts)
 extractReadmeSections(readme, maxChars?): ReadmeSections
 inferBinaryNames(repoDir): string[]
 readSourceVersion(repoDir): string | undefined
-extractCommandsFromReadme(readme, toolName): Array<{name, description}>
 
-// Curated
-loadAllTools(projectRoot): CliTool[]
+// Curated (lib/curated-tools.ts)
+loadAllTools(projectRoot): CliTool[]   // loads examples/data/ai-ml-tools.json
 GENERAL_TOOLS: CliTool[]
 
-// Indexes
+// Indexes (lib/indexes.ts)
 groupByDomain(entries): Map<string, ManifestEntry[]>
 generateMasterIndex(manifest, triggers): string
 ```
@@ -234,18 +295,33 @@ generateMasterIndex(manifest, triggers): string
 ## Data Directory
 
 ```
-~/.agents-cli/tools.json — metadata store
-~/.agents-cli/tools/<id>/package/ — installed files
-~/.agents-cli/tools/<id>/CONTEXT.md — auto-docs
+~/.agents-cli/tools.json              — metadata store
+~/.agents-cli/tools/<id>/package/     — installed files
+~/.agents-cli/tools/<id>/CONTEXT.md   — auto-docs
 ~/.agents-cli/skills/<name>/skill.json + CONTEXT.md
 ```
 
+## Common Pitfalls
+
+- `shellQuote` canonical location is `lib/guards.ts` — import from `./guards.js` in new code
+- `buildDescription(tool)` in `lib/skills/description.ts` takes `Tool`; `buildShortDescription(entry)` in `lib/skill-content.ts` takes `ManifestEntry` — they are different functions
+- `ai-ml-tools.json` is at `examples/data/` (not project root)
+- SaaS UI is at `examples/saas-ui/` (not root `saas-ui/`)
+- `loadAllTools(projectRoot)` needs project root path, not data dir
+- Bare tool names (e.g. `ruff`) don't match FORMAT_PATTERNS — need `pypi:` prefix
+- `IntentResult` has `.intent` (not `.type`); `ExtractedEntity` has `.packageName` (not `.packages`)
+- `ToolCapabilities.commands` is `readonly` — use spread
+- Cache treats `repoSha: "unknown"` as miss (PyPI installs never get stale-hit)
+- Linter hook may auto-add imports or revert changes — re-read files after edits
+
 ## Do NOT
 
-- Add heavy deps or `yaml`/`js-yaml` (custom frontmatter parser exists)
+- Add `yaml`/`js-yaml` (custom frontmatter parser in `lib/skills/frontmatter.ts`)
 - Skip build, remove security guards, use `process.exit()`, add interactive prompts
-- Bypass `CliOutput<T>`, hardcode `dryRun: false`, bare `console.error` with `--json`
+- Bypass `CliOutput<T>`, hardcode `dryRun: false`, use bare `console.error` with `--json`
 - Add HTTP helpers without SSRF checks, use `require()`, use magic numbers
-- Match frontmatter with full-content regex, fabricate CLI subcommands
-- Use same trigger text for different categories, suggest wrong package managers
-- Write files outside output dir, interpolate unsanitized input into shell
+- Match frontmatter with full-content regex — use `parseFrontmatter()`
+- Fabricate CLI subcommands not present in actual `--help`
+- Use same trigger text for different categories; suggest wrong package managers
+- Write files outside output dir; interpolate unsanitized input into shell
+- Import `shellQuote` from `lib/skills.ts` in new code — use `lib/guards.ts`

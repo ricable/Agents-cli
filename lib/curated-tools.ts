@@ -175,7 +175,7 @@ interface AiMlToolEntry {
 
 /** Load AI/ML tools from ai-ml-tools.json at project root */
 export function loadAiMlTools(projectRoot: string): CliTool[] {
-  const jsonPath = join(projectRoot, "ai-ml-tools.json");
+  const jsonPath = join(projectRoot, "examples", "data", "ai-ml-tools.json");
   if (!existsSync(jsonPath)) return [];
   const raw = JSON.parse(readFileSync(jsonPath, "utf-8")) as AiMlToolEntry[];
   return raw.map(t => ({

@@ -19,6 +19,11 @@ export class AppStore {
       usage: null,
       serverStatus: null,
       jobs: [],
+      earnings: null,
+      agentKeys: [],
+      activeAgent: null,
+      invocationFeed: [],
+      agentMetrics: {},
     };
     this._listeners = new Map();
     this.restore();
@@ -55,7 +60,7 @@ export class AppStore {
 
   // Persist only certain keys to localStorage
   _autoPersist(key) {
-    const persistKeys = ['user', 'tier', 'installed', 'searchFilters'];
+    const persistKeys = ['user', 'tier', 'installed', 'searchFilters', 'earnings', 'agentKeys'];
     if (persistKeys.includes(key)) this.persist();
   }
 
@@ -66,6 +71,8 @@ export class AppStore {
         tier: this.state.tier,
         installed: this.state.installed,
         searchFilters: this.state.searchFilters,
+        earnings: this.state.earnings,
+        agentKeys: this.state.agentKeys,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch { /* quota exceeded or private browsing */ }
@@ -80,7 +87,19 @@ export class AppStore {
       if (data.tier) this.state.tier = data.tier;
       if (data.installed) this.state.installed = data.installed;
       if (data.searchFilters) this.state.searchFilters = { ...this.state.searchFilters, ...data.searchFilters };
+      if (data.earnings) this.state.earnings = data.earnings;
+      if (data.agentKeys) this.state.agentKeys = data.agentKeys;
     } catch { /* corrupted data */ }
+  }
+
+  pushInvocationEvent(event) {
+    const feed = [...(this.state.invocationFeed || []), event];
+    // Keep max 50 events
+    this.set('invocationFeed', feed.slice(-50));
+  }
+
+  setAgentMetric(agentId, metrics) {
+    this.set('agentMetrics', { ...this.state.agentMetrics, [agentId]: metrics });
   }
 
   isInstalled(productId) {

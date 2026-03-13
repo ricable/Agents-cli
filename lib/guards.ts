@@ -229,3 +229,8 @@ export function validateFullFrontmatter(content: string): string[] {
 
   return errors;
 }
+
+/** Shell-quote a value: wrap in single quotes with inner single-quote escaping */
+export function shellQuote(s: string): string {
+  return "'" + s.replace(/'/g, "'\\''") + "'";
+}

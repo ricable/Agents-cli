@@ -565,6 +565,121 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
       return;
     }
 
+    // ── Agent Economy endpoints ─────────────────────────────────────
+
+    // GET /api/earnings
+    if (method === "GET" && path === "/api/earnings") {
+      const keyRecord = authenticate(req);
+      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      const period = url.searchParams.get("period") || "month";
+      const nextPayout = new Date();
+      nextPayout.setDate(nextPayout.getDate() + (30 - nextPayout.getDate() % 30));
+      sendJson(res, 200, success("earnings", {
+        totalEarned: 0,
+        pendingPayout: 0,
+        nextPayoutDate: nextPayout.toISOString().slice(0, 10),
+        period,
+        skills: [],
+      }, Date.now()));
+      return;
+    }
+
+    // GET /api/agents/:id/metrics
+    const agentMetricsMatch = path.match(/^\/api\/agents\/([^/]+)\/metrics$/);
+    if (method === "GET" && agentMetricsMatch) {
+      const keyRecord = authenticate(req);
+      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+      res.end(JSON.stringify({
+        success: true,
+        data: {
+          agentId: agentMetricsMatch[1],
+          totalCalls: 0,
+          totalCost: 0,
+          avgLatencyMs: 0,
+          heatmap: Array.from({ length: 24 }, () => 0),
+        },
+      }));
+      return;
+    }
+
+    // GET /api/agents/:id/heatmap
+    const agentHeatmapMatch = path.match(/^\/api\/agents\/([^/]+)\/heatmap$/);
+    if (method === "GET" && agentHeatmapMatch) {
+      const keyRecord = authenticate(req);
+      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+      res.end(JSON.stringify({
+        success: true,
+        data: {
+          agentId: agentHeatmapMatch[1],
+          hours: Array.from({ length: 24 }, () => 0),
+          date: new Date().toISOString().slice(0, 10),
+        },
+      }));
+      return;
+    }
+
+    // POST /api/agent-keys
+    if (method === "POST" && path === "/api/agent-keys") {
+      const keyRecord = authenticate(req);
+      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      try {
+        const body = await parseBody(req, config.maxBodySize);
+        const parsed = JSON.parse(body) as { scopes?: string[] };
+        const scopes = parsed.scopes ?? [];
+        const id = Math.random().toString(36).slice(2, 10);
+        const secret = "sk-" + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+        sendJson(res, 200, success("agent-keys-create", {
+          id,
+          secret,
+          scopes,
+          createdAt: new Date().toISOString(),
+        }, Date.now()));
+      } catch (err) {
+        sendError(res, 400, "INVALID_INPUT", toErrorMessage(err));
+      }
+      return;
+    }
+
+    // DELETE /api/agent-keys/:id
+    const agentKeyDeleteMatch = path.match(/^\/api\/agent-keys\/([^/]+)$/);
+    if (method === "DELETE" && agentKeyDeleteMatch) {
+      const keyRecord = authenticate(req);
+      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      sendJson(res, 200, success("agent-keys-revoke", {
+        revoked: true,
+        id: agentKeyDeleteMatch[1],
+      }, Date.now()));
+      return;
+    }
+
+    // GET /api/invocations/stream
+    if (method === "GET" && path === "/api/invocations/stream") {
+      const keyRecord = authenticate(req);
+      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      const skill = url.searchParams.get("skill") || "unknown";
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "Access-Control-Allow-Origin": "*",
+      });
+
+      const agents = ["claude-sonnet-4-6", "gpt-4o", "gemini-1.5-pro", "local-agent"];
+      const sendEvent = () => {
+        const agent = agents[Math.floor(Math.random() * agents.length)];
+        const latencyMs = Math.floor(Math.random() * 900) + 80;
+        const event = JSON.stringify({ skill, agent, latencyMs, ts: Date.now() });
+        res.write(`data: ${event}\n\n`);
+      };
+
+      sendEvent();
+      const streamInterval = setInterval(sendEvent, 3000 + Math.random() * 5000);
+      req.on("close", () => clearInterval(streamInterval));
+      return;
+    }
+
     // ── Catalog endpoint ───────────────────────────────────────
 
     // GET /api/catalog
@@ -586,7 +701,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     // ── Static file serving for saas-ui/ ───────────────────────
 
     if (!path.startsWith("/api/")) {
-      const saasUiDir = resolve(config.projectRoot, "saas-ui");
+      const saasUiDir = resolve(config.projectRoot, "examples", "saas-ui");
       let filePath = path === "/" ? "/index.html" : path;
       const resolved = resolve(saasUiDir, normalize(filePath).replace(/^\//, ""));
 

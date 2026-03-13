@@ -205,6 +205,51 @@ export class AgentsApi {
     if (productType) results = results.filter(p => p.productType === productType);
     return results.slice(offset, offset + limit);
   }
+
+  // ── Streaming Invocations ──────────────────────────────────
+
+  streamInvocations(skillName, onEvent, onError) {
+    const url = `${this.baseUrl}/api/invocations/stream?skill=${encodeURIComponent(skillName)}`;
+    const headers = {};
+    if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
+    const source = new EventSource(url);
+    source.onmessage = (e) => {
+      try { onEvent(JSON.parse(e.data)); } catch { onEvent(e.data); }
+    };
+    source.onerror = (e) => { onError?.(e); };
+    return { stop() { source.close(); } };
+  }
+
+  // ── Earnings ────────────────────────────────────────────────
+
+  async getEarnings(period = 'month') {
+    return this._fetch(`/api/earnings?period=${encodeURIComponent(period)}`);
+  }
+
+  // ── Agent Metrics ────────────────────────────────────────────
+
+  async getAgentMetrics(agentId) {
+    return this._fetch(`/api/agents/${encodeURIComponent(agentId)}/metrics`);
+  }
+
+  async getInvocationHeatmap(agentId) {
+    return this._fetch(`/api/agents/${encodeURIComponent(agentId)}/heatmap`);
+  }
+
+  // ── Agent API Keys ────────────────────────────────────────────
+
+  async createAgentKey(scopes = []) {
+    return this._fetch('/api/agent-keys', {
+      method: 'POST',
+      body: JSON.stringify({ scopes }),
+    });
+  }
+
+  async revokeAgentKey(keyId) {
+    return this._fetch(`/api/agent-keys/${encodeURIComponent(keyId)}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 export class ApiError extends Error {

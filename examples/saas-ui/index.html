@@ -43,15 +43,10 @@
                 <button class="btn btn-ghost" id="loginBtn">Log In</button>
                 <button class="btn btn-primary shine" id="getStartedBtn">Get Started</button>
 
-                <!-- User Profile (hidden until login) -->
-                <div class="user-profile" id="userProfile" style="display: none;">
-                    <span class="user-name">User</span>
-                    <div class="user-avatar">U</div>
-                    <!-- Dropdown -->
-                    <div class="user-dropdown" id="userDropdown">
-                        <button class="dropdown-item" id="dashboardNavBtn">Dashboard</button>
-                        <button class="dropdown-item" id="logoutBtn">Log Out</button>
-                    </div>
+                <!-- User Profile — always visible, opens settings modal -->
+                <div class="user-profile user-profile-btn" id="userProfile" title="Account &amp; Settings" style="cursor:pointer">
+                    <span class="user-name">Cedric</span>
+                    <div class="user-avatar">C</div>
                 </div>
             </div>
         </div>
@@ -233,10 +228,13 @@ Result: Success 200 OK</code></pre>
                         <div class="sidebar-item" data-pane="mcp"><i class="icon">&#x26A1;</i> MCP Bridge <span class="status-dot green"></span></div>
                         <div class="sidebar-item" data-pane="forge"><i class="icon">&#x1F6E0;</i> Skill Forge</div>
                         <div class="sidebar-title">Registries</div>
-                        <div class="sidebar-item" data-pane="registry-git"><span class="registry-badge github">Git</span> GitHub</div>
+                        <div class="sidebar-item" data-pane="registry-github"><span class="registry-badge github">Git</span> GitHub</div>
                         <div class="sidebar-item" data-pane="registry-npm"><span class="registry-badge npm">npm</span> npm</div>
                         <div class="sidebar-item" data-pane="registry-pypi"><span class="registry-badge pypi">pip</span> PyPI</div>
                         <div class="sidebar-item" data-pane="registry-crates"><span class="registry-badge crates">rs</span> crates.io</div>
+                        <div class="sidebar-item" data-pane="registry-cli-anything"><span class="registry-badge cli-anything">cli</span> CLI-Anything</div>
+                        <div class="sidebar-item" data-pane="economy">💰 Agent Economy</div>
+                        <div class="sidebar-item" data-pane="agent-keys">🔑 API Keys</div>
                     </div>
                     <div class="dashboard-content">
 
@@ -267,6 +265,14 @@ Result: Success 200 OK</code></pre>
                                 <button class="product-type-tab" data-type="agent-def">Agent Defs</button>
                                 <button class="product-type-tab" data-type="agent-team">Agent Teams</button>
                                 <button class="product-type-tab" data-type="harness">Harnesses</button>
+                                <button class="product-type-tab" data-type="agent-native">🤖 Agent-Native</button>
+                            </div>
+
+                            <div id="bulkActionBar" style="display:none;padding:8px 0;gap:8px;align-items:center" class="bulk-action-bar">
+                              <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                                <input type="checkbox" id="bulkToggle" class="bulk-checkbox"> Bulk Select
+                              </label>
+                              <button class="btn btn-secondary btn-sm" id="bulkInstallBtn" style="display:none">Install Selected (<span id="bulkCount">0</span>)</button>
                             </div>
 
                             <div class="result-bar">
@@ -358,6 +364,43 @@ Authorization: Bearer ***</code></pre></div>
                                             </div>
                                             <span class="progress-stage" id="forgeProgressStage"></span>
                                         </div>
+
+                                        <!-- Cost estimator -->
+                                        <div class="forge-row" id="costEstimatorRow" style="display:none">
+                                          <span style="color:var(--text-muted)">Estimated cost:</span>
+                                          <span id="costEstimate" class="cost-badge">--</span>
+                                        </div>
+                                        <!-- Persona selector -->
+                                        <div class="forge-row">
+                                          <label>AI Persona</label>
+                                          <div class="persona-selector" id="personaSelector">
+                                            <button class="persona-btn active" data-persona="claude">Claude Sonnet 4.6</button>
+                                            <button class="persona-btn" data-persona="gpt4">GPT-4o</button>
+                                            <button class="persona-btn" data-persona="gemini">Gemini 1.5</button>
+                                            <button class="persona-btn" data-persona="any">Any</button>
+                                          </div>
+                                        </div>
+                                        <!-- Quality preview bar -->
+                                        <div class="forge-row" id="qualityPreviewRow">
+                                          <label>Trigger Quality</label>
+                                          <div class="quality-preview-bar">
+                                            <div class="quality-preview-fill" id="qualityPreviewFill" style="width:0%"></div>
+                                          </div>
+                                          <span id="qualityPreviewScore" style="color:var(--text-muted);font-size:12px">--</span>
+                                        </div>
+                                        <!-- Batch CSV drop zone -->
+                                        <div class="forge-row">
+                                          <label>Batch CSV</label>
+                                          <div class="batch-upload-area" id="batchDropZone">
+                                            <span>Drop CSV or <label for="batchFileInput" style="color:var(--accent-blue);cursor:pointer">browse</label></span>
+                                            <input type="file" id="batchFileInput" accept=".csv" style="display:none">
+                                          </div>
+                                        </div>
+                                        <!-- Generation history -->
+                                        <div class="forge-row" id="genHistoryRow">
+                                          <label>History</label>
+                                          <div id="genHistoryList" style="max-height:120px;overflow-y:auto"></div>
+                                        </div>
                                     </div>
                                     <div class="forge-preview glass">
                                         <div class="preview-header">
@@ -373,38 +416,65 @@ Authorization: Bearer ***</code></pre></div>
                             </div>
                         </div>
 
-                        <!-- Pane: Registries -->
-                        <div class="pane" id="pane-registry-git">
-                            <h3>GitHub Registry</h3>
-                            <p class="text-muted">Browse tools sourced directly from GitHub repositories.</p>
-                            <div class="empty-state">
-                                <div class="empty-icon">&#x1F419;</div>
-                                <p>Connect your companion server to browse GitHub tools.</p>
+                        <!-- Pane: Registries — populated by registries.js -->
+                        <div class="pane" id="pane-registry-github"></div>
+                        <div class="pane" id="pane-registry-npm"></div>
+                        <div class="pane" id="pane-registry-pypi"></div>
+                        <div class="pane" id="pane-registry-crates"></div>
+                        <div class="pane" id="pane-registry-cli-anything"></div>
+
+                        <!-- Pane: Agent Economy -->
+                        <div class="pane" id="pane-economy">
+                          <h2>Agent Economy</h2>
+                          <!-- Token stats grid -->
+                          <div class="economy-stats-grid">
+                            <div class="economy-stat-card glass-card">
+                              <div class="stat-label">Total Earned</div>
+                              <div class="stat-value revenue-big" id="econTotalEarned">$0.00</div>
                             </div>
+                            <div class="economy-stat-card glass-card">
+                              <div class="stat-label">Pending Payout</div>
+                              <div class="stat-value revenue-big" id="econPendingPayout">$0.00</div>
+                            </div>
+                            <div class="economy-stat-card glass-card">
+                              <div class="stat-label">Next Payout</div>
+                              <div class="stat-value" id="econNextPayout">--</div>
+                            </div>
+                            <div class="economy-stat-card glass-card">
+                              <div class="stat-label">Published Skills</div>
+                              <div class="stat-value" id="econSkillCount">0</div>
+                            </div>
+                          </div>
+                          <!-- Published skills table -->
+                          <div class="dash-section">
+                            <h3>Published Skills</h3>
+                            <table class="skills-revenue-table" id="econSkillsTable">
+                              <thead><tr><th>Skill</th><th>Calls</th><th>Earned</th><th>Trend</th></tr></thead>
+                              <tbody id="econSkillsBody"><tr><td colspan="4" style="text-align:center;color:var(--text-muted)">No published skills yet</td></tr></tbody>
+                            </table>
+                          </div>
+                          <!-- Agent leaderboard -->
+                          <div class="dash-section">
+                            <h3>Agent Leaderboard</h3>
+                            <div id="econLeaderboard"></div>
+                          </div>
                         </div>
-                        <div class="pane" id="pane-registry-npm">
-                            <h3>npm Registry</h3>
-                            <p class="text-muted">Browse Node.js CLI tools and frameworks.</p>
-                            <div class="empty-state">
-                                <div class="empty-icon">&#x1F4E6;</div>
-                                <p>Connect your companion server to browse npm packages.</p>
+
+                        <!-- Pane: API Keys -->
+                        <div class="pane" id="pane-agent-keys">
+                          <h2>API Keys</h2>
+                          <div class="dash-section">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                              <p style="color:var(--text-secondary)">Manage agent API keys for programmatic access.</p>
+                              <button class="btn btn-primary btn-sm" id="createKeyBtn">+ Create Key</button>
                             </div>
-                        </div>
-                        <div class="pane" id="pane-registry-pypi">
-                            <h3>PyPI Registry</h3>
-                            <p class="text-muted">Browse Python utilities and agents.</p>
-                            <div class="empty-state">
-                                <div class="empty-icon">&#x1F40D;</div>
-                                <p>Connect your companion server to browse PyPI packages.</p>
+                            <div id="agentKeysList">
+                              <div class="empty-state">
+                                <div class="empty-icon">🔑</div>
+                                <p style="color:var(--text-secondary)">No API keys yet. Create one to get started.</p>
+                              </div>
                             </div>
-                        </div>
-                        <div class="pane" id="pane-registry-crates">
-                            <h3>Crates.io Registry</h3>
-                            <p class="text-muted">Browse Rust binaries.</p>
-                            <div class="empty-state">
-                                <div class="empty-icon">&#x1F980;</div>
-                                <p>Connect your companion server to browse crates.io packages.</p>
-                            </div>
+                          </div>
                         </div>
 
                     </div>

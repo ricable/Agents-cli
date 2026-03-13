@@ -28,6 +28,8 @@ const QUALITY_COLOR = (score) => {
 };
 
 let debounceTimer = null;
+let bulkMode = false;
+const bulkSelected = new Set();
 
 export function initMarketplace(api, store, showProductDetail) {
   const grid = document.getElementById('productGrid');
@@ -55,7 +57,12 @@ export function initMarketplace(api, store, showProductDetail) {
   function renderProducts() {
     const filters = store.get('searchFilters');
     const query = store.get('searchQuery');
-    const results = api.searchProducts(query, filters);
+    let results = api.searchProducts(query, filters);
+
+    // Special post-filter for agent-native tab
+    if (filters.productType === 'agent-native') {
+      results = results.filter(p => isAgentNative(p));
+    }
 
     if (resultCount) {
       resultCount.textContent = `${results.length} product${results.length !== 1 ? 's' : ''}`;
@@ -118,6 +125,22 @@ export function initMarketplace(api, store, showProductDetail) {
     });
   }
 
+  // ── Bulk select ─────────────────────────────────────────────────
+
+  const bulkToggle = document.getElementById('bulkToggle');
+  const bulkInstallBtn = document.getElementById('bulkInstallBtn');
+  const bulkCount = document.getElementById('bulkCount');
+
+  if (bulkToggle) {
+    bulkToggle.addEventListener('change', () => {
+      bulkMode = bulkToggle.checked;
+      bulkSelected.clear();
+      if (bulkInstallBtn) bulkInstallBtn.style.display = bulkMode ? 'inline-flex' : 'none';
+      if (bulkCount) bulkCount.textContent = '0';
+      renderProducts();
+    });
+  }
+
   // ── Subscribe to store changes ──────────────────────────────────
 
   store.subscribe('catalog', () => renderProducts());
@@ -162,10 +185,15 @@ function renderCard(product) {
           ${commands > 0 ? `<span class="meta-item" title="Commands">${commands} cmds</span>` : ''}
           ${rating > 0 ? `<span class="meta-item">${renderStars(rating)}</span>` : ''}
           ${downloads > 0 ? `<span class="meta-item">${formatNum(downloads)} dl</span>` : ''}
+          ${isAgentNative(product) ? '<span class="badge-agent">🤖 Agent</span>' : ''}
+          ${product.pricing?.perCall ? `<span class="cost-badge">$${product.pricing.perCall}/call</span>` : ''}
         </div>
-        <button class="btn btn-secondary btn-sm install-card-btn" data-id="${escapeAttr(product.id)}">
-          View
-        </button>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="btn btn-ghost btn-sm try-card-btn" data-id="${escapeAttr(product.id)}">▶ Try</button>
+          <button class="btn btn-secondary btn-sm install-card-btn" data-id="${escapeAttr(product.id)}">
+            View
+          </button>
+        </div>
       </div>
     </div>`;
 }
@@ -189,8 +217,24 @@ function attachCardListeners(grid, showProductDetail, store) {
         showProductDetail(id);
         return;
       }
+      if (e.target.closest('.try-card-btn')) return;
       const id = card.dataset.productId;
       if (id) showProductDetail(id);
+    });
+  });
+
+  grid.querySelectorAll('.try-card-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.id;
+      // Switch to forge pane with tool pre-filled
+      const forgeSidebar = document.querySelector('[data-pane="forge"]');
+      if (forgeSidebar) forgeSidebar.click();
+      const toolInput = document.getElementById('forgeToolInput');
+      if (toolInput) {
+        toolInput.value = id;
+        toolInput.dispatchEvent(new Event('blur'));
+      }
     });
   });
 }
@@ -236,4 +280,11 @@ function escapeAttr(str) {
   return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-export { PRODUCT_TYPE_ICONS, PRODUCT_TYPE_COLORS, formatPrice, formatType, escapeHtml };
+function isAgentNative(product) {
+  return product.productType === 'agent-def' ||
+         product.productType === 'agent-team' ||
+         product.tags?.includes('agent-native') ||
+         product.agentNative === true;
+}
+
+export { PRODUCT_TYPE_ICONS, PRODUCT_TYPE_COLORS, formatPrice, formatType, escapeHtml, isAgentNative };
