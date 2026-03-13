@@ -4,6 +4,11 @@ Package manager for AI agent tools. Resolves, installs, analyzes, exposes CLI to
 
 > See **README.md** for full usage guide, examples, and architecture overview.
 
+## Key Dependencies
+
+- `@clerk/backend` — Clerk JWT verification (server-side). Canonical import location: `lib/companion/clerk-auth.ts`
+- `stripe` — official Stripe Node.js SDK used by `StripeProvider` in `lib/companion/billing.ts` (customers, checkout, billing portal, invoices, webhook verification). Do NOT use raw fetch for Stripe API calls.
+
 ## Build & Test
 
 ```bash
@@ -163,7 +168,7 @@ lib/
   hooks/              — types.ts, generator.ts, validator.ts, templates/
   plugin/             — builder.ts, publisher.ts, marketplace.ts, audit-report.ts, versioning.ts, ...
   db/                 — domain-db.ts, aggregated-db.ts, sqlite.ts
-  companion/          — web-service.ts, billing.ts, oauth.ts, metering.ts, tiers.ts, ...
+  companion/          — web-service.ts, billing.ts, oauth.ts, metering.ts, tiers.ts, clerk-auth.ts, ...
 examples/
   skill-forge.ts      — thin dispatcher → forge/ modules
   forge/              — types, helpers, parse-args, stages, 15 mode-* modules
@@ -278,8 +283,13 @@ store.subscribe('*', cb)     // wildcard: cb(key, value, old)
 
 Served at `:3100`. Static files served from `examples/saas-ui/`. All `/api/*` endpoints require `Authorization: Bearer <token>`.
 
+Auth is dual-mode: API-key SHA256 checked first, then Clerk JWT fallback via `verifyClerkToken()`.
+
+Required env vars: `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`.
+
 ```
 GET  /api/health
+GET  /api/config                       — returns {publishableKey} for frontend Clerk init (public, no auth)
 GET  /api/auth/me
 GET  /api/catalog
 GET  /api/usage
@@ -288,6 +298,7 @@ GET  /api/status/:jobId
 GET  /api/download/:jobId
 POST /api/billing/checkout
 GET  /api/billing/portal
+POST /api/billing/webhook              — Stripe webhook (raw body + stripe-signature header)
 GET  /api/earnings?period=month        — creator revenue summary
 GET  /api/agents/:id/metrics           — call/cost/latency metrics stub
 GET  /api/agents/:id/heatmap           — 24h invocation heatmap stub
@@ -351,6 +362,12 @@ GENERAL_TOOLS: CliTool[]
 // Indexes (lib/indexes.ts)
 groupByDomain(entries): Map<string, ManifestEntry[]>
 generateMasterIndex(manifest, triggers): string
+
+// Clerk Auth (lib/companion/clerk-auth.ts) — canonical @clerk/backend import location
+verifyClerkToken(req: IncomingMessage, config: ClerkConfig): Promise<ClerkSession | null>
+updateUserMetadata(userId, metadata, config: ClerkConfig): Promise<void>
+// ClerkSession: { userId, sessionId, email?, publicMetadata }
+// ClerkConfig: { secretKey, publishableKey? }
 ```
 
 ## Data Directory
@@ -389,3 +406,5 @@ generateMasterIndex(manifest, triggers): string
 - Use same trigger text for different categories; suggest wrong package managers
 - Write files outside output dir; interpolate unsanitized input into shell
 - Import `shellQuote` from `lib/skills.ts` in new code — use `lib/guards.ts`
+- Import `@clerk/backend` directly in new files — use `lib/companion/clerk-auth.ts` as the canonical import location
+- Use raw fetch for Stripe API calls — `StripeProvider` in `lib/companion/billing.ts` uses the official `stripe` npm SDK
