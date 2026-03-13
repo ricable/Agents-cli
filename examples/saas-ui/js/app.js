@@ -174,15 +174,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const userProfileEl = document.getElementById('userProfile');
   const userDisplayName = document.getElementById('userDisplayName');
   const userAvatarEl = document.getElementById('userAvatar');
-  const userDropdown = document.getElementById('userDropdown');
+  const logoutBtn = document.getElementById('logoutBtn');
 
   const updateNavState = (user, serverOk = false) => {
-    // Server status indicator
     if (statusEl) {
       statusEl.className = `extension-status ${serverOk ? 'connected' : 'disconnected'}`;
       statusEl.innerHTML = `<span class="status-indicator"></span>${serverOk ? 'Server: Active' : 'Server: Offline'}`;
     }
-
     const loggedIn = !!user;
     if (loginBtn) loginBtn.style.display = loggedIn ? 'none' : '';
     if (getStartedBtn) getStartedBtn.style.display = loggedIn ? 'none' : '';
@@ -190,35 +188,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       userProfileEl.style.display = loggedIn ? 'flex' : 'none';
       if (loggedIn && user) {
         const name = user.name || user.email || 'User';
-        const initial = name[0].toUpperCase();
         if (userDisplayName) userDisplayName.textContent = name;
-        if (userAvatarEl) userAvatarEl.textContent = initial;
+        if (userAvatarEl) userAvatarEl.textContent = name[0].toUpperCase();
       }
     }
+    if (logoutBtn) logoutBtn.style.display = loggedIn ? '' : 'none';
   };
 
-  // Toggle user dropdown on profile click
-  if (userProfileEl) {
-    userProfileEl.addEventListener('click', (e) => {
-      if (!e.target.closest('#logoutBtn')) {
-        const isVisible = userDropdown?.style.display !== 'none';
-        if (userDropdown) userDropdown.style.display = isVisible ? 'none' : 'block';
-      }
-    });
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('#userProfile') && userDropdown) {
-        userDropdown.style.display = 'none';
-      }
-    });
-  }
-
   // Logout
-  document.addEventListener('click', (e) => {
-    if (e.target.closest('#logoutBtn')) {
-      auth.logout();
-      if (userDropdown) userDropdown.style.display = 'none';
-    }
-  });
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => auth.logout());
+  }
 
   // Auth state changes → update nav
   auth.onAuthChange((user) => {
