@@ -9,6 +9,7 @@
     <!-- Clerk publishable key — set via Vercel env var CLERK_PUBLISHABLE_KEY
          or override inline: window.__CLERK_KEY = 'pk_live_...' -->
     <script>window.__CLERK_KEY = window.__CLERK_KEY || null;</script>
+    <script async src="https://js.stripe.com/v3/buy-button.js"></script>
 </head>
 <body>
 
@@ -611,7 +612,10 @@ Authorization: Bearer ***</code></pre></div>
                             </div>
                         </div>
                         <div class="tier-body">
-                            <button class="btn btn-primary btn-block shine" data-price-id="price_starter">Subscribe Now</button>
+                            <stripe-buy-button
+                              buy-button-id="buy_btn_1TAcnB2QpzdUwTFgAk1ZG3Gf"
+                              publishable-key="pk_test_51RkrC42QpzdUwTFg1FIiE9WgCFIsaRoRchu9saxK8mI3efzMZ0SxFaws4s9jCb1YVH2m1IRmbc0vRMfSaOrlqZoe00KUughf1w"
+                            ></stripe-buy-button>
                             <ul class="feature-list">
                                 <li><i class="icon-check">&#x2713;</i> 15 tools, 20 daily generations</li>
                                 <li><i class="icon-check">&#x2713;</i> Natural language tool discovery</li>
