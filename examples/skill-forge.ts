@@ -37,8 +37,28 @@
  *   npx tsx examples/skill-forge.ts --orchestrate --recipe creative-suite
  */
 
+import { readFileSync, existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { setQuiet } from "./forge/helpers.js";
 import { failure, emit, toErrorMessage } from "../lib/output.js";
+
+// ── Load .env from project root (before anything else) ────────────────
+(function loadDotEnv() {
+  const envPath = resolve(import.meta.dirname ?? process.cwd(), "../.env");
+  if (!existsSync(envPath)) return;
+  const lines = readFileSync(envPath, "utf-8").split("\n");
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq === -1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    const val = trimmed.slice(eq + 1).trim();
+    if (key && val && !(key in process.env)) {
+      process.env[key] = val;
+    }
+  }
+})();
 
 // Re-export for backward compatibility with tests
 export { parseArgs } from "./forge/parse-args.js";
@@ -144,7 +164,17 @@ async function main(): Promise<void> {
     const { startServer } = await import("../lib/companion/web-service.js");
     const { createHash } = await import("node:crypto");
     const testKeyHash = createHash("sha256").update("test-key").digest("hex");
-    console.log("  WARNING: Using test API key — not for production use");
+
+    const clerkPublishableKey = process.env["CLERK_PUBLISHABLE_KEY"];
+    const clerkSecretKey = process.env["CLERK_SECRET_KEY"];
+    const stripeWebhookSecret = process.env["STRIPE_WEBHOOK_SECRET"];
+
+    if (clerkSecretKey) {
+      console.log("  Clerk auth enabled");
+    } else {
+      console.log("  WARNING: CLERK_SECRET_KEY not set — auth in mock mode");
+    }
+
     startServer({
       port: args.port,
       host: "127.0.0.1",
@@ -156,6 +186,10 @@ async function main(): Promise<void> {
       maxBodySize: 1_048_576,
       projectRoot: process.cwd(),
       outputDir: "examples/generated-skills",
+      clerkConfig: clerkSecretKey
+        ? { secretKey: clerkSecretKey, publishableKey: clerkPublishableKey }
+        : undefined,
+      stripeWebhookSecret,
     });
     return;
   }

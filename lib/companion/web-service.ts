@@ -567,21 +567,27 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
         const billing = createBillingProvider("stripe");
         const event = await billing.verifyWebhook(payload, signature, config.stripeWebhookSecret);
 
-        // Sync subscription tier to Clerk user publicMetadata
+        // Sync subscription tier → Clerk user publicMetadata
         if (config.clerkConfig) {
-          const clerkUserId =
-            (event.data["clerkUserId"] as string | undefined) ??
-            ((event.data["metadata"] as Record<string, string> | undefined)?.["clerkUserId"]);
+          // clerkUserId is stored in session metadata (checkout.session.completed)
+          // and in subscription metadata (customer.subscription.*)
+          const meta = event.data["metadata"] as Record<string, string> | undefined;
+          const clerkUserId = meta?.["clerkUserId"];
 
           if (clerkUserId) {
-            let tier: ApiTier = "free";
-            if (event.type === "checkout.session.completed" || event.type === "customer.subscription.updated") {
-              // Derive tier from Stripe price metadata or default to "starter"
-              const plan = event.data["plan"] as Record<string, unknown> | undefined;
-              const priceMeta = plan?.["metadata"] as Record<string, string> | undefined;
-              tier = (priceMeta?.["tier"] as ApiTier | undefined) ?? "starter";
+            let tier: ApiTier;
+            switch (event.type) {
+              case "checkout.session.completed":
+              case "customer.subscription.updated":
+                // Read tier from subscription/price metadata, default to "starter"
+                tier = (meta?.["tier"] as ApiTier | undefined) ?? "starter";
+                break;
+              case "customer.subscription.deleted":
+                tier = "free";
+                break;
+              default:
+                tier = "starter";
             }
-            // "customer.subscription.deleted" leaves tier as "free" (default above)
             await updateUserMetadata(
               clerkUserId,
               { tier, stripeCustomerId: event.customerId },
@@ -623,6 +629,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
           customerId,
           parsed.priceId || "price_default",
           parsed.successUrl ?? `${origin}/?checkout=success`,
+          authed.clerkUserId,
         );
         sendJson(res, 200, success("billing-checkout", result, Date.now()));
       } catch (err) {

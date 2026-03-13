@@ -9,7 +9,7 @@ export default function handler(req, res) {
   res.json({
     success: true,
     data: {
-      clerkPublishableKey: process.env.CLERK_PUBLISHABLE_KEY ?? null,
+      clerkPublishableKey: process.env.CLERK_PUBLISHABLE_KEY?.trim() ?? null,
     },
   });
 }

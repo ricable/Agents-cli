@@ -199,7 +199,7 @@ export class AuthManager {
       if (mountEl) {
         this._clerk.mountSignIn(mountEl);
       } else {
-        this._clerk.openSignIn({});
+        this._clerk.openSignIn({ afterSignInUrl: window.location.href, afterSignUpUrl: window.location.href });
       }
     } else {
       this._mockLogin('email');
@@ -212,7 +212,7 @@ export class AuthManager {
       if (mountEl) {
         this._clerk.mountSignUp(mountEl);
       } else {
-        this._clerk.openSignUp({});
+        this._clerk.openSignUp({ afterSignInUrl: window.location.href, afterSignUpUrl: window.location.href });
       }
     } else {
       this._mockLogin('email');

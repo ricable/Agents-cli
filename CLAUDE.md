@@ -6,8 +6,8 @@ Package manager for AI agent tools. Resolves, installs, analyzes, exposes CLI to
 
 ## Key Dependencies
 
-- `@clerk/backend` — Clerk JWT verification (server-side). Canonical import location: `lib/companion/clerk-auth.ts`
-- `stripe` — official Stripe Node.js SDK used by `StripeProvider` in `lib/companion/billing.ts` (customers, checkout, billing portal, invoices, webhook verification). Do NOT use raw fetch for Stripe API calls.
+- `@clerk/backend` — Clerk JWT verification (server-side). Canonical import location: `lib/companion/clerk-auth.ts`. `ClerkConfig` now supports `authorizedParties?: string[]` (reads `CLERK_AUTHORIZED_PARTIES` env var, comma-separated). `verifyClerkToken()` gets `publicMetadata` from `clerk.users.getUser()` (not session claims).
+- `stripe` — official Stripe Node.js SDK used by `StripeProvider` in `lib/companion/billing.ts` (customers, checkout, billing portal, invoices, webhook verification). Do NOT use raw fetch for Stripe API calls. `createCheckoutSession` now accepts `clerkUserId?: string` (4th arg) — embeds it in `session.metadata` + `subscription_data.metadata` for webhook reverse-lookup.
 
 ## Build & Test
 
@@ -246,6 +246,47 @@ vercel ls
 - `searchFilters` is **session-only state** (not persisted to localStorage) — stale filters caused 0 products bug
 - Marketplace re-renders on `catalog-updated` custom event fired by `registries.js` after async inject
 
+## GitHub Actions Deploy (.github/workflows/deploy.yml)
+
+| Trigger | Action |
+|---|---|
+| Push any branch | Vercel preview deploy |
+| Push tag `v*` | Vercel production deploy → ui.spectredve.com |
+
+Required secrets: `VERCEL_TOKEN`, `VERCEL_ORG_ID` (`team_sPtjjiJVOLGPrwDr8PCCHqqU`), `VERCEL_PROJECT_ID` (`prj_a8P8OO3AkotB3hR5Yoq4F01oXyve`)
+
+```bash
+# Release to production
+git tag v1.2.0 && git push --tags
+```
+
+## Local Dev
+
+```bash
+# Start both servers (sources .env, validates keys, opens browser)
+./deploy-local.sh              # build + serve saas-ui :8080 + companion :3100
+./deploy-local.sh --no-build   # skip npm build
+./deploy-local.sh --port 3000  # different UI port
+
+# Manual companion start (loads .env automatically)
+npx tsx examples/skill-forge.ts --companion --serve --port 3100
+
+# Stripe webhook local testing
+stripe listen --forward-to localhost:3100/api/billing/webhook
+stripe trigger checkout.session.completed
+```
+
+**Ports:** SaaS UI → :8080, Companion API → :3100
+
+**Env vars** (in `.env` at project root, gitignored):
+```
+CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...   # from `stripe listen` output
+```
+`skill-forge.ts` auto-loads `.env` on startup (does NOT override existing process.env vars).
+
 ## SaaS UI Auth (examples/saas-ui/js/auth.js)
 
 `AuthManager` — wire in `app.js` via `new AuthManager(api, store)`.
@@ -284,6 +325,11 @@ store.subscribe('*', cb)     // wildcard: cb(key, value, old)
 Served at `:3100`. Static files served from `examples/saas-ui/`. All `/api/*` endpoints require `Authorization: Bearer <token>`.
 
 Auth is dual-mode: API-key SHA256 checked first, then Clerk JWT fallback via `verifyClerkToken()`.
+
+- Clerk tier is read from `user.publicMetadata.tier` (set by Stripe webhook on subscription events)
+- Stripe webhook at `POST /api/billing/webhook` handles: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted` → updates `clerk.users.updateUserMetadata(userId, { tier, stripeCustomerId })`
+- `clerkUserId` stored in Stripe customer metadata + checkout session metadata for webhook reverse-lookup
+- `STRIPE_WEBHOOK_SECRET` must be `whsec_...` format (from `stripe listen` or Stripe Dashboard → Webhooks → Signing secret)
 
 Required env vars: `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`.
 
@@ -394,6 +440,9 @@ updateUserMetadata(userId, metadata, config: ClerkConfig): Promise<void>
 - SaaS UI `searchFilters` must NOT be in localStorage `persistKeys` — stale filter state (e.g. `productType:"agent-def"`) across sessions causes 0 products in all marketplace tabs
 - SaaS UI Vercel: deploy from `examples/saas-ui/` dir (linked to `saas-ui` project). Do NOT deploy from repo root — rootDirectory is not configured on `agents-cli-saas` project
 - `AgentsApi.baseUrl` (not `._base`) is the correct field name for the API base URL
+- `clerkPublishableKey: null` in `/api/config` means `CLERK_SECRET_KEY` not loaded — check `.env` is populated and `skill-forge.ts --companion --serve` was restarted after editing `.env`
+- Clerk `publicMetadata` comes from `clerk.users.getUser(userId).publicMetadata` (not session claims `public_metadata`)
+- `STRIPE_WEBHOOK_SECRET` wrong format (`sk_test_...` instead of `whsec_...`) causes all webhook verifications to fail silently
 
 ## Do NOT
 
@@ -408,3 +457,4 @@ updateUserMetadata(userId, metadata, config: ClerkConfig): Promise<void>
 - Import `shellQuote` from `lib/skills.ts` in new code — use `lib/guards.ts`
 - Import `@clerk/backend` directly in new files — use `lib/companion/clerk-auth.ts` as the canonical import location
 - Use raw fetch for Stripe API calls — `StripeProvider` in `lib/companion/billing.ts` uses the official `stripe` npm SDK
+- Set `STRIPE_WEBHOOK_SECRET` to a `sk_test_...` key — it must be `whsec_...` from `stripe listen` or the Dashboard

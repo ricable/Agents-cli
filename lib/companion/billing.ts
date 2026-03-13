@@ -29,7 +29,7 @@ export interface WebhookEvent {
 export interface BillingProvider {
   name: string;
   createCustomer(email: string, tier: string, metadata?: Record<string, string>): Promise<{ customerId: string }>;
-  createCheckoutSession(customerId: string, priceId: string, returnUrl: string): Promise<{ url: string }>;
+  createCheckoutSession(customerId: string, priceId: string, returnUrl: string, clerkUserId?: string): Promise<{ url: string }>;
   getPortalUrl(customerId: string): Promise<{ url: string }>;
   listInvoices(customerId: string, limit?: number): Promise<{ invoices: Invoice[] }>;
   verifyWebhook(payload: string, signature: string, secret?: string): Promise<WebhookEvent>;
@@ -101,7 +101,7 @@ export class LemonSqueezyProvider implements BillingProvider {
     }
   }
 
-  async createCheckoutSession(customerId: string, priceId: string, returnUrl: string): Promise<{ url: string }> {
+  async createCheckoutSession(customerId: string, priceId: string, returnUrl: string, _clerkUserId?: string): Promise<{ url: string }> {
     if (this.isMock) {
       return { url: `https://checkout.lemonsqueezy.com/mock?customer=${customerId}&price=${priceId}&return=${encodeURIComponent(returnUrl)}` };
     }
@@ -238,17 +238,21 @@ export class StripeProvider implements BillingProvider {
     }
   }
 
-  async createCheckoutSession(customerId: string, priceId: string, returnUrl: string): Promise<{ url: string }> {
+  async createCheckoutSession(customerId: string, priceId: string, returnUrl: string, clerkUserId?: string): Promise<{ url: string }> {
     if (this.isMock) {
       return { url: `https://checkout.stripe.com/mock?customer=${customerId}&price=${priceId}&return=${encodeURIComponent(returnUrl)}` };
     }
     try {
+      // Embed clerkUserId in session + subscription metadata so webhooks can resolve the Clerk user
+      const meta = clerkUserId ? { clerkUserId } : undefined;
       const session = await this.stripe!.checkout.sessions.create({
         customer: customerId,
         line_items: [{ price: priceId, quantity: 1 }],
         mode: "subscription",
         success_url: returnUrl,
         cancel_url: returnUrl,
+        metadata: meta,
+        subscription_data: meta ? { metadata: meta } : undefined,
       });
       if (!session.url) throw new Error("Stripe returned no checkout URL");
       return { url: session.url };
