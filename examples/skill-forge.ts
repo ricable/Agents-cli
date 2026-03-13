@@ -132,6 +132,44 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (args.companion && args.serve) {
+    const { startServer } = await import("../lib/companion/web-service.js");
+    const { createHash } = await import("node:crypto");
+    const testKeyHash = createHash("sha256").update("test-key").digest("hex");
+    console.log("  WARNING: Using test API key — not for production use");
+    startServer({
+      port: args.port,
+      host: "127.0.0.1",
+      apiKeys: new Map([[testKeyHash, { tier: "starter" as const, label: "test" }]]),
+      maxConcurrentJobs: 3,
+      jobTtlMs: 3_600_000,
+      rateLimitPerKey: 60,
+      rateLimitPerIp: 30,
+      maxBodySize: 1_048_576,
+      projectRoot: process.cwd(),
+      outputDir: "examples/generated-skills",
+    });
+    return;
+  }
+
+  if (args.companion) {
+    const { companionMode } = await import("./forge/mode-companion.js");
+    await companionMode(args, startTime);
+    return;
+  }
+
+  if (args.auditPlugins) {
+    const { runAuditPluginsMode } = await import("./forge/mode-audit-plugins.js");
+    await runAuditPluginsMode(args);
+    return;
+  }
+
+  if (args.benchmark) {
+    const { runBenchmarkMode } = await import("./forge/mode-benchmark.js");
+    await runBenchmarkMode(args);
+    return;
+  }
+
   if (args.audit) {
     const { auditMode } = await import("./forge/mode-audit.js");
     await auditMode(args, startTime);
@@ -168,6 +206,8 @@ async function main(): Promise<void> {
   log("    npx tsx examples/skill-forge.ts --freeze");
   log("    npx tsx examples/skill-forge.ts --verify");
   log("    npx tsx examples/skill-forge.ts --system [--limit 20] [--dry-run]");
+  log('    npx tsx examples/skill-forge.ts --companion "FastAPI + PostgreSQL + React" [--dry-run]');
+  log("    npx tsx examples/skill-forge.ts --companion --serve [--port 3100]");
   log("    npx tsx examples/skill-forge.ts --mcp");
   log("");
 }

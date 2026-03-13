@@ -181,10 +181,31 @@ export type { SkillFactoryOptions, SkillFactoryResult } from "./skill-factory.js
 export { buildPlugins } from "./plugin/builder.js";
 export type { PluginManifest, PluginJson, BuildPluginsOptions, BuildPluginsResult } from "./plugin/builder.js";
 export { publishPlugin, publishAllPlugins } from "./plugin/publisher.js";
-export { generateAgentDefs, defaultAgentDef, generateAgentMarkdown, defaultAgentMarkdown } from "./plugin/ai-generator.js";
+export { generateAgentDefs, defaultAgentDef, generateAgentMarkdown, defaultAgentMarkdown, defaultMultiAgentMarkdown, buildAgentFrontmatter } from "./plugin/ai-generator.js";
 export type { AgentDef, AgentMarkdownFile } from "./plugin/ai-generator.js";
 export { generateMarketplace } from "./plugin/marketplace.js";
 export type { MarketplaceResult, MarketplaceConfig, MarketplaceOptions } from "./plugin/marketplace.js";
+export { generatePluginCommands } from "./plugin/commands-generator.js";
+export type { GeneratedCommand } from "./plugin/commands-generator.js";
+export { generatePluginSettings } from "./plugin/settings-generator.js";
+export { computePluginHash, shouldBumpVersion, bumpVersion, generateChangelog, detectChanges } from "./plugin/versioning.js";
+export type { ChangeEntry } from "./plugin/versioning.js";
+export { auditPlugin, auditAllPlugins, generateHtmlReport, generateJsonReport } from "./plugin/audit-report.js";
+export type { ComplianceCheck, ComplianceResult, AuditSummary } from "./plugin/audit-report.js";
+export { generateTeamSkill, generateWorkerAgents, DOMAIN_TEAMS } from "./plugin/team-generator.js";
+export type { TeamConfig, TeamRole } from "./plugin/team-generator.js";
+export { generateRuntimeAdapters, generatePiMonoAdapter, generateOpencodeAdapter } from "./plugin/runtime-adapters.js";
+export type { RuntimeAdapter } from "./plugin/runtime-adapters.js";
+
+// Hook system
+export { generateHooksJson, generateDomainHooks } from "./hooks/generator.js";
+export { validateHooksJson, validateHookScript, validateGeneratedHooks } from "./hooks/validator.js";
+export { getHookConfig, getAllHookConfigs } from "./hooks/templates/index.js";
+export type {
+  HookEvent, HookMatcher, HookDefinition, HooksJson,
+  DomainHookConfig, BlockPattern, PostValidation, QualityGate,
+  ContextInjection, AlertTrigger, HookScript, GeneratedHooks,
+} from "./hooks/types.js";
 
 // MCP skill bridge
 export { callOpensrc, opensrc } from "./mcp-skill.js";
@@ -262,4 +283,12 @@ export { discoverPyPIPackages } from "./classifier/pypi.js";
 // Curated tools registry
 export { GENERAL_TOOLS, loadAllTools, loadAiMlTools, getCategories } from "./curated-tools.js";
 export type { CliTool } from "./curated-tools.js";
+
+// Companion mode
+export { analyzeProject } from "./companion/analyzer.js";
+export type { TechStackProfile, DetectedTech, TechLayer } from "./companion/analyzer.js";
+export { mapToTools } from "./companion/mapper.js";
+export type { CompanionToolPlan, ToolRecommendation, ToolPriority } from "./companion/mapper.js";
+export { startServer } from "./companion/web-service.js";
+export type { WebServiceConfig } from "./companion/web-service.js";
 export { discoverCratesPackages } from "./classifier/crates.js";

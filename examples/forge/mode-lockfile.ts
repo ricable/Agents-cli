@@ -28,15 +28,17 @@ export function freezeMode(args: CliArgs, startTime: number): void {
 
   // Scan all skills and build pseudo-Tool objects for lockfile
   const entries = scanSkillEntries(OUTPUT_DIR);
+  // Use the actual directory name from scanSkillEntries, not the frontmatter name
+  // This ensures lockfile entries match the actual directory structure for verification
   const tools: Tool[] = entries.map(e => ({
-    id: e.name,
+    id: e.dirName || e.name,  // Use directory name for consistency
     meta: {
-      name: e.name,
+      name: e.name,  // Keep frontmatter name for skill metadata
       version: "1.0.0",
       description: e.description ?? "",
       tags: [],
     },
-    source: { format: "local", uri: e.name },
+    source: { format: "local", uri: e.dirName || e.name },  // Use directory name for uri
     capabilities: { commands: [], globalFlags: [], analysisMethod: "manual" as const },
     installPath: join(OUTPUT_DIR, e.name),
     status: "installed" as const,

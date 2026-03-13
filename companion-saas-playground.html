@@ -1,0 +1,1274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>agents-cli Companion — SaaS Playground</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2129;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --accent-dim: #1f6feb;
+    --green: #3fb950;
+    --orange: #d29922;
+    --red: #f85149;
+    --purple: #bc8cff;
+    --cyan: #39d2c0;
+    --pink: #f778ba;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    grid-template-rows: 1fr auto;
+    height: 100vh;
+  }
+
+  /* ── Controls Panel ──────────────────────────── */
+
+  .controls {
+    grid-row: 1 / -1;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 20px;
+  }
+
+  .controls h1 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--accent);
+  }
+
+  .controls .subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+  }
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin: 20px 0 8px;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 80px;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px;
+    font-family: inherit;
+    font-size: 13px;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  textarea:focus {
+    border-color: var(--accent);
+  }
+
+  .presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .preset-btn {
+    background: var(--bg);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 10px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .preset-btn:hover {
+    color: var(--text);
+    border-color: var(--accent);
+    background: var(--surface2);
+  }
+
+  .preset-btn.active {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: rgba(88,166,255,0.1);
+  }
+
+  /* Controls */
+
+  .control-group {
+    margin-bottom: 12px;
+  }
+
+  .control-group label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+
+  select {
+    width: 100%;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  select:focus { border-color: var(--accent); }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+  }
+
+  .toggle-row span {
+    font-size: 13px;
+  }
+
+  .toggle {
+    width: 36px;
+    height: 20px;
+    background: var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+
+  .toggle.on { background: var(--accent); }
+
+  .toggle::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    background: white;
+    border-radius: 50%;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.2s;
+  }
+
+  .toggle.on::after { transform: translateX(16px); }
+
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent);
+    height: 4px;
+  }
+
+  .slider-val {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    min-width: 24px;
+    text-align: right;
+  }
+
+  /* ── Preview Panel ──────────────────────────── */
+
+  .preview {
+    overflow-y: auto;
+    padding: 24px;
+  }
+
+  .preview-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
+  .preview-header h2 {
+    font-size: 20px;
+    font-weight: 600;
+  }
+
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 8px;
+    border-radius: 12px;
+    margin-left: 8px;
+  }
+
+  .badge-minimal { background: rgba(63,185,80,0.15); color: var(--green); }
+  .badge-standard { background: rgba(88,166,255,0.15); color: var(--accent); }
+  .badge-complex { background: rgba(210,153,34,0.15); color: var(--orange); }
+  .badge-enterprise { background: rgba(248,81,73,0.15); color: var(--red); }
+
+  /* Tech Stack Visualization */
+
+  .stack-viz {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+
+  .tech-chip {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+    transition: all 0.2s;
+    animation: fadeIn 0.3s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .tech-chip .tech-name {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .tech-chip .tech-layer {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .tech-chip[data-layer="language"] { border-color: var(--purple); }
+  .tech-chip[data-layer="language"] .tech-layer { color: var(--purple); }
+  .tech-chip[data-layer="framework"] { border-color: var(--accent); }
+  .tech-chip[data-layer="framework"] .tech-layer { color: var(--accent); }
+  .tech-chip[data-layer="database"] { border-color: var(--green); }
+  .tech-chip[data-layer="database"] .tech-layer { color: var(--green); }
+  .tech-chip[data-layer="infra"] { border-color: var(--orange); }
+  .tech-chip[data-layer="infra"] .tech-layer { color: var(--orange); }
+  .tech-chip[data-layer="cicd"] { border-color: var(--cyan); }
+  .tech-chip[data-layer="cicd"] .tech-layer { color: var(--cyan); }
+  .tech-chip[data-layer="messaging"] { border-color: var(--pink); }
+  .tech-chip[data-layer="messaging"] .tech-layer { color: var(--pink); }
+  .tech-chip[data-layer="monitoring"] { border-color: var(--red); }
+  .tech-chip[data-layer="monitoring"] .tech-layer { color: var(--red); }
+  .tech-chip[data-layer="auth"] { border-color: #d2a8ff; }
+  .tech-chip[data-layer="auth"] .tech-layer { color: #d2a8ff; }
+  .tech-chip[data-layer="testing"] { border-color: #a5d6ff; }
+  .tech-chip[data-layer="testing"] .tech-layer { color: #a5d6ff; }
+  .tech-chip[data-layer="storage"] { border-color: #ffa657; }
+  .tech-chip[data-layer="storage"] .tech-layer { color: #ffa657; }
+  .tech-chip[data-layer="search"] { border-color: #79c0ff; }
+  .tech-chip[data-layer="search"] .tech-layer { color: #79c0ff; }
+
+  /* Tool Recommendations */
+
+  .tools-section {
+    margin-bottom: 24px;
+  }
+
+  .tools-section h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .tool-count {
+    font-size: 11px;
+    background: var(--surface2);
+    color: var(--text-muted);
+    padding: 1px 6px;
+    border-radius: 10px;
+  }
+
+  .tool-card {
+    display: grid;
+    grid-template-columns: 32px 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 6px;
+    transition: border-color 0.15s;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .tool-card:hover { border-color: var(--accent-dim); }
+
+  .tool-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+
+  .tool-icon.essential { background: rgba(63,185,80,0.15); color: var(--green); }
+  .tool-icon.recommended { background: rgba(88,166,255,0.15); color: var(--accent); }
+  .tool-icon.optional { background: rgba(139,148,158,0.15); color: var(--text-muted); }
+
+  .tool-info .tool-name {
+    font-size: 13px;
+    font-weight: 600;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+
+  .tool-info .tool-reason {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 1px;
+  }
+
+  .tool-source {
+    font-size: 11px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    color: var(--text-muted);
+    background: var(--bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  /* Pricing Cards */
+
+  .pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+
+  .price-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+    transition: all 0.2s;
+    cursor: pointer;
+    position: relative;
+  }
+
+  .price-card:hover { border-color: var(--accent-dim); }
+  .price-card.selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+
+  .price-card .tier-name {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .price-card .tier-price {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+
+  .price-card .tier-price span {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+
+  .price-card .tier-feature {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin: 2px 0;
+  }
+
+  .price-card .tier-feature.included {
+    color: var(--green);
+  }
+
+  .price-card .tier-feature.excluded {
+    color: var(--text-muted);
+    opacity: 0.4;
+    text-decoration: line-through;
+  }
+
+  /* Empty State */
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 300px;
+    color: var(--text-muted);
+    text-align: center;
+  }
+
+  .empty-state .icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+    opacity: 0.3;
+  }
+
+  .empty-state p {
+    font-size: 14px;
+    max-width: 300px;
+  }
+
+  /* API Endpoint Preview */
+
+  .api-preview {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 24px;
+  }
+
+  .api-preview h3 {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+
+  .api-endpoint {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 6px 0;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+  }
+
+  .method {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 10px;
+    min-width: 36px;
+    text-align: center;
+  }
+
+  .method-get { background: rgba(63,185,80,0.2); color: var(--green); }
+  .method-post { background: rgba(88,166,255,0.2); color: var(--accent); }
+
+  .tier-badge {
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 8px;
+    margin-left: auto;
+  }
+
+  .tier-free { background: rgba(139,148,158,0.2); color: var(--text-muted); }
+  .tier-starter { background: rgba(88,166,255,0.15); color: var(--accent); }
+
+  /* ── Format Tabs ──────────────────────────────── */
+
+  .format-tabs {
+    display: flex;
+    gap: 4px;
+    margin-top: 8px;
+  }
+
+  .format-tab {
+    flex: 1;
+    background: var(--bg);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 0;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+  }
+
+  .format-tab:hover {
+    color: var(--text);
+    border-color: var(--accent-dim);
+  }
+
+  .format-tab.active {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: rgba(88,166,255,0.08);
+  }
+
+  /* ── Prompt Output ──────────────────────────── */
+
+  .prompt-panel {
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    padding: 10px 24px 14px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .prompt-hint {
+    width: 100%;
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .prompt-hint .hint-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .hint-terminal { background: rgba(63,185,80,0.15); color: var(--green); }
+  .hint-curl { background: rgba(210,153,34,0.15); color: var(--orange); }
+  .hint-claude { background: rgba(188,140,255,0.15); color: var(--purple); }
+
+  .prompt-text {
+    flex: 1;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    color: var(--text);
+    line-height: 1.6;
+    max-height: 100px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    background: var(--bg);
+    border-radius: 6px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    min-height: 44px;
+  }
+
+  .copy-btn {
+    background: var(--accent-dim);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+    flex-shrink: 0;
+    align-self: flex-end;
+  }
+
+  .copy-btn:hover { background: var(--accent); }
+
+  .copy-btn.copied {
+    background: var(--green);
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <!-- Controls -->
+  <div class="controls">
+    <h1>agents-cli Companion</h1>
+    <div class="subtitle">Describe your project, get a complete AI dev environment</div>
+
+    <div class="section-title">Project Description</div>
+    <textarea id="description" placeholder="FastAPI backend with PostgreSQL, React frontend, AWS CI/CD..."></textarea>
+
+    <div class="section-title">Presets</div>
+    <div class="presets" id="presets"></div>
+
+    <div class="section-title">Configuration</div>
+
+    <div class="control-group">
+      <label>Pricing Tier</label>
+      <select id="tier">
+        <option value="free">Free</option>
+        <option value="starter" selected>Starter ($29/mo)</option>
+        <option value="pro">Pro ($99/mo)</option>
+        <option value="enterprise">Enterprise (custom)</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label>Tool Limit</label>
+      <div class="slider-row">
+        <input type="range" id="limit" min="5" max="30" value="15">
+        <span class="slider-val" id="limitVal">15</span>
+      </div>
+    </div>
+
+    <div class="toggle-row">
+      <span>Deep analysis</span>
+      <div class="toggle" id="deep" data-key="deep"></div>
+    </div>
+    <div class="toggle-row">
+      <span>Include optional tools</span>
+      <div class="toggle" id="full" data-key="full"></div>
+    </div>
+    <div class="toggle-row">
+      <span>Plugin bundle</span>
+      <div class="toggle on" id="plugin" data-key="plugin"></div>
+    </div>
+    <div class="toggle-row">
+      <span>Generate CLAUDE.md</span>
+      <div class="toggle on" id="claudemd" data-key="claudemd"></div>
+    </div>
+
+    <div class="section-title">Copy as</div>
+    <div class="format-tabs" id="formatTabs">
+      <button class="format-tab active" data-format="cli">Terminal</button>
+      <button class="format-tab" data-format="curl">API (curl)</button>
+      <button class="format-tab" data-format="claude">Claude prompt</button>
+    </div>
+  </div>
+
+  <!-- Preview -->
+  <div class="preview" id="preview"></div>
+
+  <!-- Prompt Output -->
+  <div class="prompt-panel">
+    <div class="prompt-hint" id="promptHint"></div>
+    <div class="prompt-text" id="prompt">Describe your project above to generate a command...</div>
+    <button class="copy-btn" id="copyBtn">Copy</button>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────
+
+const DEFAULTS = {
+  description: '',
+  tier: 'starter',
+  limit: 15,
+  deep: false,
+  full: false,
+  plugin: true,
+  claudemd: true,
+  format: 'cli',
+};
+
+const state = { ...DEFAULTS };
+
+// ── Tech Detection (mirrors lib/companion/analyzer.ts) ──
+
+const TECH_MAP = {
+  // Languages
+  python: { layer: 'language', confidence: 0.95 },
+  typescript: { layer: 'language', confidence: 0.95 },
+  javascript: { layer: 'language', confidence: 0.95 },
+  rust: { layer: 'language', confidence: 0.95 },
+  golang: { layer: 'language', confidence: 0.95 },
+  java: { layer: 'language', confidence: 0.90 },
+  kotlin: { layer: 'language', confidence: 0.90 },
+  ruby: { layer: 'language', confidence: 0.90 },
+  php: { layer: 'language', confidence: 0.90 },
+  elixir: { layer: 'language', confidence: 0.90 },
+  swift: { layer: 'language', confidence: 0.90 },
+  // Frameworks
+  fastapi: { layer: 'framework', confidence: 0.95 },
+  django: { layer: 'framework', confidence: 0.95 },
+  flask: { layer: 'framework', confidence: 0.95 },
+  express: { layer: 'framework', confidence: 0.95 },
+  'next.js': { layer: 'framework', confidence: 0.95 },
+  nextjs: { layer: 'framework', confidence: 0.95 },
+  react: { layer: 'framework', confidence: 0.95 },
+  vue: { layer: 'framework', confidence: 0.95 },
+  nuxt: { layer: 'framework', confidence: 0.95 },
+  svelte: { layer: 'framework', confidence: 0.90 },
+  angular: { layer: 'framework', confidence: 0.90 },
+  hono: { layer: 'framework', confidence: 0.90 },
+  'spring boot': { layer: 'framework', confidence: 0.95 },
+  rails: { layer: 'framework', confidence: 0.95 },
+  laravel: { layer: 'framework', confidence: 0.95 },
+  actix: { layer: 'framework', confidence: 0.90 },
+  axum: { layer: 'framework', confidence: 0.90 },
+  gin: { layer: 'framework', confidence: 0.85 },
+  remix: { layer: 'framework', confidence: 0.90 },
+  astro: { layer: 'framework', confidence: 0.90 },
+  // Databases
+  postgresql: { layer: 'database', confidence: 0.95 },
+  postgres: { layer: 'database', confidence: 0.95, variant: 'postgresql' },
+  mysql: { layer: 'database', confidence: 0.95 },
+  mongodb: { layer: 'database', confidence: 0.95 },
+  redis: { layer: 'database', confidence: 0.95 },
+  sqlite: { layer: 'database', confidence: 0.90 },
+  supabase: { layer: 'database', confidence: 0.90 },
+  dynamodb: { layer: 'database', confidence: 0.95 },
+  neo4j: { layer: 'database', confidence: 0.90 },
+  clickhouse: { layer: 'database', confidence: 0.90 },
+  // Infra
+  aws: { layer: 'infra', confidence: 0.95 },
+  gcp: { layer: 'infra', confidence: 0.95 },
+  azure: { layer: 'infra', confidence: 0.95 },
+  docker: { layer: 'infra', confidence: 0.95 },
+  kubernetes: { layer: 'infra', confidence: 0.95 },
+  k8s: { layer: 'infra', confidence: 0.95, variant: 'kubernetes' },
+  terraform: { layer: 'infra', confidence: 0.95 },
+  vercel: { layer: 'infra', confidence: 0.90 },
+  cloudflare: { layer: 'infra', confidence: 0.90 },
+  nginx: { layer: 'infra', confidence: 0.85 },
+  // CI/CD
+  'github actions': { layer: 'cicd', confidence: 0.95 },
+  'gitlab ci': { layer: 'cicd', confidence: 0.95 },
+  'ci/cd': { layer: 'cicd', confidence: 0.80 },
+  jenkins: { layer: 'cicd', confidence: 0.90 },
+  // Messaging
+  kafka: { layer: 'messaging', confidence: 0.95 },
+  rabbitmq: { layer: 'messaging', confidence: 0.95 },
+  nats: { layer: 'messaging', confidence: 0.90 },
+  celery: { layer: 'messaging', confidence: 0.85 },
+  // Monitoring
+  prometheus: { layer: 'monitoring', confidence: 0.95 },
+  grafana: { layer: 'monitoring', confidence: 0.95 },
+  datadog: { layer: 'monitoring', confidence: 0.95 },
+  sentry: { layer: 'monitoring', confidence: 0.90 },
+  opentelemetry: { layer: 'monitoring', confidence: 0.90 },
+  // Auth
+  auth0: { layer: 'auth', confidence: 0.95 },
+  keycloak: { layer: 'auth', confidence: 0.90 },
+  clerk: { layer: 'auth', confidence: 0.90 },
+  nextauth: { layer: 'auth', confidence: 0.90 },
+  jwt: { layer: 'auth', confidence: 0.85 },
+  // Testing
+  jest: { layer: 'testing', confidence: 0.90 },
+  vitest: { layer: 'testing', confidence: 0.90 },
+  pytest: { layer: 'testing', confidence: 0.90 },
+  playwright: { layer: 'testing', confidence: 0.90 },
+  cypress: { layer: 'testing', confidence: 0.90 },
+  // Search
+  elasticsearch: { layer: 'search', confidence: 0.90 },
+  meilisearch: { layer: 'search', confidence: 0.90 },
+  algolia: { layer: 'search', confidence: 0.90 },
+  // Storage
+  s3: { layer: 'storage', confidence: 0.90 },
+  minio: { layer: 'storage', confidence: 0.85 },
+};
+
+const FRAMEWORK_LANG = {
+  fastapi: 'python', django: 'python', flask: 'python',
+  express: 'typescript', nextjs: 'typescript', 'next.js': 'typescript',
+  react: 'typescript', vue: 'typescript', nuxt: 'typescript',
+  svelte: 'typescript', angular: 'typescript', hono: 'typescript',
+  remix: 'typescript', astro: 'typescript',
+  'spring boot': 'java', rails: 'ruby', laravel: 'php',
+  actix: 'rust', axum: 'rust', gin: 'golang',
+};
+
+// ── Tool Recommendations (mirrors lib/companion/mapper.ts) ──
+
+const TOOL_DB = {
+  python: [
+    { name: 'uv', source: 'pypi:uv', reason: 'Ultra-fast Python package manager', priority: 'essential' },
+    { name: 'ruff', source: 'pypi:ruff', reason: 'Blazing fast linter and formatter', priority: 'essential' },
+    { name: 'pyright', source: 'npm:pyright', reason: 'Fast static type checker', priority: 'recommended' },
+    { name: 'pytest', source: 'pypi:pytest', reason: 'Python testing framework', priority: 'recommended' },
+  ],
+  typescript: [
+    { name: 'tsc', source: 'npm:typescript', reason: 'TypeScript compiler', priority: 'essential' },
+    { name: 'biome', source: 'biomejs/biome', reason: 'Fast linter + formatter', priority: 'essential' },
+    { name: 'tsx', source: 'npm:tsx', reason: 'Run TS directly', priority: 'recommended' },
+    { name: 'vitest', source: 'npm:vitest', reason: 'Vite-native test runner', priority: 'recommended' },
+  ],
+  rust: [
+    { name: 'cargo-watch', source: 'crates:cargo-watch', reason: 'Watch and recompile', priority: 'recommended' },
+    { name: 'cargo-nextest', source: 'crates:cargo-nextest', reason: 'Next-gen test runner', priority: 'recommended' },
+  ],
+  golang: [
+    { name: 'golangci-lint', source: 'pypi:golangci-lint', reason: 'Go linters aggregator', priority: 'essential' },
+  ],
+  java: [
+    { name: 'google-java-format', source: 'google/google-java-format', reason: 'Java formatter', priority: 'recommended' },
+  ],
+  ruby: [
+    { name: 'rubocop', source: 'rubocop/rubocop', reason: 'Ruby linter and formatter', priority: 'essential' },
+  ],
+  postgresql: [
+    { name: 'pgcli', source: 'pypi:pgcli', reason: 'PostgreSQL CLI with autocomplete', priority: 'recommended' },
+    { name: 'prisma', source: 'npm:prisma', reason: 'Type-safe ORM with migrations', priority: 'recommended' },
+  ],
+  mongodb: [
+    { name: 'mongosh', source: 'npm:mongosh', reason: 'MongoDB Shell', priority: 'recommended' },
+  ],
+  redis: [
+    { name: 'redis-cli', source: 'redis/redis', reason: 'Redis CLI', priority: 'recommended' },
+  ],
+  supabase: [
+    { name: 'supabase', source: 'npm:supabase', reason: 'Supabase local dev CLI', priority: 'essential' },
+  ],
+  aws: [
+    { name: 'aws', source: 'pypi:awscli', reason: 'AWS cloud management', priority: 'essential' },
+    { name: 'terraform', source: 'hashicorp/terraform', reason: 'Infrastructure as Code', priority: 'recommended' },
+  ],
+  docker: [
+    { name: 'docker', source: 'moby/moby', reason: 'Container runtime', priority: 'essential' },
+    { name: 'dive', source: 'wagoodman/dive', reason: 'Image layer analyzer', priority: 'optional' },
+  ],
+  kubernetes: [
+    { name: 'kubectl', source: 'kubernetes/kubectl', reason: 'Cluster management', priority: 'essential' },
+    { name: 'helm', source: 'helm/helm', reason: 'K8s package manager', priority: 'recommended' },
+    { name: 'k9s', source: 'derailed/k9s', reason: 'Terminal UI for K8s', priority: 'optional' },
+  ],
+  vercel: [
+    { name: 'vercel', source: 'npm:vercel', reason: 'Vercel deployment CLI', priority: 'essential' },
+  ],
+  cloudflare: [
+    { name: 'wrangler', source: 'npm:wrangler', reason: 'Workers CLI', priority: 'essential' },
+  ],
+  fastapi: [
+    { name: 'uvicorn', source: 'pypi:uvicorn', reason: 'ASGI server', priority: 'essential' },
+    { name: 'httpie', source: 'pypi:httpie', reason: 'API testing client', priority: 'recommended' },
+  ],
+  react: [
+    { name: 'playwright', source: 'microsoft/playwright', reason: 'E2E testing', priority: 'recommended' },
+  ],
+  'github actions': [
+    { name: 'gh', source: 'cli/cli', reason: 'GitHub CLI', priority: 'essential' },
+    { name: 'act', source: 'nektos/act', reason: 'Run Actions locally', priority: 'recommended' },
+  ],
+  kafka: [
+    { name: 'kcat', source: 'edenhill/kcat', reason: 'Kafka producer/consumer', priority: 'recommended' },
+  ],
+  prometheus: [
+    { name: 'promtool', source: 'prometheus/prometheus', reason: 'Config validation', priority: 'recommended' },
+  ],
+};
+
+const UNIVERSAL = [
+  { name: 'rg', source: 'BurntSushi/ripgrep', reason: 'Fast code search', priority: 'recommended' },
+  { name: 'fd', source: 'sharkdp/fd', reason: 'Fast file finder', priority: 'recommended' },
+  { name: 'jq', source: 'jqlang/jq', reason: 'JSON processing', priority: 'recommended' },
+  { name: 'gh', source: 'cli/cli', reason: 'GitHub CLI', priority: 'recommended' },
+  { name: 'gitleaks', source: 'gitleaks/gitleaks', reason: 'Secret scanning', priority: 'recommended' },
+  { name: 'delta', source: 'dandavison/delta', reason: 'Better git diffs', priority: 'optional' },
+];
+
+// ── Presets ──────────────────────────────────────
+
+const PRESETS = [
+  { label: 'Python API', desc: 'FastAPI + PostgreSQL + Redis + Docker' },
+  { label: 'Full-Stack JS', desc: 'Next.js + TypeScript + PostgreSQL + Vercel' },
+  { label: 'Rust CLI', desc: 'Rust CLI tool with GitHub Actions CI/CD' },
+  { label: 'Enterprise Java', desc: 'Java Spring Boot + Kafka + Kubernetes + Prometheus + PostgreSQL + GitHub Actions' },
+  { label: 'ML Pipeline', desc: 'Python + PostgreSQL + Redis + Docker + AWS + Prometheus' },
+];
+
+// ── Analysis ──────────────────────────────────────
+
+function analyze(desc) {
+  const lower = desc.toLowerCase();
+  const techs = [];
+  const seen = new Set();
+
+  const sorted = Object.entries(TECH_MAP).sort((a, b) => b[0].length - a[0].length);
+
+  for (const [kw, entry] of sorted) {
+    const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(?:^|[\\s,+/&(])${escaped}(?:[\\s,+/&).]|$)`, 'i');
+    if (regex.test(lower) || lower === kw) {
+      const name = entry.variant || kw;
+      if (seen.has(name)) continue;
+      seen.add(name);
+      techs.push({ name, layer: entry.layer, confidence: entry.confidence });
+    }
+  }
+
+  // Infer language
+  let lang = null;
+  const explicitLangs = techs.filter(t => t.layer === 'language');
+  if (explicitLangs.length > 0) lang = explicitLangs[0].name;
+  if (!lang) {
+    for (const fw of techs.filter(t => t.layer === 'framework')) {
+      if (FRAMEWORK_LANG[fw.name]) { lang = FRAMEWORK_LANG[fw.name]; break; }
+    }
+  }
+
+  const layers = new Set(techs.map(t => t.layer));
+  let complexity = 'minimal';
+  if (layers.size > 6) complexity = 'enterprise';
+  else if (layers.size > 4) complexity = 'complex';
+  else if (layers.size > 2) complexity = 'standard';
+
+  return { techs, lang, complexity, layers: [...layers] };
+}
+
+function getTools(analysis) {
+  const tools = [];
+  const seen = new Set();
+
+  const add = (t, trigger) => {
+    if (seen.has(t.source)) return;
+    seen.add(t.source);
+    tools.push({ ...t, triggeredBy: trigger });
+  };
+
+  // Language tools (explicit or inferred)
+  if (analysis.lang && TOOL_DB[analysis.lang]) {
+    for (const t of TOOL_DB[analysis.lang]) add(t, `language:${analysis.lang}`);
+  }
+
+  // Tech-specific tools
+  for (const tech of analysis.techs) {
+    if (tech.layer === 'language') continue; // already handled
+    const db = TOOL_DB[tech.name];
+    if (db) for (const t of db) add(t, `${tech.layer}:${tech.name}`);
+  }
+
+  // Universal
+  for (const t of UNIVERSAL) add(t, 'universal');
+
+  return tools;
+}
+
+// ── Render ──────────────────────────────────────
+
+function renderPreview() {
+  const preview = document.getElementById('preview');
+
+  if (!state.description.trim()) {
+    preview.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">&#9881;</div>
+        <p>Describe your project in the left panel to see a live analysis of your tech stack and recommended tools.</p>
+      </div>`;
+    return;
+  }
+
+  const analysis = analyze(state.description);
+  const tools = getTools(analysis);
+
+  // Filter by priority
+  const filtered = tools.filter(t => {
+    if (t.priority === 'essential') return true;
+    if (t.priority === 'recommended') return true;
+    if (t.priority === 'optional') return state.full;
+    return false;
+  }).slice(0, state.limit);
+
+  const essential = filtered.filter(t => t.priority === 'essential');
+  const recommended = filtered.filter(t => t.priority === 'recommended');
+  const optional = filtered.filter(t => t.priority === 'optional');
+
+  const tierFeatures = {
+    free: { analyze: '100/day', plan: '50/day', generate: false, download: false, deep: false, cache: '-' },
+    starter: { analyze: 'unlimited', plan: 'unlimited', generate: '20/day', download: true, deep: false, cache: '1hr' },
+    pro: { analyze: 'unlimited', plan: 'unlimited', generate: '200/day', download: true, deep: true, cache: '24hr' },
+    enterprise: { analyze: 'unlimited', plan: 'unlimited', generate: 'unlimited', download: true, deep: true, cache: '7d' },
+  };
+
+  const tierPrices = { free: '$0', starter: '$29', pro: '$99', enterprise: 'Custom' };
+
+  let html = `
+    <div class="preview-header">
+      <h2>Tech Stack Analysis
+        <span class="badge badge-${analysis.complexity}">${analysis.complexity}</span>
+        ${analysis.lang ? `<span class="badge badge-standard">${analysis.lang}</span>` : ''}
+      </h2>
+    </div>
+
+    <div class="stack-viz">
+      ${analysis.techs.map((t, i) => `
+        <div class="tech-chip" data-layer="${t.layer}" style="animation-delay: ${i * 50}ms">
+          <div class="tech-name">${t.name}</div>
+          <div class="tech-layer">${t.layer}</div>
+        </div>
+      `).join('')}
+    </div>`;
+
+  // Pricing
+  html += `
+    <div class="section-title" style="margin-bottom: 10px;">Pricing Tier</div>
+    <div class="pricing-grid">
+      ${['free', 'starter', 'pro', 'enterprise'].map(t => {
+        const f = tierFeatures[t];
+        return `
+          <div class="price-card ${state.tier === t ? 'selected' : ''}" onclick="selectTier('${t}')">
+            <div class="tier-name">${t.charAt(0).toUpperCase() + t.slice(1)}</div>
+            <div class="tier-price">${tierPrices[t]}${t !== 'enterprise' && t !== 'free' ? '<span>/mo</span>' : ''}</div>
+            <div class="tier-feature ${f.generate ? 'included' : 'excluded'}">${f.generate || 'No'} generations</div>
+            <div class="tier-feature ${f.download ? 'included' : 'excluded'}">Bundle download</div>
+            <div class="tier-feature ${f.deep ? 'included' : 'excluded'}">Deep analysis</div>
+            <div class="tier-feature included">Cache: ${f.cache}</div>
+          </div>`;
+      }).join('')}
+    </div>`;
+
+  // API Preview
+  html += `
+    <div class="api-preview">
+      <h3>API Endpoints</h3>
+      <div class="api-endpoint">
+        <span class="method method-get">GET</span>
+        <span>/api/health</span>
+        <span class="tier-badge tier-free">public</span>
+      </div>
+      <div class="api-endpoint">
+        <span class="method method-post">POST</span>
+        <span>/api/analyze</span>
+        <span class="tier-badge tier-free">free</span>
+      </div>
+      <div class="api-endpoint">
+        <span class="method method-post">POST</span>
+        <span>/api/plan</span>
+        <span class="tier-badge tier-free">free</span>
+      </div>
+      <div class="api-endpoint">
+        <span class="method method-post">POST</span>
+        <span>/api/generate</span>
+        <span class="tier-badge tier-starter">starter+</span>
+      </div>
+      <div class="api-endpoint">
+        <span class="method method-get">GET</span>
+        <span>/api/status/:id</span>
+        <span class="tier-badge tier-starter">starter+</span>
+      </div>
+      <div class="api-endpoint">
+        <span class="method method-get">GET</span>
+        <span>/api/download/:id</span>
+        <span class="tier-badge tier-starter">starter+</span>
+      </div>
+    </div>`;
+
+  // Tool sections
+  const renderToolSection = (title, items, icon) => {
+    if (items.length === 0) return '';
+    return `
+      <div class="tools-section">
+        <h3>${title} <span class="tool-count">${items.length}</span></h3>
+        ${items.map((t, i) => `
+          <div class="tool-card" style="animation-delay: ${i * 40}ms">
+            <div class="tool-icon ${t.priority}">
+              ${t.name.slice(0, 2).toUpperCase()}
+            </div>
+            <div class="tool-info">
+              <div class="tool-name">${t.name}</div>
+              <div class="tool-reason">${t.reason}</div>
+            </div>
+            <div class="tool-source">${t.source}</div>
+          </div>
+        `).join('')}
+      </div>`;
+  };
+
+  html += renderToolSection('Essential Tools', essential);
+  html += renderToolSection('Recommended Tools', recommended);
+  html += renderToolSection('Optional Tools', optional);
+
+  preview.innerHTML = html;
+}
+
+function updatePrompt() {
+  const el = document.getElementById('prompt');
+  const hint = document.getElementById('promptHint');
+
+  if (!state.description.trim()) {
+    hint.innerHTML = '';
+    el.textContent = 'Type a project description above to generate a ready-to-use command.';
+    return;
+  }
+
+  const analysis = analyze(state.description);
+  const tools = getTools(analysis);
+  const filtered = tools.filter(t => {
+    if (t.priority === 'essential') return true;
+    if (t.priority === 'recommended') return true;
+    if (t.priority === 'optional') return state.full;
+    return false;
+  }).slice(0, state.limit);
+
+  if (state.format === 'cli') {
+    // ── Terminal: a shell command to paste in terminal
+    hint.innerHTML = '<span class="hint-icon hint-terminal">$</span> Paste this in your <strong>terminal</strong> to generate skills + plugin bundle locally';
+    let cmd = `npx tsx examples/skill-forge.ts --companion "${state.description}"`;
+    if (state.limit !== DEFAULTS.limit) cmd += ` --limit ${state.limit}`;
+    if (state.deep) cmd += ' --deep';
+    if (state.full) cmd += ' --full';
+    el.textContent = cmd;
+    return;
+  }
+
+  if (state.format === 'curl') {
+    // ── curl: an API call to paste in terminal
+    hint.innerHTML = '<span class="hint-icon hint-curl">></span> Paste this <strong>curl</strong> command to call the Companion SaaS API';
+    const payload = JSON.stringify({
+      description: state.description,
+    });
+    const lines = [
+      `curl -X POST https://api.agents-cli.dev/api/generate \\`,
+      `  -H "Authorization: Bearer YOUR_API_KEY" \\`,
+      `  -H "Content-Type: application/json" \\`,
+      `  -d '${payload}'`,
+      ``,
+      `# Then poll for results:`,
+      `# curl -H "Authorization: Bearer YOUR_API_KEY" \\`,
+      `#   https://api.agents-cli.dev/api/status/JOB_ID`,
+      ``,
+      `# Download the bundle:`,
+      `# curl -H "Authorization: Bearer YOUR_API_KEY" \\`,
+      `#   https://api.agents-cli.dev/api/download/JOB_ID -o bundle.tar.gz`,
+    ];
+    el.textContent = lines.join('\n');
+    return;
+  }
+
+  // ── Claude prompt: paste into Claude Code to set up your environment
+  hint.innerHTML = '<span class="hint-icon hint-claude">C</span> Paste this into <strong>Claude Code</strong> to set up your dev environment';
+
+  const toolList = filtered.map(t =>
+    `- \`${t.name}\` (${t.source}) — ${t.reason}`
+  ).join('\n');
+
+  const prompt = [
+    `Set up my development environment for this project: ${state.description}`,
+    ``,
+    `Detected stack: ${analysis.techs.map(t => t.name).join(', ')} (${analysis.complexity} complexity, primary language: ${analysis.lang || 'not detected'}).`,
+    ``,
+    `Install and configure these ${filtered.length} CLI tools:`,
+    toolList,
+    ``,
+    state.plugin ? `Generate a Claude Code plugin bundle with skills, agents, hooks, and slash commands for this stack.` : '',
+    state.claudemd ? `Create a CLAUDE.md for this project with quick commands, tool docs, and workflow hints.` : '',
+    state.deep ? `Use deep analysis (probe subcommands recursively) for richer skill generation.` : '',
+    ``,
+    `For each tool: install it, generate a SKILL.md with "Use when" triggers and "Do NOT use for" guards, and wire it into the plugin.`,
+  ].filter(Boolean).join('\n');
+
+  el.textContent = prompt;
+}
+
+function updateAll() {
+  renderPreview();
+  updatePrompt();
+}
+
+// ── Event Wiring ──────────────────────────────────
+
+function selectTier(tier) {
+  state.tier = tier;
+  document.getElementById('tier').value = tier;
+  updateAll();
+}
+
+document.getElementById('description').addEventListener('input', e => {
+  state.description = e.target.value;
+  updateAll();
+});
+
+document.getElementById('tier').addEventListener('change', e => {
+  state.tier = e.target.value;
+  updateAll();
+});
+
+document.getElementById('limit').addEventListener('input', e => {
+  state.limit = parseInt(e.target.value, 10);
+  document.getElementById('limitVal').textContent = state.limit;
+  updateAll();
+});
+
+// Format tabs
+document.querySelectorAll('.format-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    state.format = tab.dataset.format;
+    document.querySelectorAll('.format-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    updateAll();
+  });
+});
+
+// Toggles
+document.querySelectorAll('.toggle').forEach(el => {
+  el.addEventListener('click', () => {
+    const key = el.dataset.key;
+    state[key] = !state[key];
+    el.classList.toggle('on', state[key]);
+    updateAll();
+  });
+});
+
+// Presets
+const presetsEl = document.getElementById('presets');
+PRESETS.forEach((p, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'preset-btn';
+  btn.textContent = p.label;
+  btn.addEventListener('click', () => {
+    state.description = p.desc;
+    document.getElementById('description').value = p.desc;
+    presetsEl.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    updateAll();
+  });
+  presetsEl.appendChild(btn);
+});
+
+// Copy
+document.getElementById('copyBtn').addEventListener('click', () => {
+  const text = document.getElementById('prompt').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyBtn');
+    const labels = { cli: 'Paste in terminal', curl: 'Paste in terminal', claude: 'Paste in Claude' };
+    btn.textContent = labels[state.format] || 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  });
+});
+
+// Initial render
+updateAll();
+</script>
+</body>
+</html>

@@ -69,6 +69,18 @@ export interface CliArgs {
   resume: string;
   // Skip index/chunk persistence during batch
   noIndex: boolean;
+  // Phase 1: Full ecosystem integration
+  full: boolean;
+  multiRuntime: boolean;
+  outputDir: string;
+  batchSize: number;
+  // Phase 2: Audit plugins
+  auditPlugins: boolean;
+  benchmark: boolean;
+  // Companion mode
+  companion: boolean;
+  serve: boolean;
+  port: number;
 }
 
 export interface ChunkStats {

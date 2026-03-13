@@ -41,21 +41,29 @@ export async function pluginMode(args: CliArgs, startTime: number): Promise<void
     atomicWrite(manifestPath, JSON.stringify({ repos: entries }, null, 2));
   }
 
-  // P1: pass dryRun into buildPlugins itself
+  const outputDir = args.outputDir || undefined;
+  const finalPluginsDir = outputDir ? resolve(outputDir, "plugins") : pluginsDir;
+
+  // P1: pass dryRun and full/multiRuntime into buildPlugins
   const result = await buildPlugins({
     manifestPath,
-    pluginsDir,
+    pluginsDir: finalPluginsDir,
     domain: args.domain || undefined,
     aiGenerate: args.ai,
     skillsSourceDir: OUTPUT_DIR,
     dryRun: args.dryRun,
+    full: args.full,
+    multiRuntime: args.multiRuntime,
   });
 
   if (args.dryRun) {
-    log(`  Would write ${result.pluginCount} plugins (${result.skillsCopied} skills) to: ${pluginsDir}/`);
+    log(`  Would write ${result.pluginCount} plugins (${result.skillsCopied} skills) to: ${finalPluginsDir}/`);
   } else {
-    log(`  Plugins written to: ${pluginsDir}/`);
+    log(`  Plugins written to: ${finalPluginsDir}/`);
     log(`  ${result.pluginCount} plugins, ${result.skillsCopied} skills copied`);
+    if (result.hookCount) log(`  ${result.hookCount} hooks generated`);
+    if (result.agentCount) log(`  ${result.agentCount} agents generated`);
+    if (result.commandCount) log(`  ${result.commandCount} commands generated`);
   }
 
   // P2: Always emit JSON output (not just for dry-run)
@@ -67,6 +75,9 @@ export async function pluginMode(args: CliArgs, startTime: number): Promise<void
       domains: result.domains,
       pluginsDir,
       dryRun: args.dryRun,
+      hookCount: result.hookCount ?? 0,
+      agentCount: result.agentCount ?? 0,
+      commandCount: result.commandCount ?? 0,
     }, startTime), true);
   }
 }

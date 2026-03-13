@@ -409,6 +409,8 @@ export interface ManifestEntry {
   subdir?: string;
   /** Optional: sub-classification within the domain (e.g. "swarm" for agent/swarm) */
   subdomain?: string;
+  /** Optional: actual directory name (may differ from frontmatter name due to naming conventions) */
+  dirName?: string;
 }
 
 /** A collection of manifest entries */

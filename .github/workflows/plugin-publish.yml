@@ -1,0 +1,49 @@
+name: Plugin Publish
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+
+      - name: Build full plugins
+        run: npx tsx examples/skill-forge.ts --plugin --full --json > plugin-results.json
+
+      - name: Build marketplace
+        run: npx tsx examples/skill-forge.ts --marketplace --json > marketplace-results.json
+
+      - name: Run benchmark
+        run: npx tsx examples/skill-forge.ts --benchmark --json > benchmark.json
+
+      - name: Audit plugins
+        run: npx tsx examples/skill-forge.ts --audit-plugins --json > audit-report.json
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-artifacts
+          path: |
+            plugin-results.json
+            marketplace-results.json
+            benchmark.json
+            audit-report.json
+            examples/marketplace/

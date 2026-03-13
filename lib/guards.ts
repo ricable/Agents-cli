@@ -100,6 +100,9 @@ const ALLOWED_FIELDS = new Set([
   "name", "description", "allowed-tools", "compatibility", "license", "metadata",
   // Extended fields used by skill-forge pipeline
   "version", "ingredients", "tags", "domain",
+  // Rich skill frontmatter fields (Phase 1 ecosystem integration)
+  "context", "argument-hint", "disable-model-invocation", "agent",
+  "hooks", "user-invocable", "model",
 ]) as ReadonlySet<string>;
 
 /**
@@ -123,9 +126,11 @@ export function validateSkillContent(content: string): string[] {
 
   const fm: string = fmMatch[1];
 
-  // Security: no XML angle brackets anywhere in frontmatter
-  if (/<|>/.test(fm)) {
-    errors.push("XML angle brackets found in frontmatter (security violation)");
+  // Security: no XML/HTML tags in frontmatter (e.g. <script>, <img>)
+  // Allow standalone < > in descriptions (markdown quotes, comparison operators, argument-hint placeholders)
+  const fmWithoutHintLines = fm.replace(/^argument-hint:.*$/gm, "");
+  if (/<\/?[a-zA-Z][a-zA-Z0-9]*[\s>\/]/.test(fmWithoutHintLines)) {
+    errors.push("XML/HTML tags found in frontmatter (security violation)");
   }
 
   // name field: required, kebab-case only
@@ -180,15 +185,15 @@ export function validateFullFrontmatter(content: string): string[] {
 
   const fm: string = fmMatch[1];
 
-  // allowed-tools: space-separated tool specs (e.g. "Bash(npm:*) Bash(npx:*)")
+  // allowed-tools: comma or space-separated tool specs (e.g. "Read,Grep,Glob,Bash(npm *)")
   const allowedToolsMatch = fm.match(/^allowed-tools:\s*["']?(.+?)["']?\s*$/m);
   if (allowedToolsMatch && allowedToolsMatch[1]) {
     const val = allowedToolsMatch[1].trim();
     if (val.length === 0) {
       errors.push("allowed-tools is empty -- omit field or provide tool specs");
     }
-    // Basic format check: each spec should be a word optionally followed by (...)
-    const specs = val.split(/\s+/);
+    // Split on commas (with optional surrounding whitespace), then validate each spec
+    const specs = val.split(/\s*,\s*/);
     for (const spec of specs) {
       if (!/^[A-Za-z][A-Za-z0-9_]*(\([^)]*\))?$/.test(spec)) {
         errors.push(`allowed-tools spec "${spec}" has invalid format (expected: ToolName or ToolName(filter))`);

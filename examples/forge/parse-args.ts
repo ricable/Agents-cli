@@ -26,6 +26,18 @@ export function parseArgs(): CliArgs {
     concurrency: 1,
     resume: "",
     noIndex: false,
+    // Phase 1: Full ecosystem integration
+    full: false,
+    multiRuntime: false,
+    outputDir: "",
+    batchSize: 20,
+    // Phase 2: Audit plugins
+    auditPlugins: false,
+    benchmark: false,
+    // Companion mode
+    companion: false,
+    serve: false,
+    port: 3100,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -114,6 +126,32 @@ export function parseArgs(): CliArgs {
         throw new Error(`Invalid --resume path: "${resumePath}" — must not contain ".." or null bytes`);
       }
       opts.resume = resumePath;
+    }
+    // Full ecosystem integration
+    else if (a === "--full")                  { opts.full = true; }
+    else if (a === "--multi-runtime")         { opts.multiRuntime = true; }
+    else if (a === "--output-dir" && argv[i+1]) { opts.outputDir = argv[++i]!; }
+    else if (a === "--batch-size" && argv[i+1]) {
+      const val = argv[++i]!;
+      const parsed = parseInt(val, 10);
+      if (Number.isNaN(parsed) || parsed < 1 || parsed > 100) {
+        throw new Error(`Invalid --batch-size value: "${val}" (must be 1-100)`);
+      }
+      opts.batchSize = parsed;
+    }
+    // Audit plugins
+    else if (a === "--audit-plugins")         { opts.auditPlugins = true; }
+    else if (a === "--benchmark")             { opts.benchmark = true; }
+    // Companion mode
+    else if (a === "--companion")             { opts.companion = true; }
+    else if (a === "--serve")                 { opts.serve = true; }
+    else if (a === "--port" && argv[i+1])     {
+      const val = argv[++i]!;
+      const parsed = parseInt(val, 10);
+      if (Number.isNaN(parsed) || parsed < 1 || parsed > 65535) {
+        throw new Error(`Invalid --port value: "${val}" (must be 1-65535)`);
+      }
+      opts.port = parsed;
     }
     // Positional → prompt
     else if (!a.startsWith("--"))             { opts.prompt += (opts.prompt ? " " : "") + a; }

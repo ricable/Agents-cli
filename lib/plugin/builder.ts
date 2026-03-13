@@ -19,8 +19,13 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { generateAgentMarkdown, defaultAgentMarkdown } from "./ai-generator.js";
+import { generateAgentMarkdown, defaultAgentMarkdown, defaultMultiAgentMarkdown } from "./ai-generator.js";
 import { assertWithinDir, validatePluginName } from "./shared.js";
+import { generateHooksJson } from "../hooks/generator.js";
+import { generatePluginCommands } from "./commands-generator.js";
+import { generatePluginSettings } from "./settings-generator.js";
+import { generateRuntimeAdapters } from "./runtime-adapters.js";
+import { generateTeamSkill, generateWorkerAgents } from "./team-generator.js";
 import type { ManifestEntry } from "../types.js";
 
 // ── Official plugin.json schema (Claude Code spec-compliant) ───────────
@@ -54,12 +59,22 @@ export interface BuildPluginsOptions {
   skillsSourceDir?: string;
   /** Dry-run mode — preview without writing */
   dryRun?: boolean;
+  /** Generate full-featured plugins (hooks, multi-agents, 8 commands, settings, CLAUDE.md) */
+  full?: boolean;
+  /** Generate multi-runtime adapters (pi-mono, opencode) */
+  multiRuntime?: boolean;
 }
 
 export interface BuildPluginsResult {
   pluginCount: number;
   skillsCopied: number;
   domains: string[];
+  /** Total hooks generated (only when full=true) */
+  hookCount?: number;
+  /** Total agents generated */
+  agentCount?: number;
+  /** Total commands generated */
+  commandCount?: number;
 }
 
 interface Manifest {
@@ -261,6 +276,8 @@ export async function buildPlugins(opts?: BuildPluginsOptions): Promise<BuildPlu
     pluginsDir: pluginsDirOpt,
     skillsSourceDir,
     dryRun = false,
+    full = false,
+    multiRuntime = false,
   } = opts ?? {};
 
   const root = rootDir ?? process.cwd();
@@ -287,12 +304,14 @@ export async function buildPlugins(opts?: BuildPluginsOptions): Promise<BuildPlu
   }
 
   let totalSkillsCopied = 0;
+  let totalHookCount = 0;
+  let totalAgentCount = 0;
+  let totalCommandCount = 0;
   const domains: string[] = [];
 
   if (dryRun) {
     for (const [flatDomain, { entries }] of byDomain) {
       domains.push(flatDomain);
-      // Only count skills whose SKILL.md actually exists (match non-dry-run behavior)
       if (skillsSourceDir) {
         for (const entry of entries) {
           if (fs.existsSync(path.join(skillsSourceDir, entry.name, "SKILL.md"))) {
@@ -326,11 +345,13 @@ export async function buildPlugins(opts?: BuildPluginsOptions): Promise<BuildPlu
     const skillsDir = path.join(pluginDir, "skills");
     const agentsDir = path.join(pluginDir, "agents");
     const commandsDir = path.join(pluginDir, "commands");
+    const hooksDir = path.join(pluginDir, "hooks");
 
     fs.mkdirSync(metaDir, { recursive: true });
     fs.mkdirSync(skillsDir, { recursive: true });
     fs.mkdirSync(agentsDir, { recursive: true });
     fs.mkdirSync(commandsDir, { recursive: true });
+    fs.mkdirSync(hooksDir, { recursive: true });
 
     // 1. Copy skills into plugin (self-contained)
     if (skillsSourceDir) {
@@ -345,52 +366,152 @@ export async function buildPlugins(opts?: BuildPluginsOptions): Promise<BuildPlu
       }
     }
 
-    // 2. Generate agent markdown files
+    // 2. Generate agent markdown files (multi-agent when full=true)
     const pkgNames = entries.map(e => e.name);
-    // Use first original domain for description context
     const origDomain = [...originals][0]!;
 
-    if (aiGenerate && apiKey) {
-      try {
-        const agentMds = await generateAgentMarkdown(origDomain, pkgNames, apiKey);
+    if (full) {
+      // Full mode: generate expert + worker agents
+      if (aiGenerate && apiKey) {
+        try {
+          const agentMds = await generateAgentMarkdown(origDomain, pkgNames, apiKey);
+          for (const agent of agentMds) {
+            validatePluginName(agent.name, "agent name");
+            fs.writeFileSync(path.join(agentsDir, `${agent.name}.md`), agent.content, "utf-8");
+            totalAgentCount++;
+          }
+        } catch {
+          // Fall back to default multi-agent
+          const agentMds = defaultMultiAgentMarkdown(origDomain, pkgNames);
+          for (const agent of agentMds) {
+            validatePluginName(agent.name, "agent name");
+            fs.writeFileSync(path.join(agentsDir, `${agent.name}.md`), agent.content, "utf-8");
+            totalAgentCount++;
+          }
+        }
+      } else {
+        const agentMds = defaultMultiAgentMarkdown(origDomain, pkgNames);
         for (const agent of agentMds) {
           validatePluginName(agent.name, "agent name");
-          fs.writeFileSync(
-            path.join(agentsDir, `${agent.name}.md`),
-            agent.content,
-            "utf-8"
-          );
+          fs.writeFileSync(path.join(agentsDir, `${agent.name}.md`), agent.content, "utf-8");
+          totalAgentCount++;
         }
-      } catch {
-        const defaultAgent = defaultAgentMarkdown(origDomain, pkgNames);
-        fs.writeFileSync(
-          path.join(agentsDir, `${defaultAgent.name}.md`),
-          defaultAgent.content,
-          "utf-8"
-        );
       }
     } else {
-      const defaultAgent = defaultAgentMarkdown(origDomain, pkgNames);
+      // Basic mode: single expert agent
+      if (aiGenerate && apiKey) {
+        try {
+          const agentMds = await generateAgentMarkdown(origDomain, pkgNames, apiKey);
+          for (const agent of agentMds) {
+            validatePluginName(agent.name, "agent name");
+            fs.writeFileSync(path.join(agentsDir, `${agent.name}.md`), agent.content, "utf-8");
+            totalAgentCount++;
+          }
+        } catch {
+          const defaultAgent = defaultAgentMarkdown(origDomain, pkgNames);
+          fs.writeFileSync(path.join(agentsDir, `${defaultAgent.name}.md`), defaultAgent.content, "utf-8");
+          totalAgentCount++;
+        }
+      } else {
+        const defaultAgent = defaultAgentMarkdown(origDomain, pkgNames);
+        fs.writeFileSync(path.join(agentsDir, `${defaultAgent.name}.md`), defaultAgent.content, "utf-8");
+        totalAgentCount++;
+      }
+    }
+
+    // 2b. Generate team skill and worker agents (full mode)
+    if (full) {
+      // Worker agents from team-generator
+      const workers = generateWorkerAgents(origDomain);
+      for (const worker of workers) {
+        // Only write if not already generated by AI or default multi-agent
+        const workerPath = path.join(agentsDir, `${worker.name}.md`);
+        if (!fs.existsSync(workerPath)) {
+          validatePluginName(worker.name, "worker agent name");
+          fs.writeFileSync(workerPath, worker.content, "utf-8");
+          totalAgentCount++;
+        }
+      }
+
+      // Team skill (goes into skills/)
+      const teamSkill = generateTeamSkill(origDomain, pkgNames);
+      if (teamSkill) {
+        const teamName = `${flatDomain}-team`;
+        const teamDir = path.join(skillsDir, teamName);
+        assertWithinDir(teamDir, skillsDir, "team skill dir");
+        fs.mkdirSync(teamDir, { recursive: true });
+        fs.writeFileSync(path.join(teamDir, "SKILL.md"), teamSkill, "utf-8");
+        totalSkillsCopied++;
+      }
+    }
+
+    // 3. Generate user-invokable commands (8 when full, 2 otherwise)
+    if (full) {
+      const commands = generatePluginCommands(origDomain, entries);
+      for (const cmd of commands) {
+        fs.writeFileSync(path.join(commandsDir, cmd.filename), cmd.content, "utf-8");
+        totalCommandCount++;
+      }
+    } else {
+      fs.writeFileSync(path.join(commandsDir, "search.md"), generateSearchCommand(origDomain, entries), "utf-8");
+      fs.writeFileSync(path.join(commandsDir, "list.md"), generateListCommand(origDomain, entries), "utf-8");
+      totalCommandCount += 2;
+    }
+
+    // 4. Generate hooks.json and hook scripts (full mode)
+    if (full) {
+      const generated = generateHooksJson(origDomain, pkgNames);
       fs.writeFileSync(
-        path.join(agentsDir, `${defaultAgent.name}.md`),
-        defaultAgent.content,
-        "utf-8"
+        path.join(hooksDir, "hooks.json"),
+        JSON.stringify(generated.hooksJson, null, 2) + "\n",
+        "utf-8",
+      );
+      totalHookCount += generated.hooksJson.hooks.length;
+
+      // Write supporting hook scripts
+      for (const script of generated.scripts) {
+        const scriptPath = path.join(pluginDir, script.path);
+        assertWithinDir(scriptPath, pluginDir, "hook script");
+        fs.mkdirSync(path.dirname(scriptPath), { recursive: true });
+        fs.writeFileSync(scriptPath, script.content, "utf-8");
+        if (script.executable) {
+          fs.chmodSync(scriptPath, 0o755);
+        }
+      }
+    }
+
+    // 5. Generate settings.json (full mode)
+    if (full) {
+      fs.writeFileSync(
+        path.join(pluginDir, "settings.json"),
+        generatePluginSettings(origDomain),
+        "utf-8",
       );
     }
 
-    // 3. Generate user-invokable commands
-    fs.writeFileSync(
-      path.join(commandsDir, "search.md"),
-      generateSearchCommand(origDomain, entries),
-      "utf-8"
-    );
-    fs.writeFileSync(
-      path.join(commandsDir, "list.md"),
-      generateListCommand(origDomain, entries),
-      "utf-8"
-    );
+    // 6. Generate CLAUDE.md (full mode)
+    if (full) {
+      fs.writeFileSync(
+        path.join(pluginDir, "CLAUDE.md"),
+        generatePluginClaudeMd(origDomain, entries),
+        "utf-8",
+      );
+    }
 
-    // 4. Write plugin.json manifest (official schema only)
+    // 7. Generate multi-runtime adapters
+    if (multiRuntime) {
+      const adapters = generateRuntimeAdapters(origDomain, entries, pluginName);
+      for (const adapter of adapters) {
+        for (const [filePath, content] of Object.entries(adapter.files)) {
+          const fullPath = path.join(pluginDir, filePath);
+          assertWithinDir(fullPath, pluginDir, `runtime adapter ${adapter.runtime}`);
+          fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+          fs.writeFileSync(fullPath, content, "utf-8");
+        }
+      }
+    }
+
+    // 8. Write plugin.json manifest (official schema only)
     const description = domainDescription(origDomain, entries);
     const keywords = [
       origDomain,
@@ -400,7 +521,6 @@ export async function buildPlugins(opts?: BuildPluginsOptions): Promise<BuildPlu
       "plugin",
     ].filter((v, i, a) => a.indexOf(v) === i);
 
-    // P3: Infer license from skills instead of hardcoding MIT
     const license = inferLicense(entries, skillsSourceDir);
 
     const pluginManifest: PluginManifest = {
@@ -418,5 +538,72 @@ export async function buildPlugins(opts?: BuildPluginsOptions): Promise<BuildPlu
     );
   }
 
-  return { pluginCount: byDomain.size, skillsCopied: totalSkillsCopied, domains };
+  return {
+    pluginCount: byDomain.size,
+    skillsCopied: totalSkillsCopied,
+    domains,
+    hookCount: totalHookCount,
+    agentCount: totalAgentCount,
+    commandCount: totalCommandCount,
+  };
+}
+
+// ── Plugin CLAUDE.md generation ────────────────────────────────────────
+
+/**
+ * Generate CLAUDE.md for a plugin with CLI-first doctrine and domain conventions.
+ */
+function generatePluginClaudeMd(domain: string, entries: ManifestEntry[]): string {
+  const toolList = entries.slice(0, 20).map(e => `- \`${e.name}\`: ${e.description || "CLI tool"}`).join("\n");
+  const flatDomain = domain.replace(/\//g, "-");
+
+  return [
+    `# ${domain} Plugin — Claude Code`,
+    "",
+    "## CLI-First Doctrine",
+    "",
+    "When working with this domain, follow this priority order:",
+    "",
+    "1. **Use CLI tools from loaded skills first** — each skill has commands and examples",
+    "2. **Fall back to Bash** for unsupported operations",
+    "3. **Use MCP only** when no CLI alternative exists",
+    "4. **Never use raw API calls** when a CLI tool is available",
+    "",
+    "## Domain Conventions",
+    "",
+    `- Always check tool --help before guessing flags`,
+    `- Use --dry-run on destructive operations when available`,
+    `- Verify tool versions match expected compatibility`,
+    `- Read the skill's troubleshooting guide when commands fail`,
+    "",
+    "## Available Tools",
+    "",
+    toolList,
+    "",
+    "## Agents",
+    "",
+    `- **${flatDomain}-expert**: Primary domain agent (sonnet model, cross-project memory)`,
+    `- Worker agents: See agents/ directory for specialized task agents`,
+    "",
+    "## Hooks",
+    "",
+    "This plugin includes lifecycle hooks in hooks/hooks.json:",
+    "- **PreToolUse**: Domain-specific safety checks",
+    "- **PostToolUse**: Auto-formatting and logging",
+    "- **Stop**: Quality gates before task completion",
+    "- **SessionStart**: Context injection (tool versions, project state)",
+    "",
+    "## Commands",
+    "",
+    `Use \`/${flatDomain}:<command>\` to invoke plugin commands:`,
+    `- \`/${flatDomain}:search <query>\` — Search domain tools`,
+    `- \`/${flatDomain}:list\` — List all tools`,
+    `- \`/${flatDomain}:setup\` — Install all domain tools`,
+    `- \`/${flatDomain}:status\` — Check tool versions and health`,
+    `- \`/${flatDomain}:audit\` — Run quality audit`,
+    `- \`/${flatDomain}:run <task>\` — Execute domain workflow`,
+    `- \`/${flatDomain}:team <task>\` — Spawn agent team`,
+    `- \`/${flatDomain}:update\` — Check for tool updates`,
+    "",
+  ].join("\n");
 }
