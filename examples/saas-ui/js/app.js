@@ -197,107 +197,59 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Logout
   if (logoutBtn) {
-    logoutBtn.addEventListener('click', () => auth.logout());
+    logoutBtn.addEventListener('click', () => auth.signOut());
   }
-
-  // Auth state changes → update nav
-  auth.onAuthChange((user) => {
-    updateNavState(user, lastServerOk);
-  });
 
   // ── Auth Modals Logic ───────────────────────────────────────────
 
   const loginModal = document.getElementById('loginModal');
   const signupModal = document.getElementById('signupModal');
-  const stripeModal = document.getElementById('stripeModal');
-  const paymentLoader = document.getElementById('payment-loader');
-  const paymentSuccess = document.getElementById('payment-success');
 
-  // Open modals
-  if (loginBtn) loginBtn.addEventListener('click', () => loginModal?.classList.add('active'));
-  if (getStartedBtn) getStartedBtn.addEventListener('click', () => signupModal?.classList.add('active'));
+  const _closeModals = () => document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+
+  // Open login modal and mount Clerk SignIn
+  if (loginBtn) {
+    loginBtn.addEventListener('click', async () => {
+      loginModal?.classList.add('active');
+      const mountEl = document.getElementById('clerk-sign-in');
+      if (mountEl) await auth.openSignIn(mountEl);
+    });
+  }
+
+  // Open signup modal and mount Clerk SignUp
+  if (getStartedBtn) {
+    getStartedBtn.addEventListener('click', async () => {
+      signupModal?.classList.add('active');
+      const mountEl = document.getElementById('clerk-sign-up');
+      if (mountEl) await auth.openSignUp(mountEl);
+    });
+  }
 
   // Signup / Get Started Buttons in hero section
   document.querySelectorAll('.btn-primary, .btn-secondary, .btn-gradient').forEach(btn => {
     if (btn.id === 'getStartedBtn') return; // already handled
     const text = btn.textContent.trim();
     if (text.includes('Get Started') || text.includes('Subscribe') || text.includes('Trial') || text.includes('Build Your First Agent')) {
-      btn.addEventListener('click', (e) => { e.preventDefault(); signupModal?.classList.add('active'); });
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        signupModal?.classList.add('active');
+        const mountEl = document.getElementById('clerk-sign-up');
+        if (mountEl) await auth.openSignUp(mountEl);
+      });
     }
   });
 
-  // ── OAuth button wiring ─────────────────────────────────────────
-
-  const _spinBtn = (btn) => {
-    const orig = btn.innerHTML;
-    btn.innerHTML = '<span class="pulse-dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;background:white;animation:pulse 1s infinite"></span> Authenticating...';
-    btn.disabled = true;
-    return () => { btn.innerHTML = orig; btn.disabled = false; };
-  };
-
-  const _closeModals = () => document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
-
-  const _onLoginSuccess = (user, isSignup = false) => {
-    _closeModals();
-    if (isSignup) {
-      setTimeout(() => {
-        if (stripeModal) {
-          stripeModal.classList.add('active');
-          if (paymentLoader && paymentSuccess) {
-            paymentLoader.style.display = 'block';
-            paymentSuccess.style.display = 'none';
-            setTimeout(() => {
-              paymentLoader.style.display = 'none';
-              paymentSuccess.style.display = 'block';
-            }, 2500);
-          }
-        }
-      }, 400);
-    }
-  };
-
-  // Wire each auth button by content
-  document.querySelectorAll('.auth-submit').forEach(btn => {
-    const text = btn.textContent.trim();
-    const isGoogle = text.includes('Google');
-    const isGithub = text.includes('GitHub');
-    const isSignup = !!btn.closest('#signupModal');
-    const isEmailLogin = !isGoogle && !isGithub && btn.closest('#loginModal');
-    const isEmailSignup = !isGoogle && !isGithub && btn.closest('#signupModal') && !text.includes('Claim');
-    const isClaim = text.includes('Claim');
-
-    btn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      const restore = _spinBtn(btn);
-      try {
-        if (isGoogle) {
-          await auth.loginWithGoogle();
-        } else if (isGithub) {
-          await auth.loginWithGithub();
-        } else if (isEmailLogin) {
-          const emailInput = btn.closest('.modal-body')?.querySelector('input[type="email"]');
-          const passInput = btn.closest('.modal-body')?.querySelector('input[type="password"]');
-          await auth.loginWithEmail(emailInput?.value || '', passInput?.value || '');
-        } else if (isClaim || isSignup) {
-          const emailInput = btn.closest('.modal-body')?.querySelector('input[type="email"]');
-          const passInput = btn.closest('.modal-body')?.querySelector('input[type="password"]');
-          await auth.signupWithEmail(emailInput?.value || '', passInput?.value || '');
-        }
-        restore();
-        _onLoginSuccess(auth.getUser(), isSignup || isClaim);
-      } catch {
-        restore();
-      }
-    });
+  // Auth state changes close modals and update nav
+  auth.onAuthChange((user) => {
+    if (user) _closeModals();
+    updateNavState(user, lastServerOk);
   });
 
-  // Finish Stripe Flow
-  const checkoutDone = document.querySelector('.checkout-done');
-  if (checkoutDone) {
-    checkoutDone.addEventListener('click', () => {
-      stripeModal?.classList.remove('active');
-      document.getElementById('marketplace')?.scrollIntoView({ behavior: 'smooth' });
-    });
+  // Handle ?checkout=success query param (Stripe redirect back)
+  if (new URLSearchParams(window.location.search).get('checkout') === 'success') {
+    setTimeout(() => showToast('Payment successful — your plan is now active!', 'success'), 800);
+    // Clean up URL
+    history.replaceState({}, '', window.location.pathname);
   }
 
   // ── Restore session + server health ────────────────────────────

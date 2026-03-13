@@ -814,20 +814,10 @@ agents-cli mcp start</code></pre>
                 <h3>Welcome Back</h3>
                 <button class="close-modal">&times;</button>
             </div>
-            <div class="modal-body">
-                <p class="text-muted text-center mb-4">Log in to manage your agent deployments.</p>
-                <button class="btn btn-outline btn-block mb-2 auth-submit"><i class="icon">G</i> Continue with Google</button>
-                <button class="btn btn-outline btn-block auth-submit"><i class="icon">🐙</i> Continue with GitHub</button>
-                <div class="auth-divider"><span>or with Email</span></div>
-                <div class="form-group">
-                    <label>Email Address</label>
-                    <input type="email" class="form-control" placeholder="agent@example.com">
-                </div>
-                <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" class="form-control" placeholder="••••••••">
-                </div>
-                <button class="btn btn-primary btn-block shine mt-2 auth-submit">Log In</button>
+            <div class="modal-body" style="padding: 0; min-height: 300px;">
+                <!-- Clerk SignIn component mounts here -->
+                <div id="clerk-sign-in" style="display:flex;justify-content:center;align-items:center;min-height:280px;padding:16px"></div>
+                <p class="auth-footer mt-2 text-center" style="font-size:.75rem;color:var(--text-secondary);padding-bottom:12px">Powered securely by <strong>Clerk</strong>.</p>
             </div>
         </div>
     </div>
@@ -839,43 +829,10 @@ agents-cli mcp start</code></pre>
                 <h3>Create Account</h3>
                 <button class="close-modal">&times;</button>
             </div>
-            <div class="modal-body">
-                <p class="text-muted text-center mb-4">Claim your 50% Founders Tier discount instantly.</p>
-                <button class="btn btn-primary btn-block mb-2 shine auth-submit"><i class="icon">G</i> Sign up with Google (Default)</button>
-                <button class="btn btn-outline btn-block auth-submit"><i class="icon">🐙</i> Sign up with GitHub</button>
-                <div class="auth-divider"><span>or with Email</span></div>
-                <div class="form-group">
-                    <label>Work Email</label>
-                    <input type="email" class="form-control" placeholder="agent@startup.inc">
-                </div>
-                <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" class="form-control" placeholder="••••••••">
-                </div>
-                <button class="btn btn-gradient btn-block shine mt-2 auth-submit">Claim Founders Promo & Register</button>
-                <p class="auth-footer mt-4 text-center">Powered securely by <strong>Supabase Auth</strong>.</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Stripe Modal -->
-    <div id="stripeModal" class="modal-overlay">
-        <div class="modal-content glass-card auth-modal text-center" style="max-width: 450px;">
-            <div class="modal-header" style="justify-content: center; position: relative;">
-                <h3>Secure Checkout</h3>
-                <button class="close-modal" style="position: absolute; right: 0;">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div id="payment-loader">
-                    <div class="pulse-dot" style="margin: 0 auto 16px; width: 40px; height: 40px; background: #6772e5; box-shadow: 0 0 20px #6772e5;"></div>
-                    <h4 style="margin-bottom: 8px;">Connecting to Payment Provider...</h4>
-                    <p class="text-muted mb-4 text-sm">Setting up end-to-end encrypted session.</p>
-                </div>
-                <div id="payment-success" style="display: none;">
-                    <h4 style="color: var(--accent-green); margin-bottom: 8px;">Payment Successful</h4>
-                    <p class="text-muted mb-4 text-sm">Your agents-cli environment is now upgraded.</p>
-                    <button class="btn btn-primary btn-block checkout-done">Go to Dashboard</button>
-                </div>
+            <div class="modal-body" style="padding: 0; min-height: 300px;">
+                <!-- Clerk SignUp component mounts here -->
+                <div id="clerk-sign-up" style="display:flex;justify-content:center;align-items:center;min-height:280px;padding:16px"></div>
+                <p class="auth-footer mt-2 text-center" style="font-size:.75rem;color:var(--text-secondary);padding-bottom:12px">Powered securely by <strong>Clerk</strong>.</p>
             </div>
         </div>
     </div>

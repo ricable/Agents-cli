@@ -1,10 +1,12 @@
 /**
- * companion/billing.ts — BillingProvider interface + LemonSqueezy & Stripe stub implementations.
+ * companion/billing.ts — BillingProvider interface + LemonSqueezy & Stripe implementations.
  *
- * Stubs return mock data when no API key is configured.
- * Comments mark where real API calls would go.
+ * Stripe uses the official stripe npm SDK.
+ * LemonSqueezy uses raw fetch (no official SDK).
+ * Both fall back to mock data when no API key is configured.
  */
 
+import Stripe from "stripe";
 import { toErrorMessage } from "../output.js";
 
 // ── Interfaces ─────────────────────────────────────────────────────────
@@ -30,7 +32,7 @@ export interface BillingProvider {
   createCheckoutSession(customerId: string, priceId: string, returnUrl: string): Promise<{ url: string }>;
   getPortalUrl(customerId: string): Promise<{ url: string }>;
   listInvoices(customerId: string, limit?: number): Promise<{ invoices: Invoice[] }>;
-  verifyWebhook(payload: string, signature: string): Promise<WebhookEvent>;
+  verifyWebhook(payload: string, signature: string, secret?: string): Promise<WebhookEvent>;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -192,9 +194,9 @@ export class LemonSqueezyProvider implements BillingProvider {
     }
   }
 
-  async verifyWebhook(payload: string, _signature: string): Promise<WebhookEvent> {
+  async verifyWebhook(payload: string, _signature: string, _secret?: string): Promise<WebhookEvent> {
     // Real implementation: verify HMAC-SHA256 of payload against _signature using webhook secret
-    // const secret = process.env["LEMONSQUEEZY_WEBHOOK_SECRET"];
+    // const secret = _secret ?? process.env["LEMONSQUEEZY_WEBHOOK_SECRET"];
     // const hmac = createHmac("sha256", secret).update(payload).digest("hex");
     // if (hmac !== _signature) throw new Error("Invalid webhook signature");
     const data = JSON.parse(payload) as { meta: { event_name: string; custom_data?: { customer_id?: string } }; data: Record<string, unknown> };
@@ -210,42 +212,27 @@ export class LemonSqueezyProvider implements BillingProvider {
 
 export class StripeProvider implements BillingProvider {
   readonly name = "stripe";
-  private readonly apiKey: string | undefined;
+  private readonly stripe: Stripe | null;
 
   constructor(opts?: { apiKey?: string }) {
-    this.apiKey = opts?.apiKey ?? process.env["STRIPE_SECRET_KEY"];
+    const apiKey = opts?.apiKey ?? process.env["STRIPE_SECRET_KEY"];
+    this.stripe = apiKey ? new Stripe(apiKey) : null;
   }
 
   private get isMock(): boolean {
-    return !this.apiKey;
-  }
-
-  private async stripeRequest(path: string, method: string, body?: URLSearchParams): Promise<unknown> {
-    const res = await fetch(`https://api.stripe.com/v1${path}`, {
-      method,
-      headers: {
-        "Authorization": `Basic ${Buffer.from(`${this.apiKey}:`).toString("base64")}`,
-        ...(body ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
-      },
-      body: body?.toString(),
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Stripe API error ${res.status}: ${text.slice(0, 200)}`);
-    }
-    return res.json();
+    return this.stripe === null;
   }
 
   async createCustomer(email: string, tier: string): Promise<{ customerId: string }> {
     if (this.isMock) {
       return { customerId: mockCustomerId() };
     }
-
-    // Real implementation: POST /v1/customers
     try {
-      const params = new URLSearchParams({ email, "metadata[tier]": tier });
-      const json = await this.stripeRequest("/customers", "POST", params) as { id: string };
-      return { customerId: json.id };
+      const customer = await this.stripe!.customers.create({
+        email,
+        metadata: { tier },
+      });
+      return { customerId: customer.id };
     } catch (err) {
       throw new Error(`Failed to create Stripe customer: ${toErrorMessage(err)}`);
     }
@@ -255,19 +242,16 @@ export class StripeProvider implements BillingProvider {
     if (this.isMock) {
       return { url: `https://checkout.stripe.com/mock?customer=${customerId}&price=${priceId}&return=${encodeURIComponent(returnUrl)}` };
     }
-
-    // Real implementation: POST /v1/checkout/sessions
     try {
-      const params = new URLSearchParams({
+      const session = await this.stripe!.checkout.sessions.create({
         customer: customerId,
-        "line_items[0][price]": priceId,
-        "line_items[0][quantity]": "1",
+        line_items: [{ price: priceId, quantity: 1 }],
         mode: "subscription",
         success_url: returnUrl,
         cancel_url: returnUrl,
       });
-      const json = await this.stripeRequest("/checkout/sessions", "POST", params) as { url: string };
-      return { url: json.url };
+      if (!session.url) throw new Error("Stripe returned no checkout URL");
+      return { url: session.url };
     } catch (err) {
       throw new Error(`Failed to create Stripe checkout: ${toErrorMessage(err)}`);
     }
@@ -277,12 +261,11 @@ export class StripeProvider implements BillingProvider {
     if (this.isMock) {
       return { url: `https://billing.stripe.com/mock/portal?customer=${customerId}` };
     }
-
-    // Real implementation: POST /v1/billing_portal/sessions
     try {
-      const params = new URLSearchParams({ customer: customerId });
-      const json = await this.stripeRequest("/billing_portal/sessions", "POST", params) as { url: string };
-      return { url: json.url };
+      const session = await this.stripe!.billingPortal.sessions.create({
+        customer: customerId,
+      });
+      return { url: session.url };
     } catch (err) {
       throw new Error(`Failed to create Stripe portal session: ${toErrorMessage(err)}`);
     }
@@ -293,21 +276,16 @@ export class StripeProvider implements BillingProvider {
       const count = Math.min(limit ?? 10, 10);
       return { invoices: Array.from({ length: count }, (_, i) => mockInvoice(i)) };
     }
-
-    // Real implementation: GET /v1/invoices?customer={customerId}&limit={limit}
     try {
       const pageSize = Math.min(limit ?? 10, 100);
-      const json = await this.stripeRequest(
-        `/invoices?customer=${customerId}&limit=${pageSize}`,
-        "GET",
-      ) as { data: Array<{ id: string; amount_due: number; currency: string; status: string; created: number; invoice_pdf?: string }> };
-      const invoices: Invoice[] = json.data.map(inv => ({
+      const list = await this.stripe!.invoices.list({ customer: customerId, limit: pageSize });
+      const invoices: Invoice[] = list.data.map(inv => ({
         id: inv.id,
         amount: inv.amount_due,
         currency: inv.currency,
         status: inv.status ?? "unknown",
         date: new Date(inv.created * 1000).toISOString(),
-        pdfUrl: inv.invoice_pdf,
+        pdfUrl: inv.invoice_pdf ?? undefined,
       }));
       return { invoices };
     } catch (err) {
@@ -315,17 +293,21 @@ export class StripeProvider implements BillingProvider {
     }
   }
 
-  async verifyWebhook(payload: string, _signature: string): Promise<WebhookEvent> {
-    // Real implementation: verify Stripe-Signature header using webhook endpoint secret
-    // const secret = process.env["STRIPE_WEBHOOK_SECRET"];
-    // Use Stripe's signature verification: t=timestamp,v1=signature
-    // Compute HMAC-SHA256 of `${timestamp}.${payload}` with secret and compare
-    const data = JSON.parse(payload) as { type: string; data: { object: { customer?: string } & Record<string, unknown> } };
-    return {
-      type: data.type,
-      customerId: data.data.object.customer ?? "unknown",
-      data: data.data.object,
-    };
+  async verifyWebhook(payload: string, signature: string, secret?: string): Promise<WebhookEvent> {
+    const webhookSecret = secret ?? process.env["STRIPE_WEBHOOK_SECRET"];
+    if (!webhookSecret) throw new Error("No Stripe webhook secret configured");
+    if (this.isMock) throw new Error("Cannot verify webhook without Stripe API key");
+    try {
+      const event = this.stripe!.webhooks.constructEvent(payload, signature, webhookSecret);
+      const obj = event.data.object as unknown as { customer?: string } & Record<string, unknown>;
+      return {
+        type: event.type,
+        customerId: obj.customer ?? "unknown",
+        data: obj,
+      };
+    } catch (err) {
+      throw new Error(`Webhook verification failed: ${toErrorMessage(err)}`);
+    }
   }
 }
 

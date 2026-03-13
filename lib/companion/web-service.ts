@@ -17,12 +17,9 @@ import { mapToTools } from "./mapper.js";
 import { executePipeline } from "./pipeline.js";
 import { UsageMeter } from "./metering.js";
 import { getTierLimits } from "./tiers.js";
-import { OAuthManager, buildDefaultConfigs } from "./oauth.js";
 import { createBillingProvider } from "./billing.js";
-
-function getOAuthConfigs() {
-  return buildDefaultConfigs();
-}
+import { verifyClerkToken, updateUserMetadata } from "./clerk-auth.js";
+import type { ClerkConfig } from "./clerk-auth.js";
 import type { TechStackProfile } from "./analyzer.js";
 import type { CompanionToolPlan } from "./mapper.js";
 import type { PipelineReport } from "../types.js";
@@ -50,6 +47,8 @@ export interface WebServiceConfig {
   readonly projectRoot: string;
   readonly outputDir: string;
   readonly maxQueueDepth?: number;
+  readonly clerkConfig?: ClerkConfig;
+  readonly stripeWebhookSecret?: string;
 }
 
 type JobStatus = "queued" | "running" | "completed" | "failed";
@@ -232,11 +231,77 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
 
   // ── Auth ──────────────────────────────────────────────────────────
 
-  function authenticate(req: IncomingMessage): ApiKeyRecord | null {
+  /** Synchronous API-key lookup (SHA256). Returns ApiKeyRecord or null. */
+  function authenticateApiKey(req: IncomingMessage): ApiKeyRecord | null {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith("Bearer ")) return null;
     const token = authHeader.slice(7);
     return config.apiKeys.get(hashKey(token)) ?? null;
+  }
+
+  /** Legacy alias used by rate-limiter helpers. */
+  function authenticate(req: IncomingMessage): ApiKeyRecord | null {
+    return authenticateApiKey(req);
+  }
+
+  /**
+   * Dual-mode auth: API-key SHA256 first, then Clerk JWT fallback.
+   * Returns { keyRecord, clerkSession? } or null if unauthenticated.
+   */
+  async function requireAuth(req: IncomingMessage): Promise<{
+    keyRecord: ApiKeyRecord;
+    clerkUserId?: string;
+    clerkEmail?: string;
+    clerkMetadata?: Record<string, unknown>;
+  } | null> {
+    // 1. Try static API key
+    const keyRecord = authenticateApiKey(req);
+    if (keyRecord) return { keyRecord };
+
+    // 2. Try Clerk JWT
+    if (config.clerkConfig) {
+      const session = await verifyClerkToken(req, config.clerkConfig);
+      if (session) {
+        // Synthesize a "pro" ApiKeyRecord for Clerk-authenticated users
+        const syntheticKey: ApiKeyRecord = { tier: "pro", label: `clerk:${session.userId}` };
+        return {
+          keyRecord: syntheticKey,
+          clerkUserId: session.userId,
+          clerkEmail: session.email,
+          clerkMetadata: session.publicMetadata,
+        };
+      }
+    }
+
+    return null;
+  }
+
+  /** Get or create a Stripe customer ID for a Clerk user. */
+  async function getOrCreateStripeCustomer(
+    clerkUserId: string,
+    clerkEmail: string | undefined,
+    clerkMetadata: Record<string, unknown>,
+  ): Promise<string> {
+    const existing = clerkMetadata["stripeCustomerId"];
+    if (typeof existing === "string" && existing) return existing;
+
+    const billing = createBillingProvider("stripe");
+    const { customerId } = await billing.createCustomer(clerkEmail ?? "", "pro");
+
+    // Persist on Clerk user metadata (best-effort)
+    if (config.clerkConfig) {
+      try {
+        await updateUserMetadata(
+          clerkUserId,
+          { ...clerkMetadata, stripeCustomerId: customerId },
+          config.clerkConfig,
+        );
+      } catch {
+        // Non-fatal
+      }
+    }
+
+    return customerId;
   }
 
   function getClientIp(req: IncomingMessage): string {
@@ -313,6 +378,15 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     }
 
     const ip = getClientIp(req);
+
+    // ── GET /api/config ─────────────────────────────────────────
+    // No auth required — returns public config for frontend init
+    if (method === "GET" && path === "/api/config") {
+      sendJson(res, 200, success("config", {
+        clerkPublishableKey: config.clerkConfig?.publishableKey ?? null,
+      }, Date.now()));
+      return;
+    }
 
     // ── GET /api/health ─────────────────────────────────────────
     if (method === "GET" && path === "/api/health") {
@@ -446,9 +520,11 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
 
     // ── GET /api/usage ──────────────────────────────────────────
     if (method === "GET" && path === "/api/usage") {
-      const keyRecord = authenticate(req);
-      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
-      const keyHash = hashKey(req.headers.authorization!.slice(7));
+      const authed = await requireAuth(req);
+      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      const keyRecord = authed.keyRecord;
+      const authHeader = req.headers.authorization ?? "";
+      const keyHash = hashKey(authHeader.startsWith("Bearer ") ? authHeader.slice(7) : authed.clerkUserId ?? "");
       const usage = usageMeter.getUsage(keyHash);
       const tierLimits = getTierLimits(keyRecord.tier);
       sendJson(res, 200, success("usage", {
@@ -463,73 +539,66 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
 
     // ── Auth endpoints ────────────────────────────────────────
 
-    // GET /api/auth/init?provider=X&redirect_uri=Y
-    if (method === "GET" && path === "/api/auth/init") {
-      const provider = url.searchParams.get("provider");
-      const redirectUri = url.searchParams.get("redirect_uri");
-      if (!provider || !redirectUri) {
-        sendError(res, 400, "INVALID_INPUT", "Missing provider or redirect_uri"); return;
-      }
-      try {
-        const oauthMgr = new OAuthManager(getOAuthConfigs());
-        const flow = oauthMgr.initiateFlow(provider as "google" | "github" | "slack" | "zoom", redirectUri);
-        sendJson(res, 200, success("auth-init", flow, Date.now()));
-      } catch (err) {
-        sendError(res, 400, "AUTH_ERROR", toErrorMessage(err));
-      }
-      return;
-    }
-
-    // POST /api/auth/callback
-    if (method === "POST" && path === "/api/auth/callback") {
-      try {
-        const body = await parseBody(req, config.maxBodySize);
-        const parsed = JSON.parse(body) as { provider?: string; code?: string; state?: string; codeVerifier?: string };
-        if (!parsed.provider || !parsed.code || !parsed.codeVerifier) {
-          sendError(res, 400, "INVALID_INPUT", "Missing provider, code, or codeVerifier"); return;
-        }
-        const oauthMgr = new OAuthManager(getOAuthConfigs());
-        const redirectUri = url.searchParams.get("redirect_uri") || "";
-        const tokenRes = await oauthMgr.completeFlow(
-          parsed.provider as "google" | "github" | "slack" | "zoom",
-          parsed.code, parsed.codeVerifier, redirectUri,
-        );
-        // Generate a session token for the UI
-        const sessionToken = randomUUID();
-        sendJson(res, 200, success("auth-callback", {
-          token: sessionToken,
-          user: { email: `user@${parsed.provider}.com`, name: parsed.provider, provider: parsed.provider },
-          tier: "free",
-          accessToken: tokenRes.accessToken,
-        }, Date.now()));
-      } catch (err) {
-        sendError(res, 400, "AUTH_ERROR", toErrorMessage(err));
-      }
-      return;
-    }
-
-    // GET /api/auth/me
+    // GET /api/auth/me — Clerk-aware user info
     if (method === "GET" && path === "/api/auth/me") {
-      const keyRecord = authenticate(req);
-      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      const authed = await requireAuth(req);
+      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
       sendJson(res, 200, success("auth-me", {
-        email: "user@example.com",
-        tier: keyRecord.tier,
+        email: authed.clerkEmail ?? "user@example.com",
+        userId: authed.clerkUserId ?? null,
+        tier: authed.keyRecord.tier,
       }, Date.now()));
       return;
     }
 
     // ── Billing endpoints ──────────────────────────────────────
 
+    // POST /api/billing/webhook — raw body, Stripe-Signature header
+    // IMPORTANT: must read raw bytes before any JSON parsing
+    if (method === "POST" && path === "/api/billing/webhook") {
+      try {
+        const payload = await parseBody(req, config.maxBodySize);
+        const signature = req.headers["stripe-signature"];
+        if (!signature || Array.isArray(signature)) {
+          sendError(res, 400, "INVALID_SIGNATURE", "Missing stripe-signature header"); return;
+        }
+        const billing = createBillingProvider("stripe");
+        const event = await billing.verifyWebhook(payload, signature, config.stripeWebhookSecret);
+        // TODO: handle event.type (e.g. checkout.session.completed, customer.subscription.updated)
+        sendJson(res, 200, success("billing-webhook", { received: true, type: event.type }, Date.now()));
+      } catch (err) {
+        sendError(res, 400, "WEBHOOK_ERROR", toErrorMessage(err));
+      }
+      return;
+    }
+
     // POST /api/billing/checkout
     if (method === "POST" && path === "/api/billing/checkout") {
-      const keyRecord = authenticate(req);
-      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      const authed = await requireAuth(req);
+      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
       try {
         const body = await parseBody(req, config.maxBodySize);
-        const parsed = JSON.parse(body) as { priceId?: string };
+        const parsed = JSON.parse(body) as { priceId?: string; successUrl?: string; cancelUrl?: string };
+
+        // Resolve Stripe customer ID
+        let customerId: string;
+        if (authed.clerkUserId) {
+          customerId = await getOrCreateStripeCustomer(
+            authed.clerkUserId,
+            authed.clerkEmail,
+            authed.clerkMetadata ?? {},
+          );
+        } else {
+          customerId = "cus_mock";
+        }
+
+        const origin = `${req.headers["x-forwarded-proto"] ?? "http"}://${req.headers.host ?? "localhost"}`;
         const billing = createBillingProvider("stripe");
-        const result = await billing.createCheckoutSession("cus_mock", parsed.priceId || "price_default", "http://127.0.0.1:3100/");
+        const result = await billing.createCheckoutSession(
+          customerId,
+          parsed.priceId || "price_default",
+          parsed.successUrl ?? `${origin}/?checkout=success`,
+        );
         sendJson(res, 200, success("billing-checkout", result, Date.now()));
       } catch (err) {
         sendError(res, 400, "BILLING_ERROR", toErrorMessage(err));
@@ -539,11 +608,21 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
 
     // GET /api/billing/portal
     if (method === "GET" && path === "/api/billing/portal") {
-      const keyRecord = authenticate(req);
-      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      const authed = await requireAuth(req);
+      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
       try {
+        let customerId: string;
+        if (authed.clerkUserId) {
+          customerId = await getOrCreateStripeCustomer(
+            authed.clerkUserId,
+            authed.clerkEmail,
+            authed.clerkMetadata ?? {},
+          );
+        } else {
+          customerId = "cus_mock";
+        }
         const billing = createBillingProvider("stripe");
-        const result = await billing.getPortalUrl("cus_mock");
+        const result = await billing.getPortalUrl(customerId);
         sendJson(res, 200, success("billing-portal", result, Date.now()));
       } catch (err) {
         sendError(res, 400, "BILLING_ERROR", toErrorMessage(err));
@@ -553,11 +632,21 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
 
     // GET /api/billing/invoices
     if (method === "GET" && path === "/api/billing/invoices") {
-      const keyRecord = authenticate(req);
-      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      const authed = await requireAuth(req);
+      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
       try {
+        let customerId: string;
+        if (authed.clerkUserId) {
+          customerId = await getOrCreateStripeCustomer(
+            authed.clerkUserId,
+            authed.clerkEmail,
+            authed.clerkMetadata ?? {},
+          );
+        } else {
+          customerId = "cus_mock";
+        }
         const billing = createBillingProvider("stripe");
-        const result = await billing.listInvoices("cus_mock");
+        const result = await billing.listInvoices(customerId);
         sendJson(res, 200, success("billing-invoices", result, Date.now()));
       } catch (err) {
         sendError(res, 400, "BILLING_ERROR", toErrorMessage(err));
@@ -569,8 +658,9 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
 
     // GET /api/earnings
     if (method === "GET" && path === "/api/earnings") {
-      const keyRecord = authenticate(req);
-      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      const authed = await requireAuth(req);
+      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      void authed; // authenticated but no keyRecord fields needed here
       const period = url.searchParams.get("period") || "month";
       const nextPayout = new Date();
       nextPayout.setDate(nextPayout.getDate() + (30 - nextPayout.getDate() % 30));
@@ -587,8 +677,8 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     // GET /api/agents/:id/metrics
     const agentMetricsMatch = path.match(/^\/api\/agents\/([^/]+)\/metrics$/);
     if (method === "GET" && agentMetricsMatch) {
-      const keyRecord = authenticate(req);
-      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      const authed = await requireAuth(req);
+      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
       res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
       res.end(JSON.stringify({
         success: true,
@@ -606,8 +696,8 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     // GET /api/agents/:id/heatmap
     const agentHeatmapMatch = path.match(/^\/api\/agents\/([^/]+)\/heatmap$/);
     if (method === "GET" && agentHeatmapMatch) {
-      const keyRecord = authenticate(req);
-      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      const authed = await requireAuth(req);
+      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
       res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
       res.end(JSON.stringify({
         success: true,
@@ -622,8 +712,8 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
 
     // POST /api/agent-keys
     if (method === "POST" && path === "/api/agent-keys") {
-      const keyRecord = authenticate(req);
-      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      const authed = await requireAuth(req);
+      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
       try {
         const body = await parseBody(req, config.maxBodySize);
         const parsed = JSON.parse(body) as { scopes?: string[] };
@@ -645,8 +735,8 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     // DELETE /api/agent-keys/:id
     const agentKeyDeleteMatch = path.match(/^\/api\/agent-keys\/([^/]+)$/);
     if (method === "DELETE" && agentKeyDeleteMatch) {
-      const keyRecord = authenticate(req);
-      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      const authed = await requireAuth(req);
+      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
       sendJson(res, 200, success("agent-keys-revoke", {
         revoked: true,
         id: agentKeyDeleteMatch[1],
@@ -656,8 +746,8 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
 
     // GET /api/invocations/stream
     if (method === "GET" && path === "/api/invocations/stream") {
-      const keyRecord = authenticate(req);
-      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      const authed = await requireAuth(req);
+      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
       const skill = url.searchParams.get("skill") || "unknown";
       res.writeHead(200, {
         "Content-Type": "text/event-stream",
@@ -777,10 +867,10 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     console.log("    GET  /api/status/:id       — Poll job status");
     console.log("    GET  /api/download/:id     — Download bundle");
     console.log("    GET  /api/usage            — Check daily usage");
-    console.log("    GET  /api/auth/init        — OAuth flow init");
-    console.log("    POST /api/auth/callback    — OAuth callback");
-    console.log("    GET  /api/auth/me          — Current user");
-    console.log("    POST /api/billing/checkout — Stripe checkout");
+    console.log("    GET  /api/config           — Public config (Clerk publishable key)");
+    console.log("    GET  /api/auth/me          — Current user (Clerk or API key)");
+    console.log("    POST /api/billing/webhook  — Stripe webhook (raw body)");
+    console.log("    POST /api/billing/checkout — Stripe checkout session");
     console.log("    GET  /api/billing/portal   — Billing portal");
     console.log("    GET  /api/billing/invoices — Invoice history");
     console.log("    GET  /api/catalog          — Marketplace catalog");

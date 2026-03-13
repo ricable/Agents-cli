@@ -20,6 +20,24 @@ export class AgentsApi {
     this.token = token;
   }
 
+  /**
+   * Async version of setToken for Clerk — awaits clerk.session?.getToken()
+   * and then calls setToken with the result.
+   */
+  async refreshClerkToken() {
+    const clerk = window.Clerk;
+    if (clerk?.session) {
+      const token = await clerk.session.getToken();
+      if (token) this.setToken(token);
+    }
+  }
+
+  async getAuthHeaders(extra = {}) {
+    // Refresh Clerk token before making authenticated requests
+    await this.refreshClerkToken();
+    return this._headers(extra);
+  }
+
   _headers(extra = {}) {
     const h = { 'Content-Type': 'application/json', ...extra };
     if (this.token) h['Authorization'] = `Bearer ${this.token}`;
@@ -28,9 +46,11 @@ export class AgentsApi {
 
   async _fetch(path, opts = {}) {
     const url = `${this.baseUrl}${path}`;
+    // Use fresh auth headers for authenticated requests
+    const headers = await this.getAuthHeaders(opts.headers);
     const res = await fetch(url, {
       ...opts,
-      headers: this._headers(opts.headers),
+      headers,
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
