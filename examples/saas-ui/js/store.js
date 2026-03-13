@@ -60,7 +60,8 @@ export class AppStore {
 
   // Persist only certain keys to localStorage
   _autoPersist(key) {
-    const persistKeys = ['user', 'tier', 'installed', 'searchFilters', 'earnings', 'agentKeys'];
+    // searchFilters intentionally excluded — session-only state, stale filters break the UI
+    const persistKeys = ['user', 'tier', 'installed', 'earnings', 'agentKeys'];
     if (persistKeys.includes(key)) this.persist();
   }
 

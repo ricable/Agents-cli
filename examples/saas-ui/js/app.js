@@ -166,133 +166,170 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
   });
 
-  // Logout Logic
-  document.addEventListener('click', (e) => {
-      const logoutBtn = e.target.closest('#logoutBtn');
-      if (logoutBtn) {
-          sessionStorage.removeItem('is_authenticated');
-          window.location.reload();
-      }
-  });
+  // ── Nav state ──────────────────────────────────────────────────
 
-  // Restore Session on Load — probe server health to set status
-  const restoreAuthSession = async () => {
-      let serverOk = false;
-      try {
-          const res = await fetch('/api/health');
-          serverOk = res.ok;
-      } catch { /* server offline */ }
-      updateAuthenticatedUI(serverOk);
+  const statusEl = document.querySelector('.extension-status');
+  const loginBtn = document.getElementById('loginBtn');
+  const getStartedBtn = document.getElementById('getStartedBtn');
+  const userProfileEl = document.getElementById('userProfile');
+  const userDisplayName = document.getElementById('userDisplayName');
+  const userAvatarEl = document.getElementById('userAvatar');
+  const userDropdown = document.getElementById('userDropdown');
+
+  const updateNavState = (user, serverOk = false) => {
+    // Server status indicator
+    if (statusEl) {
+      statusEl.className = `extension-status ${serverOk ? 'connected' : 'disconnected'}`;
+      statusEl.innerHTML = `<span class="status-indicator"></span>${serverOk ? 'Server: Active' : 'Server: Offline'}`;
+    }
+
+    const loggedIn = !!user;
+    if (loginBtn) loginBtn.style.display = loggedIn ? 'none' : '';
+    if (getStartedBtn) getStartedBtn.style.display = loggedIn ? 'none' : '';
+    if (userProfileEl) {
+      userProfileEl.style.display = loggedIn ? 'flex' : 'none';
+      if (loggedIn && user) {
+        const name = user.name || user.email || 'User';
+        const initial = name[0].toUpperCase();
+        if (userDisplayName) userDisplayName.textContent = name;
+        if (userAvatarEl) userAvatarEl.textContent = initial;
+      }
+    }
   };
 
+  // Toggle user dropdown on profile click
+  if (userProfileEl) {
+    userProfileEl.addEventListener('click', (e) => {
+      if (!e.target.closest('#logoutBtn')) {
+        const isVisible = userDropdown?.style.display !== 'none';
+        if (userDropdown) userDropdown.style.display = isVisible ? 'none' : 'block';
+      }
+    });
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#userProfile') && userDropdown) {
+        userDropdown.style.display = 'none';
+      }
+    });
+  }
+
+  // Logout
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('#logoutBtn')) {
+      auth.logout();
+      if (userDropdown) userDropdown.style.display = 'none';
+    }
+  });
+
+  // Auth state changes → update nav
+  auth.onAuthChange((user) => {
+    updateNavState(user, lastServerOk);
+  });
+
   // ── Auth Modals Logic ───────────────────────────────────────────
+
   const loginModal = document.getElementById('loginModal');
   const signupModal = document.getElementById('signupModal');
   const stripeModal = document.getElementById('stripeModal');
-  
-  // Login Buttons
-  document.querySelectorAll('.btn-ghost').forEach(btn => {
-      if(btn.textContent.includes('Log In')) {
-          btn.addEventListener('click', () => {
-              loginModal?.classList.add('active');
-          });
-      }
-  });
-
-  // Signup / Get Started Buttons
-  document.querySelectorAll('.btn-primary, .btn-secondary, .btn-gradient').forEach(btn => {
-      if(btn.textContent.includes('Get Started') || 
-         btn.textContent.includes('Subscribe') || 
-         btn.textContent.includes('Trial') ||
-         btn.textContent.includes('Build your first Agent')) {
-          btn.addEventListener('click', (e) => {
-              e.preventDefault();
-              signupModal?.classList.add('active');
-          });
-      }
-  });
-  
-  const btnGradient = document.querySelector('.btn-gradient');
-  if (btnGradient) {
-      btnGradient.addEventListener('click', () => {
-          signupModal?.classList.add('active');
-      });
-  }
-
-  // Advanced Auth & Stripe Simulation
-  const authSubmitBtns = document.querySelectorAll('.auth-submit');
   const paymentLoader = document.getElementById('payment-loader');
   const paymentSuccess = document.getElementById('payment-success');
 
-  const updateAuthenticatedUI = (serverConnected = true) => {
-      const navActions = document.querySelector('.nav-actions');
-      if (navActions) {
-          navActions.innerHTML = `
-              <div class="extension-status ${serverConnected ? 'connected' : 'disconnected'}">
-                  <span class="status-indicator"></span>
-                  ${serverConnected ? 'Server: Active' : 'Server: Offline'}
-              </div>
-              <div class="user-profile user-profile-btn" style="cursor:pointer;" title="Account & Settings">
-                  <span class="user-name">Cedric</span>
-                  <div class="user-avatar">C</div>
-              </div>
-          `;
-      }
-      // Show dashboard in sidebar after login
-      const dashboardLink = document.querySelector('[data-pane="discover"]');
-      if (dashboardLink) dashboardLink.closest('.dashboard-sidebar')?.querySelector('[data-pane="dashboard"]')?.classList.add('visible');
+  // Open modals
+  if (loginBtn) loginBtn.addEventListener('click', () => loginModal?.classList.add('active'));
+  if (getStartedBtn) getStartedBtn.addEventListener('click', () => signupModal?.classList.add('active'));
+
+  // Signup / Get Started Buttons in hero section
+  document.querySelectorAll('.btn-primary, .btn-secondary, .btn-gradient').forEach(btn => {
+    if (btn.id === 'getStartedBtn') return; // already handled
+    const text = btn.textContent.trim();
+    if (text.includes('Get Started') || text.includes('Subscribe') || text.includes('Trial') || text.includes('Build Your First Agent')) {
+      btn.addEventListener('click', (e) => { e.preventDefault(); signupModal?.classList.add('active'); });
+    }
+  });
+
+  // ── OAuth button wiring ─────────────────────────────────────────
+
+  const _spinBtn = (btn) => {
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<span class="pulse-dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;background:white;animation:pulse 1s infinite"></span> Authenticating...';
+    btn.disabled = true;
+    return () => { btn.innerHTML = orig; btn.disabled = false; };
   };
 
-  authSubmitBtns.forEach(btn => {
-      btn.addEventListener('click', (e) => {
-          e.preventDefault();
-          const originalHTML = btn.innerHTML;
-          btn.innerHTML = '<span class="pulse-dot" style="display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:8px; background:white; animation: pulse 1s infinite;"></span> Authenticating...';
-          btn.disabled = true;
+  const _closeModals = () => document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
 
-          setTimeout(() => {
-              document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
-              btn.innerHTML = originalHTML;
-              btn.disabled = false;
+  const _onLoginSuccess = (user, isSignup = false) => {
+    _closeModals();
+    if (isSignup) {
+      setTimeout(() => {
+        if (stripeModal) {
+          stripeModal.classList.add('active');
+          if (paymentLoader && paymentSuccess) {
+            paymentLoader.style.display = 'block';
+            paymentSuccess.style.display = 'none';
+            setTimeout(() => {
+              paymentLoader.style.display = 'none';
+              paymentSuccess.style.display = 'block';
+            }, 2500);
+          }
+        }
+      }, 400);
+    }
+  };
 
-              // If Signup flow, transition to Stripe
-              if (btn.closest('#signupModal')) {
-                  setTimeout(() => {
-                      if (stripeModal) {
-                          stripeModal.classList.add('active');
-                          if (paymentLoader && paymentSuccess) {
-                              paymentLoader.style.display = 'block';
-                              paymentSuccess.style.display = 'none';
+  // Wire each auth button by content
+  document.querySelectorAll('.auth-submit').forEach(btn => {
+    const text = btn.textContent.trim();
+    const isGoogle = text.includes('Google');
+    const isGithub = text.includes('GitHub');
+    const isSignup = !!btn.closest('#signupModal');
+    const isEmailLogin = !isGoogle && !isGithub && btn.closest('#loginModal');
+    const isEmailSignup = !isGoogle && !isGithub && btn.closest('#signupModal') && !text.includes('Claim');
+    const isClaim = text.includes('Claim');
 
-                              setTimeout(() => {
-                                  paymentLoader.style.display = 'none';
-                                  paymentSuccess.style.display = 'block';
-                                  sessionStorage.setItem('is_authenticated', 'true');
-                              }, 2500);
-                          }
-                      }
-                  }, 400);
-              } else {
-                  // Login flow
-                  sessionStorage.setItem('is_authenticated', 'true');
-                  updateAuthenticatedUI();
-              }
-          }, 1200);
-      });
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const restore = _spinBtn(btn);
+      try {
+        if (isGoogle) {
+          await auth.loginWithGoogle();
+        } else if (isGithub) {
+          await auth.loginWithGithub();
+        } else if (isEmailLogin) {
+          const emailInput = btn.closest('.modal-body')?.querySelector('input[type="email"]');
+          const passInput = btn.closest('.modal-body')?.querySelector('input[type="password"]');
+          await auth.loginWithEmail(emailInput?.value || '', passInput?.value || '');
+        } else if (isClaim || isSignup) {
+          const emailInput = btn.closest('.modal-body')?.querySelector('input[type="email"]');
+          const passInput = btn.closest('.modal-body')?.querySelector('input[type="password"]');
+          await auth.signupWithEmail(emailInput?.value || '', passInput?.value || '');
+        }
+        restore();
+        _onLoginSuccess(auth.getUser(), isSignup || isClaim);
+      } catch {
+        restore();
+      }
+    });
   });
-  
+
   // Finish Stripe Flow
   const checkoutDone = document.querySelector('.checkout-done');
   if (checkoutDone) {
-       checkoutDone.addEventListener('click', () => {
-            stripeModal?.classList.remove('active');
-            updateAuthenticatedUI();
-            const target = document.getElementById('marketplace');
-            if (target) {
-                target.scrollIntoView({ behavior: 'smooth' });
-            }
-       });
+    checkoutDone.addEventListener('click', () => {
+      stripeModal?.classList.remove('active');
+      document.getElementById('marketplace')?.scrollIntoView({ behavior: 'smooth' });
+    });
   }
+
+  // ── Restore session + server health ────────────────────────────
+
+  let lastServerOk = false;
+  const restoreAuthSession = async () => {
+    try {
+      const res = await fetch(api.baseUrl + '/api/health');
+      lastServerOk = res.ok;
+    } catch { lastServerOk = false; }
+    updateNavState(auth.getUser(), lastServerOk);
+  };
 
   restoreAuthSession();
 
@@ -388,28 +425,28 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
   }
 
-  // ── Server Connection Check (replaces browser extension concept) ──
+  // ── Server Connection Check ─────────────────────────────────────
   const installExtensionBtn = document.getElementById('installExtensionBtn');
   if (installExtensionBtn) {
-      // Probe server health and update button + nav status indicator
       const checkServer = async () => {
           installExtensionBtn.disabled = true;
           installExtensionBtn.innerHTML = '<span class="pulse-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:white;animation:pulse 1s infinite"></span> Checking...';
           try {
-              const res = await fetch('/api/health');
+              const res = await fetch(api.baseUrl + '/api/health');
+              lastServerOk = res.ok;
               if (res.ok) {
                   installExtensionBtn.textContent = 'Server Connected';
                   installExtensionBtn.className = 'btn btn-secondary mt-4';
-                  updateAuthenticatedUI(true);
               } else {
                   throw new Error('not ok');
               }
           } catch {
+              lastServerOk = false;
               installExtensionBtn.textContent = 'Retry Connection';
               installExtensionBtn.disabled = false;
               installExtensionBtn.className = 'btn btn-ghost mt-4';
-              updateAuthenticatedUI(false);
           }
+          updateNavState(auth.getUser(), lastServerOk);
       };
       installExtensionBtn.addEventListener('click', checkServer);
   }

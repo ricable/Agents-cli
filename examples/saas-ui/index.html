@@ -43,10 +43,13 @@
                 <button class="btn btn-ghost" id="loginBtn">Log In</button>
                 <button class="btn btn-primary shine" id="getStartedBtn">Get Started</button>
 
-                <!-- User Profile — always visible, opens settings modal -->
-                <div class="user-profile user-profile-btn" id="userProfile" title="Account &amp; Settings" style="cursor:pointer">
-                    <span class="user-name">Cedric</span>
-                    <div class="user-avatar">C</div>
+                <!-- User Profile — hidden until logged in -->
+                <div class="user-profile user-profile-btn" id="userProfile" title="Account &amp; Settings" style="cursor:pointer;display:none">
+                    <span class="user-name" id="userDisplayName"></span>
+                    <div class="user-avatar" id="userAvatar"></div>
+                    <div class="user-dropdown glass-card" id="userDropdown" style="display:none;position:absolute;top:100%;right:0;min-width:160px;padding:8px 0;z-index:1000;margin-top:8px">
+                        <button class="dropdown-item" id="logoutBtn" style="width:100%;text-align:left;padding:8px 16px;background:none;border:none;color:var(--text-primary);cursor:pointer;font-size:.9rem">Log Out</button>
+                    </div>
                 </div>
             </div>
         </div>
