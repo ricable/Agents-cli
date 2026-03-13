@@ -759,8 +759,10 @@ agents-cli mcp start</code></pre>
                     <h4>Resources</h4>
                     <ul>
                         <li><a href="#docs">Documentation</a></li>
-                        <li><a href="#">API Reference</a></li>
-                        <li><a href="#">Community</a></li>
+                        <li><a href="#" id="footerApiRef">API Reference</a></li>
+                        <li><a href="https://github.com/ricable/Agents-cli/discussions" target="_blank" rel="noopener">Community</a></li>
+                        <li><a href="https://github.com/ricable/Agents-cli" target="_blank" rel="noopener">GitHub</a></li>
+                        <li><a href="https://github.com/ricable/Agents-cli/issues" target="_blank" rel="noopener">Report Issue</a></li>
                     </ul>
                 </div>
                 <div class="footer-links">
@@ -769,6 +771,7 @@ agents-cli mcp start</code></pre>
                         <li><a href="#" id="footerAboutUs">About Us</a></li>
                         <li><a href="#" id="footerPrivacy">Privacy Policy</a></li>
                         <li><a href="#" id="footerTerms">Terms of Service</a></li>
+                        <li><a href="mailto:contact@spectredve.com">Contact</a></li>
                     </ul>
                 </div>
             </div>
@@ -876,19 +879,121 @@ agents-cli mcp start</code></pre>
         </div>
     </div>
 
+    <!-- About Us Modal -->
+    <div id="aboutModal" class="modal-overlay">
+        <div class="modal-content glass-card" style="max-width:680px">
+            <div class="modal-header"><h3>About Agents-CLI</h3><button class="close-modal">&times;</button></div>
+            <div class="modal-body" style="line-height:1.7">
+                <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px">
+                    <div class="logo-icon" style="font-size:2rem">✨</div>
+                    <div>
+                        <h4 style="margin:0;font-size:1.2rem">Agents<span class="text-gradient">-CLI</span></h4>
+                        <p style="margin:0;color:var(--text-secondary);font-size:.9rem">The operating system for AI agents</p>
+                    </div>
+                </div>
+                <p class="text-muted">Agents-CLI is an open-source package manager for AI agent tools. It resolves, installs, analyzes, and exposes CLI tools from GitHub, npm, PyPI, crates.io, and local sources — all stored in <code>~/.agents-cli/</code>.</p>
+                <p class="text-muted">Built on the principle of <em>"Rewrite Your CLI for AI Agents"</em> — structured JSON output, schema introspection, context-window discipline, input hardening, rich skill generation, multi-surface output, and dry-run safety.</p>
+                <h5 style="margin:20px 0 10px">Key capabilities</h5>
+                <ul style="color:var(--text-secondary);padding-left:20px;line-height:2">
+                    <li>Install tools from any ecosystem with a single command</li>
+                    <li>Auto-generate Claude Code skills (SKILL.md) with trigger scores ≥ 0.80</li>
+                    <li>MCP bridge — expose all installed tools to Claude as Model Context Protocol tools</li>
+                    <li>Plugin system compatible with the Claude Code plugin spec</li>
+                    <li>SaaS companion API for monetization and usage metering</li>
+                    <li>369 tests, ESM-only TypeScript, built with tsup</li>
+                </ul>
+                <div style="display:flex;gap:12px;margin-top:24px">
+                    <a href="https://github.com/ricable/Agents-cli" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">View on GitHub</a>
+                    <a href="https://github.com/ricable/Agents-cli/blob/main/README.md" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">Documentation</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- API Reference Modal -->
+    <div id="apiRefModal" class="modal-overlay">
+        <div class="modal-content glass-card" style="max-width:720px">
+            <div class="modal-header"><h3>API Reference</h3><button class="close-modal">&times;</button></div>
+            <div class="modal-body" style="line-height:1.7">
+                <p class="text-muted">The Agents-CLI companion server exposes a REST API at <code>:3100</code>. All endpoints require <code>Authorization: Bearer &lt;token&gt;</code>.</p>
+                <div style="background:var(--glass-bg);border:1px solid var(--border-color);border-radius:8px;padding:16px;margin:16px 0;font-family:'Fira Code',monospace;font-size:.82rem;line-height:1.8">
+                    <div style="color:var(--accent-green)">GET &nbsp; /api/health</div>
+                    <div style="color:var(--accent-blue)">GET &nbsp; /api/catalog &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+                    <div style="color:var(--accent-blue)">GET &nbsp; /api/usage</div>
+                    <div style="color:var(--accent-blue)">GET &nbsp; /api/auth/me</div>
+                    <div style="color:var(--accent-orange)">POST /api/analyze &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; — Description → TechStackProfile</div>
+                    <div style="color:var(--accent-orange)">POST /api/plan &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; — Description → ToolRecommendations</div>
+                    <div style="color:var(--accent-orange)">POST /api/generate &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; — Async skill generation job</div>
+                    <div style="color:var(--accent-blue)">GET &nbsp; /api/status/:id &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; — Poll job status</div>
+                    <div style="color:var(--accent-blue)">GET &nbsp; /api/download/:id &nbsp;&nbsp;&nbsp; — Download generated bundle</div>
+                    <div style="color:var(--accent-orange)">POST /api/billing/checkout &nbsp; — Stripe checkout session</div>
+                    <div style="color:var(--accent-blue)">GET &nbsp; /api/billing/portal &nbsp;&nbsp; — Customer billing portal</div>
+                    <div style="color:var(--accent-blue)">GET &nbsp; /api/earnings &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; — Creator revenue summary</div>
+                    <div style="color:var(--accent-blue)">GET &nbsp; /api/agents/:id/metrics — Call/cost/latency metrics</div>
+                    <div style="color:var(--accent-blue)">GET &nbsp; /api/invocations/stream — SSE live invocation feed</div>
+                    <div style="color:var(--accent-orange)">POST /api/agent-keys &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; — Create agent API key</div>
+                    <div style="color:var(--accent-pink)">DEL &nbsp; /api/agent-keys/:id &nbsp; — Revoke agent API key</div>
+                </div>
+                <h5 style="margin:16px 0 8px">SDK Usage</h5>
+                <div style="background:var(--glass-bg);border:1px solid var(--border-color);border-radius:8px;padding:16px;font-family:'Fira Code',monospace;font-size:.82rem;line-height:1.8">
+                    <div><span style="color:var(--accent-blue)">import</span> { startServer } <span style="color:var(--accent-blue)">from</span> <span style="color:var(--accent-green)">'agents-cli/companion'</span>;</div>
+                    <div>&nbsp;</div>
+                    <div><span style="color:var(--accent-purple)">const</span> { server } = startServer({</div>
+                    <div>&nbsp;&nbsp;port: <span style="color:var(--accent-orange)">3100</span>,</div>
+                    <div>&nbsp;&nbsp;apiKeys: <span style="color:var(--accent-blue)">new</span> Map([[ <span style="color:var(--accent-green)">'my-key'</span>, { tier: <span style="color:var(--accent-green)">'pro'</span> }]]),</div>
+                    <div>&nbsp;&nbsp;jwtSecret: process.env.JWT_SECRET,</div>
+                    <div>});</div>
+                </div>
+                <div style="margin-top:20px">
+                    <a href="https://github.com/ricable/Agents-cli/blob/main/README.md" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Full Documentation</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Privacy Policy Modal -->
     <div id="privacyModal" class="modal-overlay">
-        <div class="modal-content glass-card" style="max-width:600px">
+        <div class="modal-content glass-card" style="max-width:680px">
             <div class="modal-header"><h3>Privacy Policy</h3><button class="close-modal">&times;</button></div>
-            <div class="modal-body"><p class="text-muted">Agents-CLI is a local-first tool. Your data stays on your machine. We collect only anonymized usage metrics when the companion server is active. OAuth tokens are stored locally and never transmitted to our servers.</p></div>
+            <div class="modal-body" style="line-height:1.7">
+                <p style="color:var(--text-secondary);font-size:.85rem">Last updated: March 2026</p>
+                <h5 style="margin:16px 0 8px">Data we collect</h5>
+                <p class="text-muted">Agents-CLI is a <strong>local-first tool</strong>. All installed tools, skills, and configurations are stored in <code>~/.agents-cli/</code> on your machine. We do not upload your tool data to any server.</p>
+                <p class="text-muted">When the optional companion server is active, we may collect:</p>
+                <ul style="color:var(--text-secondary);padding-left:20px;line-height:2">
+                    <li>Anonymized usage counts (number of skills generated, tools installed)</li>
+                    <li>Error logs for debugging (no personal data, no code content)</li>
+                    <li>Billing events via Stripe (handled by Stripe, not stored by us)</li>
+                </ul>
+                <h5 style="margin:16px 0 8px">OAuth &amp; Authentication</h5>
+                <p class="text-muted">OAuth tokens (GitHub, Google) are stored locally in your session. They are never transmitted to our servers. API keys are hashed (SHA-256) before storage.</p>
+                <h5 style="margin:16px 0 8px">Cookies &amp; Local Storage</h5>
+                <p class="text-muted">This web UI uses <code>localStorage</code> to remember your preferences (theme, filters, installed products). No third-party cookies are set.</p>
+                <h5 style="margin:16px 0 8px">Contact</h5>
+                <p class="text-muted">For privacy concerns, email <a href="mailto:contact@spectredve.com" style="color:var(--accent-blue)">contact@spectredve.com</a>.</p>
+            </div>
         </div>
     </div>
 
     <!-- Terms Modal -->
     <div id="termsModal" class="modal-overlay">
-        <div class="modal-content glass-card" style="max-width:600px">
+        <div class="modal-content glass-card" style="max-width:680px">
             <div class="modal-header"><h3>Terms of Service</h3><button class="close-modal">&times;</button></div>
-            <div class="modal-body"><p class="text-muted">By using Agents-CLI, you agree to use the tool responsibly. Marketplace products are provided as-is. Revenue splits are 80% creator / 20% platform. Enterprise customers have custom SLAs.</p></div>
+            <div class="modal-body" style="line-height:1.7">
+                <p style="color:var(--text-secondary);font-size:.85rem">Last updated: March 2026</p>
+                <h5 style="margin:16px 0 8px">1. Acceptance</h5>
+                <p class="text-muted">By using Agents-CLI (the CLI tool, companion server, or this web interface), you agree to these terms. If you do not agree, do not use the service.</p>
+                <h5 style="margin:16px 0 8px">2. Use of Service</h5>
+                <p class="text-muted">Agents-CLI is provided as an open-source tool for legitimate software development. You agree not to use it for malicious automation, unauthorized access to external systems, or violating third-party terms of service.</p>
+                <h5 style="margin:16px 0 8px">3. Marketplace</h5>
+                <p class="text-muted">Marketplace products (skills, plugins, agent definitions) are provided by independent creators. We do not warrant their correctness or security. Always review skills before installing in production.</p>
+                <h5 style="margin:16px 0 8px">4. Revenue Sharing</h5>
+                <p class="text-muted">For paid marketplace listings, the revenue split is <strong>80% creator / 20% platform</strong>. Payouts are processed monthly via Stripe. Minimum payout threshold: $25 USD.</p>
+                <h5 style="margin:16px 0 8px">5. Limitation of Liability</h5>
+                <p class="text-muted">Agents-CLI is provided "as is" without warranty. We are not liable for any damages arising from use of the tool or marketplace products.</p>
+                <h5 style="margin:16px 0 8px">6. Contact</h5>
+                <p class="text-muted">Legal inquiries: <a href="mailto:contact@spectredve.com" style="color:var(--accent-blue)">contact@spectredve.com</a></p>
+            </div>
         </div>
     </div>
 

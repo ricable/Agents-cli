@@ -29,18 +29,22 @@ async function loadRegistryData() {
 }
 
 export function initRegistries(api, store) {
-  // Inject agent-defs and harnesses into catalog after load
+  // Inject agent-defs, harnesses, and generated skills into catalog after load
   api.loadCatalog().then(() => {
     loadRegistryData().then(data => {
       const extras = [
-        ...( data.agent_defs || []).map(t => ({ ...t, productType: 'agent-def' })),
+        ...(data.agent_defs || []).map(t => ({ ...t, productType: 'agent-def' })),
         ...(data.harnesses || []).map(t => ({ ...t, productType: 'harness' })),
+        ...(data.generated_skills || []).map(t => ({ ...t, productType: t.productType || 'skill' })),
       ];
       // Merge into api.catalog without duplicates
       const existingIds = new Set(api.catalog.map(p => p.id));
       const newEntries = extras.filter(e => !existingIds.has(e.id));
+      if (newEntries.length === 0) return;
       api.catalog = [...api.catalog, ...newEntries];
       store.set('catalog', api.catalog);
+      // Notify marketplace to re-render with the new entries
+      window.dispatchEvent(new CustomEvent('catalog-updated'));
     });
   });
 

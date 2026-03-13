@@ -175,9 +175,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
   });
 
-  // Restore Session on Load — always show profile avatar
-  const restoreAuthSession = () => {
-      updateAuthenticatedUI();
+  // Restore Session on Load — probe server health to set status
+  const restoreAuthSession = async () => {
+      let serverOk = false;
+      try {
+          const res = await fetch('/api/health');
+          serverOk = res.ok;
+      } catch { /* server offline */ }
+      updateAuthenticatedUI(serverOk);
   };
 
   // ── Auth Modals Logic ───────────────────────────────────────────
@@ -219,14 +224,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const paymentLoader = document.getElementById('payment-loader');
   const paymentSuccess = document.getElementById('payment-success');
 
-  const updateAuthenticatedUI = () => {
-      const isExtensionInstalled = localStorage.getItem('agent_cli_extension') === 'true';
+  const updateAuthenticatedUI = (serverConnected = true) => {
       const navActions = document.querySelector('.nav-actions');
       if (navActions) {
           navActions.innerHTML = `
-              <div class="extension-status ${isExtensionInstalled ? 'connected' : 'disconnected'}">
+              <div class="extension-status ${serverConnected ? 'connected' : 'disconnected'}">
                   <span class="status-indicator"></span>
-                  Ext: ${isExtensionInstalled ? 'Active' : 'Missing'}
+                  ${serverConnected ? 'Server: Active' : 'Server: Offline'}
               </div>
               <div class="user-profile user-profile-btn" style="cursor:pointer;" title="Account & Settings">
                   <span class="user-name">Cedric</span>
@@ -384,23 +388,51 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
   }
 
-  // ── Chrome Extension Simulation ───────────────────────────────
+  // ── Server Connection Check (replaces browser extension concept) ──
   const installExtensionBtn = document.getElementById('installExtensionBtn');
   if (installExtensionBtn) {
-      installExtensionBtn.addEventListener('click', () => {
+      // Probe server health and update button + nav status indicator
+      const checkServer = async () => {
           installExtensionBtn.disabled = true;
-          installExtensionBtn.innerHTML = '<span class="pulse-dot"></span> Installing Extension...';
-          
-          setTimeout(() => {
-              localStorage.setItem('agent_cli_extension', 'true');
-              installExtensionBtn.textContent = 'Extension Installed';
-              installExtensionBtn.className = 'btn btn-secondary mt-4';
-              
-              // Update navigation status if logged in
-              if (sessionStorage.getItem('is_authenticated') === 'true') {
-                  updateAuthenticatedUI();
+          installExtensionBtn.innerHTML = '<span class="pulse-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:white;animation:pulse 1s infinite"></span> Checking...';
+          try {
+              const res = await fetch('/api/health');
+              if (res.ok) {
+                  installExtensionBtn.textContent = 'Server Connected';
+                  installExtensionBtn.className = 'btn btn-secondary mt-4';
+                  updateAuthenticatedUI(true);
+              } else {
+                  throw new Error('not ok');
               }
-          }, 2000);
-      });
+          } catch {
+              installExtensionBtn.textContent = 'Retry Connection';
+              installExtensionBtn.disabled = false;
+              installExtensionBtn.className = 'btn btn-ghost mt-4';
+              updateAuthenticatedUI(false);
+          }
+      };
+      installExtensionBtn.addEventListener('click', checkServer);
   }
+
+  // ── Footer Modal Links ─────────────────────────────────────────
+  const footerModals = {
+    footerAboutUs:  'aboutModal',
+    footerPrivacy:  'privacyModal',
+    footerTerms:    'termsModal',
+    footerApiRef:   'apiRefModal',
+    footerSkillForge: null, // scroll to marketplace
+  };
+
+  Object.entries(footerModals).forEach(([btnId, modalId]) => {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (modalId) {
+        document.getElementById(modalId)?.classList.add('active');
+      } else if (btnId === 'footerSkillForge') {
+        document.getElementById('marketplace')?.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  });
 });

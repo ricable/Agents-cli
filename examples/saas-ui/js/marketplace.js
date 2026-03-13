@@ -146,6 +146,9 @@ export function initMarketplace(api, store, showProductDetail) {
   store.subscribe('catalog', () => renderProducts());
   store.subscribe('installed', () => renderProducts());
 
+  // Re-render when registries inject agent-defs / generated-skills
+  window.addEventListener('catalog-updated', () => renderProducts());
+
   // ── Initial load ────────────────────────────────────────────────
 
   loadAndRender();
