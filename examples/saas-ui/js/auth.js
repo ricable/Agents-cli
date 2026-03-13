@@ -78,10 +78,12 @@ export class AuthManager {
       if (window.location.pathname === '/sso-callback') {
         try {
           await clerk.handleRedirectCallback();
-        } catch {
-          // Redirect back to home if callback fails
+        } catch (err) {
+          console.error('[Clerk] handleRedirectCallback failed:', err);
           window.location.href = '/';
         }
+        // handleRedirectCallback navigates away on success; if still here, go home
+        window.location.href = '/';
         return;
       }
 
@@ -196,10 +198,16 @@ export class AuthManager {
   async openSignIn(mountEl) {
     await this._ready;
     if (this._clerk) {
+      const redirectBack = window.location.href;
       if (mountEl) {
-        this._clerk.mountSignIn(mountEl);
+        // Mount with redirect props so Clerk knows where to return after OAuth
+        this._clerk.mountSignIn(mountEl, {
+          afterSignInUrl: redirectBack,
+          afterSignUpUrl: redirectBack,
+          fallbackRedirectUrl: redirectBack,
+        });
       } else {
-        this._clerk.openSignIn({ afterSignInUrl: window.location.href, afterSignUpUrl: window.location.href });
+        this._clerk.openSignIn({ afterSignInUrl: redirectBack, afterSignUpUrl: redirectBack });
       }
     } else {
       this._mockLogin('email');
@@ -209,10 +217,15 @@ export class AuthManager {
   async openSignUp(mountEl) {
     await this._ready;
     if (this._clerk) {
+      const redirectBack = window.location.href;
       if (mountEl) {
-        this._clerk.mountSignUp(mountEl);
+        this._clerk.mountSignUp(mountEl, {
+          afterSignInUrl: redirectBack,
+          afterSignUpUrl: redirectBack,
+          fallbackRedirectUrl: redirectBack,
+        });
       } else {
-        this._clerk.openSignUp({ afterSignInUrl: window.location.href, afterSignUpUrl: window.location.href });
+        this._clerk.openSignUp({ afterSignInUrl: redirectBack, afterSignUpUrl: redirectBack });
       }
     } else {
       this._mockLogin('email');
@@ -242,20 +255,20 @@ export class AuthManager {
     await this._ready;
     if (!this._clerk) return this._mockLogin(strategy.replace('oauth_', ''));
 
+    const redirectBack = window.location.href;
     try {
       const signIn = this._clerk.client?.signIn;
       if (signIn?.authenticateWithRedirect) {
         await signIn.authenticateWithRedirect({
           strategy,
           redirectUrl: `${window.location.origin}/sso-callback`,
-          redirectUrlComplete: window.location.href,
+          redirectUrlComplete: redirectBack,
         });
       } else {
-        // Clerk JS version doesn't support direct redirect — open modal instead
-        this._clerk.openSignIn({});
+        this._clerk.openSignIn({ afterSignInUrl: redirectBack, afterSignUpUrl: redirectBack });
       }
     } catch {
-      this._clerk.openSignIn({});
+      this._clerk.openSignIn({ afterSignInUrl: redirectBack, afterSignUpUrl: redirectBack });
     }
   }
 
