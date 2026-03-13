@@ -57,7 +57,8 @@ export async function verifyClerkToken(
       publishableKey: config.publishableKey,
     });
 
-    if (!authResult.isSignedIn) return null;
+    // 'handshake' = multi-domain cookie sync redirect — not applicable to JSON API
+    if (authResult.status === "handshake" || !authResult.isSignedIn) return null;
 
     const auth = authResult.toAuth();
     if (!auth) return null;

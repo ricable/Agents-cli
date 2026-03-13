@@ -44,9 +44,10 @@ export class AuthManager {
       await clerk.load({ publishableKey });
       this._clerk = clerk;
 
-      // Listen for session changes
+      // Listen for session changes.
+      // session === undefined means loading; null means signed-out; object means active.
       clerk.addListener(({ session, user }) => {
-        if (session && user) {
+        if (session != null && user != null) {
           const authUser = {
             email: user.primaryEmailAddress?.emailAddress ?? user.emailAddresses?.[0]?.emailAddress ?? '',
             name: user.fullName ?? user.firstName ?? '',
@@ -92,50 +93,52 @@ export class AuthManager {
 
   _loadClerkScript(publishableKey) {
     return new Promise((resolve, reject) => {
-      // Derive frontend API host from publishable key
-      // pk_test_abc123 → base64 decode the third segment
+      // Derive FAPI hostname from publishable key.
+      // Format: pk_test_<base64(fapiHost + "$")> or pk_live_<base64(fapiHost + "$")>
+      // The third "_"-separated segment is standard base64 (not base64url) of the hostname + "$".
       const parts = publishableKey.split('_');
-      let frontendApiHost = '';
+      let fapiHost = '';
       if (parts.length >= 3) {
         try {
-          // The third part is base64url-encoded frontend API host
-          const decoded = atob(parts[2].replace(/-/g, '+').replace(/_/g, '/'));
-          frontendApiHost = decoded.replace(/\0/g, '').replace(/\/$/, '');
+          fapiHost = atob(parts[2]).replace(/\$$/, '').trim();
         } catch {
           // ignore decode errors
         }
       }
 
-      if (!frontendApiHost) {
-        // Fallback: use Clerk CDN with clerk-js package directly
-        frontendApiHost = 'https://cdn.jsdelivr.net';
+      const _appendScript = (src, onLoad, onError) => {
         const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js';
+        script.src = src;
         script.crossOrigin = 'anonymous';
+        script.async = true;
         script.setAttribute('data-clerk-publishable-key', publishableKey);
-        script.onload = resolve;
-        script.onerror = reject;
+        script.onload = onLoad;
+        script.onerror = onError;
         document.head.appendChild(script);
-        return;
-      }
-
-      const clerkUrl = `${frontendApiHost}/npm/@clerk/clerk-js@latest/dist/clerk.browser.js`;
-      const script = document.createElement('script');
-      script.src = clerkUrl;
-      script.crossOrigin = 'anonymous';
-      script.setAttribute('data-clerk-publishable-key', publishableKey);
-      script.onload = resolve;
-      script.onerror = () => {
-        // Fallback to jsdelivr CDN
-        const fallback = document.createElement('script');
-        fallback.src = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js';
-        fallback.crossOrigin = 'anonymous';
-        fallback.setAttribute('data-clerk-publishable-key', publishableKey);
-        fallback.onload = resolve;
-        fallback.onerror = reject;
-        document.head.appendChild(fallback);
       };
-      document.head.appendChild(script);
+
+      if (fapiHost) {
+        // Primary: load from Frontend API hostname (Clerk's recommended approach)
+        _appendScript(
+          `https://${fapiHost}/npm/@clerk/clerk-js@5/dist/clerk.browser.js`,
+          resolve,
+          () => {
+            // Fallback to jsdelivr CDN if FAPI load fails
+            _appendScript(
+              'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js',
+              resolve,
+              reject,
+            );
+          },
+        );
+      } else {
+        // No FAPI derived — go straight to CDN
+        _appendScript(
+          'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js',
+          resolve,
+          reject,
+        );
+      }
     });
   }
 
