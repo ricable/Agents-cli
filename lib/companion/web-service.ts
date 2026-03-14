@@ -180,7 +180,7 @@ async function authenticateAndParse(
   authenticate: (req: IncomingMessage) => ApiKeyRecord | null,
 ): Promise<AuthedRequest | null> {
   const keyRecord = authenticate(req);
-  if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return null; }
+  if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token", req); return null; }
   if (!keyLimiter.consume(hashKey(req.headers.authorization!.slice(7)))) {
     sendError(res, 429, "RATE_LIMITED", "Rate limit exceeded for API key"); return null;
   }
@@ -467,7 +467,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     const statusMatch = path.match(/^\/api\/status\/([a-f0-9-]{36})$/);
     if (method === "GET" && statusMatch) {
       const keyRecord = authenticate(req);
-      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token", req); return; }
 
       const job = jobs.get(statusMatch[1]!);
       if (!job) { sendError(res, 404, "NOT_FOUND", "Job not found"); return; }
@@ -493,7 +493,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     const dlMatch = path.match(/^\/api\/download\/([a-f0-9-]{36})$/);
     if (method === "GET" && dlMatch) {
       const keyRecord = authenticate(req);
-      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token", req); return; }
 
       const job = jobs.get(dlMatch[1]!);
       if (!job) { sendError(res, 404, "NOT_FOUND", "Job not found"); return; }
@@ -523,7 +523,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     // ── GET /api/usage ──────────────────────────────────────────
     if (method === "GET" && path === "/api/usage") {
       const authed = await requireAuth(req);
-      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token", req); return; }
       const keyRecord = authed.keyRecord;
       const authHeader = req.headers.authorization ?? "";
       const keyHash = hashKey(authHeader.startsWith("Bearer ") ? authHeader.slice(7) : authed.clerkUserId ?? "");
@@ -544,7 +544,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     // GET /api/auth/me — Clerk-aware user info
     if (method === "GET" && path === "/api/auth/me") {
       const authed = await requireAuth(req);
-      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token", req); return; }
       sendJson(res, 200, success("auth-me", {
         email: authed.clerkEmail ?? "user@example.com",
         userId: authed.clerkUserId ?? null,
@@ -642,7 +642,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     // GET /api/billing/portal
     if (method === "GET" && path === "/api/billing/portal") {
       const authed = await requireAuth(req);
-      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token", req); return; }
       try {
         let customerId: string;
         if (authed.clerkUserId) {
@@ -666,7 +666,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     // GET /api/billing/invoices
     if (method === "GET" && path === "/api/billing/invoices") {
       const authed = await requireAuth(req);
-      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token", req); return; }
       try {
         let customerId: string;
         if (authed.clerkUserId) {
@@ -692,7 +692,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     // GET /api/earnings
     if (method === "GET" && path === "/api/earnings") {
       const authed = await requireAuth(req);
-      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token", req); return; }
       void authed; // authenticated but no keyRecord fields needed here
       const period = url.searchParams.get("period") || "month";
       const nextPayout = new Date();
@@ -711,7 +711,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     const agentMetricsMatch = path.match(/^\/api\/agents\/([^/]+)\/metrics$/);
     if (method === "GET" && agentMetricsMatch) {
       const authed = await requireAuth(req);
-      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token", req); return; }
       res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
       res.end(JSON.stringify({
         success: true,
@@ -730,7 +730,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     const agentHeatmapMatch = path.match(/^\/api\/agents\/([^/]+)\/heatmap$/);
     if (method === "GET" && agentHeatmapMatch) {
       const authed = await requireAuth(req);
-      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token", req); return; }
       res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
       res.end(JSON.stringify({
         success: true,
@@ -746,7 +746,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     // POST /api/agent-keys
     if (method === "POST" && path === "/api/agent-keys") {
       const authed = await requireAuth(req);
-      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token", req); return; }
       try {
         const body = await parseBody(req, config.maxBodySize);
         const parsed = JSON.parse(body) as { scopes?: string[] };
@@ -769,7 +769,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     const agentKeyDeleteMatch = path.match(/^\/api\/agent-keys\/([^/]+)$/);
     if (method === "DELETE" && agentKeyDeleteMatch) {
       const authed = await requireAuth(req);
-      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token", req); return; }
       sendJson(res, 200, success("agent-keys-revoke", {
         revoked: true,
         id: agentKeyDeleteMatch[1],
@@ -780,7 +780,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     // GET /api/invocations/stream
     if (method === "GET" && path === "/api/invocations/stream") {
       const authed = await requireAuth(req);
-      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token", req); return; }
       const skill = url.searchParams.get("skill") || "unknown";
       res.writeHead(200, {
         "Content-Type": "text/event-stream",
