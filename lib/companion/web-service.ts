@@ -571,7 +571,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
         used: usage.count,
         remaining: tierLimits.dailyGens < 0 ? -1 : tierLimits.dailyGens - usage.count,
         resetsAt: new Date(usage.resetAt).toISOString(),
-      }, Date.now()));
+      }, Date.now()), req);
       return;
     }
 
@@ -580,12 +580,12 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     // GET /api/auth/me — Clerk-aware user info
     if (method === "GET" && path === "/api/auth/me") {
       const authed = await requireAuth(req);
-      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token", req); return; }
       sendJson(res, 200, success("auth-me", {
         email: authed.clerkEmail ?? "user@example.com",
         userId: authed.clerkUserId ?? null,
         tier: authed.keyRecord.tier,
-      }, Date.now()));
+      }, Date.now()), req);
       return;
     }
 
@@ -598,7 +598,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
         const payload = await parseBody(req, config.maxBodySize);
         const signature = req.headers["stripe-signature"];
         if (!signature || Array.isArray(signature)) {
-          sendError(res, 400, "INVALID_SIGNATURE", "Missing stripe-signature header"); return;
+          sendError(res, 400, "INVALID_SIGNATURE", "Missing stripe-signature header", req); return;
         }
         const billing = createBillingProvider("stripe");
         const event = await billing.verifyWebhook(payload, signature, config.stripeWebhookSecret);
@@ -661,7 +661,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
 
         sendJson(res, 200, success("billing-webhook", { received: true, type: event.type }, Date.now()), req);
       } catch (err) {
-        sendError(res, 400, "WEBHOOK_ERROR", toErrorMessage(err));
+        sendError(res, 400, "WEBHOOK_ERROR", toErrorMessage(err), req);
       }
       return;
     }
@@ -669,7 +669,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     // POST /api/billing/checkout
     if (method === "POST" && path === "/api/billing/checkout") {
       const authed = await requireAuth(req);
-      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
+      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token", req); return; }
       try {
         const body = await parseBody(req, config.maxBodySize);
         const parsed = JSON.parse(body) as { priceId?: string; successUrl?: string; cancelUrl?: string };
