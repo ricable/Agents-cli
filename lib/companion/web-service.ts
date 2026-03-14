@@ -857,12 +857,21 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
 
     // ── Catalog endpoints ──────────────────────────────────────
 
+    // Lazy-cached unified store accessor (avoids 3x dynamic imports)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let _catalogStore: any = null;
+    async function getCatalogStore() {
+      if (_catalogStore) return _catalogStore;
+      const { createUnifiedStore } = await import("../db/unified-store.js");
+      const homeDir = (await import("os")).homedir();
+      _catalogStore = createUnifiedStore(join(homeDir, ".agents-cli"));
+      return _catalogStore;
+    }
+
     // GET /api/catalog/domains — domain tree with counts
     if (method === "GET" && path === "/api/catalog/domains") {
       try {
-        const { createUnifiedStore } = await import("../db/unified-store.js");
-        const homeDir = (await import("os")).homedir();
-        const uStore = createUnifiedStore(join(homeDir, ".agents-cli"));
+        const uStore = await getCatalogStore();
         const tree = uStore.listDomainsWithCounts();
         sendJson(res, 200, success("catalog-domains", { domains: tree }, Date.now()), req);
       } catch (err) {
@@ -876,9 +885,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
       const skillId = decodeURIComponent(path.slice("/api/graph/".length));
       if (!skillId) { sendError(res, 400, "BAD_REQUEST", "Missing skillId", req); return; }
       try {
-        const { createUnifiedStore } = await import("../db/unified-store.js");
-        const homeDir = (await import("os")).homedir();
-        const uStore = createUnifiedStore(join(homeDir, ".agents-cli"));
+        const uStore = await getCatalogStore();
         const edges = uStore.getNeighbors(skillId);
         sendJson(res, 200, success("graph", { skillId, edges }, Date.now()), req);
       } catch (err) {
@@ -901,9 +908,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
 
         let result;
         try {
-          const { createUnifiedStore } = await import("../db/unified-store.js");
-          const homeDir = (await import("os")).homedir();
-          const uStore = createUnifiedStore(join(homeDir, ".agents-cli"));
+          const uStore = await getCatalogStore();
           result = uStore.searchProducts({
             q, offset: offsetParam, limit: limitParam,
             domain: domainFilter.length ? domainFilter : undefined,

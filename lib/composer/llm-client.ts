@@ -68,7 +68,15 @@ export class TieredLLMClient {
       }
     }
 
-    return this.generateOllama(task, prompt, systemPrompt);
+    // Try Ollama first, fall back to Claude for any task if Ollama fails
+    try {
+      return await this.generateOllama(task, prompt, systemPrompt);
+    } catch (ollamaErr) {
+      if (this.claudeApiKey) {
+        return this.generateClaude(task, prompt, systemPrompt);
+      }
+      throw ollamaErr;
+    }
   }
 
   /** Check if Ollama is available */
@@ -84,6 +92,33 @@ export class TieredLLMClient {
     }
   }
 
+  /**
+   * Detect an available Ollama model. If the configured model is not installed,
+   * falls back to the first available model.
+   */
+  private async resolveOllamaModel(): Promise<string> {
+    try {
+      const response = await fetch(`${this.ollamaUrl}/api/tags`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!response.ok) return this.ollamaModel;
+      const data = await response.json() as { models: Array<{ name: string }> };
+      const available = data.models?.map((m) => m.name) ?? [];
+      if (available.length === 0) {
+        throw new Error("No Ollama models installed. Run: ollama pull llama3.2");
+      }
+      // Check if configured model is available
+      if (available.some((m) => m === this.ollamaModel || m.startsWith(this.ollamaModel + ":"))) {
+        return this.ollamaModel;
+      }
+      // Fall back to first available model
+      return available[0]!;
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("No Ollama models")) throw err;
+      return this.ollamaModel;
+    }
+  }
+
   /** Check if Claude API is available */
   hasClaudeAccess(): boolean {
     return !!this.claudeApiKey;
@@ -94,9 +129,10 @@ export class TieredLLMClient {
   private async generateOllama(task: LLMTask, prompt: string, systemPrompt?: string): Promise<LLMResponse> {
     validateOllamaUrl(this.ollamaUrl);
     const start = Date.now();
+    const model = await this.resolveOllamaModel();
 
     const body: Record<string, unknown> = {
-      model: this.ollamaModel,
+      model,
       prompt,
       stream: false,
       options: {
@@ -117,7 +153,11 @@ export class TieredLLMClient {
     });
 
     if (!response.ok) {
-      throw new Error(`Ollama error: ${response.status} ${response.statusText}`);
+      const errBody = await response.text().catch(() => "");
+      const hint = errBody.includes("failed to load")
+        ? `. Model "${model}" may be too large for available resources. Try: ollama pull llama3.2`
+        : "";
+      throw new Error(`Ollama error: ${response.status} ${response.statusText}${hint}`);
     }
 
     const result = await response.json() as {

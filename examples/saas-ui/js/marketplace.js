@@ -161,6 +161,7 @@ export function initMarketplace(api, store, showProductDetail, auth) {
 
   const domainTreeContainer = document.querySelector('.domain-tree');
   let activeDomains = [];
+  let domainListenerAttached = false;
 
   async function loadDomainTree() {
     if (!domainTreeContainer) return;
@@ -184,11 +185,15 @@ export function initMarketplace(api, store, showProductDetail, auth) {
         </label>
       `).join('');
 
-    domainTreeContainer.addEventListener('change', () => {
-      activeDomains = [...domainTreeContainer.querySelectorAll('.domain-checkbox:checked')].map(cb => cb.value);
-      store.update('searchFilters', f => ({ ...f, domains: activeDomains }));
-      renderProducts();
-    });
+    // Register change listener once to prevent stacking
+    if (!domainListenerAttached) {
+      domainTreeContainer.addEventListener('change', () => {
+        activeDomains = [...domainTreeContainer.querySelectorAll('.domain-checkbox:checked')].map(cb => cb.value);
+        store.update('searchFilters', f => ({ ...f, domains: activeDomains }));
+        renderProducts();
+      });
+      domainListenerAttached = true;
+    }
   }
 
   // ── Infinite scroll ─────────────────────────────────────────────
@@ -197,12 +202,16 @@ export function initMarketplace(api, store, showProductDetail, auth) {
   let isLoadingMore = false;
   let hasMoreProducts = false;
   const PAGE_SIZE = 50;
+  let scrollObserver = null;
 
   function setupInfiniteScroll() {
     const trigger = document.querySelector('.infinite-scroll-trigger');
     if (!trigger) return;
 
-    const observer = new IntersectionObserver(async (entries) => {
+    // Disconnect previous observer if re-init
+    if (scrollObserver) scrollObserver.disconnect();
+
+    scrollObserver = new IntersectionObserver(async (entries) => {
       const entry = entries[0];
       if (!entry.isIntersecting || isLoadingMore || !hasMoreProducts) return;
 
@@ -238,8 +247,18 @@ export function initMarketplace(api, store, showProductDetail, auth) {
       isLoadingMore = false;
     }, { rootMargin: '200px' });
 
-    observer.observe(trigger);
+    scrollObserver.observe(trigger);
   }
+
+  // Set hasMoreProducts=true when catalog is large enough to paginate
+  function resetScrollState() {
+    currentOffset = 0;
+    hasMoreProducts = api.catalog.length >= PAGE_SIZE;
+  }
+
+  // Reset scroll state on filter/search changes
+  store.subscribe('searchFilters', resetScrollState);
+  store.subscribe('searchQuery', resetScrollState);
 
   setupInfiniteScroll();
 

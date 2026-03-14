@@ -745,23 +745,23 @@ export class UnifiedStore implements ToolStore {
     const includeSkills = !opts?.productType?.length || opts.productType.some((t) => t === "skill" || t === "all");
     const includeWorkflows = !opts?.productType?.length || opts.productType.some((t) => t === "workflow" || t === "all");
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const allParams: any[] = [];
     const parts: string[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const filterParams: any[] = [];
 
     if (includeSkills) {
       const conds: string[] = [];
-      if (opts?.q) { conds.push("s.id IN (SELECT id FROM skills_fts WHERE skills_fts MATCH ?)"); allParams.push(opts.q); }
-      if (opts?.domain?.length) { conds.push(`s.domain IN (${opts.domain.map(() => "?").join(",")})`); allParams.push(...opts.domain); }
-      if (opts?.minQuality !== undefined) { conds.push("s.trigger_score >= ?"); allParams.push(opts.minQuality); }
+      if (opts?.q) { conds.push("s.id IN (SELECT id FROM skills_fts WHERE skills_fts MATCH ?)"); filterParams.push(opts.q); }
+      if (opts?.domain?.length) { conds.push(`s.domain IN (${opts.domain.map(() => "?").join(",")})`); filterParams.push(...opts.domain); }
+      if (opts?.minQuality !== undefined) { conds.push("s.trigger_score >= ?"); filterParams.push(opts.minQuality); }
       const w = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
       parts.push(`SELECT s.id, s.name, s.description, s.domain, 'skill' as product_type, s.trigger_score as quality, s.version, s.tags, s.skill_dir, NULL as steps_json, NULL as estimated_duration, s.rowid as _rowid FROM skills s ${w}`);
     }
 
     if (includeWorkflows) {
       const conds: string[] = [];
-      if (opts?.q) { conds.push("(w.name LIKE ? OR w.description LIKE ?)"); allParams.push(`%${opts.q}%`, `%${opts.q}%`); }
-      if (opts?.domain?.length) { conds.push(`w.domain IN (${opts.domain.map(() => "?").join(",")})`); allParams.push(...opts.domain); }
+      if (opts?.q) { conds.push("(w.name LIKE ? OR w.description LIKE ?)"); filterParams.push(`%${opts.q}%`, `%${opts.q}%`); }
+      if (opts?.domain?.length) { conds.push(`w.domain IN (${opts.domain.map(() => "?").join(",")})`); filterParams.push(...opts.domain); }
       const w = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
       parts.push(`SELECT w.id, w.name, w.description, w.domain, 'workflow' as product_type, NULL as quality, '1.0.0' as version, '' as tags, w.skill_dir, w.steps_json, w.estimated_duration, w.rowid as _rowid FROM workflows w ${w}`);
     }
@@ -771,18 +771,19 @@ export class UnifiedStore implements ToolStore {
     const unionSql = parts.join(" UNION ALL ");
     const sortClause = opts?.sort === "quality" ? "ORDER BY quality DESC NULLS LAST" : opts?.sort === "newest" ? "ORDER BY _rowid DESC" : "ORDER BY name ASC";
 
-    // Count
-    const countSql = `SELECT COUNT(*) as c FROM (${unionSql})`;
-    const countParams = [...allParams];
-    const total = this.db.prepare(countSql).get(...countParams)?.c ?? 0;
-
-    // Paginated results
+    // Fetch limit+1 to detect hasMore without a separate COUNT query
     const pageSql = `${unionSql} ${sortClause} LIMIT ? OFFSET ?`;
-    allParams.push(lim, off);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rows: any[] = this.db.prepare(pageSql).all(...allParams);
+    const rows: any[] = this.db.prepare(pageSql).all(...filterParams, lim + 1, off);
+    const hasMore = rows.length > lim;
+    const pageRows = hasMore ? rows.slice(0, lim) : rows;
 
-    const products = rows.map((r: Record<string, unknown>) => ({
+    // Lightweight total from base tables (avoids re-executing full UNION for count)
+    let total = 0;
+    if (includeSkills) total += this.skillCount();
+    if (includeWorkflows) total += this.workflowCount();
+
+    const products = pageRows.map((r: Record<string, unknown>) => ({
       id: r.id,
       name: r.name,
       description: r.description,
@@ -796,25 +797,22 @@ export class UnifiedStore implements ToolStore {
       estimatedDuration: r.estimated_duration,
     }));
 
-    return { products, total, offset: off, limit: lim, hasMore: off + lim < total };
+    return { products, total, offset: off, limit: lim, hasMore };
   }
 
   /** List domains with skill + workflow counts as a tree */
   listDomainsWithCounts(): Array<{ id: string; label: string; parentId: string | null; depth: number; skillCount: number; workflowCount: number; total: number }> {
-    const domains = this.listDomains();
-    return domains.map((d) => {
-      const skillCount = this.db.prepare("SELECT COUNT(*) as c FROM skills WHERE domain = ?").get(d.id)?.c ?? 0;
-      const workflowCount = this.db.prepare("SELECT COUNT(*) as c FROM workflows WHERE domain = ?").get(d.id)?.c ?? 0;
-      return {
-        id: d.id,
-        label: d.label,
-        parentId: d.parent_id,
-        depth: d.depth,
-        skillCount,
-        workflowCount,
-        total: skillCount + workflowCount,
-      };
-    });
+    // Single query with LEFT JOINs instead of N+1
+    return this.db.prepare(`
+      SELECT d.id, d.label, d.parent_id as parentId, d.depth,
+        COALESCE(sc.c, 0) as skillCount,
+        COALESCE(wc.c, 0) as workflowCount,
+        COALESCE(sc.c, 0) + COALESCE(wc.c, 0) as total
+      FROM domains d
+      LEFT JOIN (SELECT domain, COUNT(*) as c FROM skills GROUP BY domain) sc ON sc.domain = d.id
+      LEFT JOIN (SELECT domain, COUNT(*) as c FROM workflows GROUP BY domain) wc ON wc.domain = d.id
+      ORDER BY d.id
+    `).all();
   }
 
   // ── General ────────────────────────────────────────────────────────

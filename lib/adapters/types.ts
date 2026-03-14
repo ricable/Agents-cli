@@ -6,6 +6,7 @@
  */
 
 import type { Tool, ToolMeta } from "../types.js";
+import { toErrorMessage } from "../output.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -76,4 +77,42 @@ export interface MCPServerConfig {
   npmPackage?: string;
   /** GitHub repo (owner/repo) */
   repo?: string;
+}
+
+// ── Shared helpers ─────────────────────────────────────────────────────
+
+/** Extract name from a prefixed source (e.g., "mcp:filesystem" → "filesystem"). Returns null if empty. */
+export function extractAdapterName(source: string, prefix: string): string | null {
+  const name = source.replace(new RegExp(`^${prefix}`), "").trim();
+  return name || null;
+}
+
+/** Build a SkillCandidate for an adapter error. */
+export function errorCandidate(source: string, adapter: AdapterType, name: string, err: unknown): SkillCandidate {
+  return { source, adapter, meta: { name, description: toErrorMessage(err) } };
+}
+
+/** Build a Tool-like object for adapters that construct tools from non-registry sources. */
+export function buildCandidateTool(opts: {
+  id: string;
+  name: string;
+  version?: string;
+  description: string;
+  tags: string[];
+  format: string;
+  uri: string;
+  commands?: Array<{ name: string; description: string; flags: unknown[] }>;
+  installPath: string;
+}): Tool {
+  const now = new Date().toISOString();
+  return {
+    id: opts.id,
+    meta: { name: opts.name, version: opts.version ?? "1.0.0", description: opts.description, tags: opts.tags },
+    source: { format: opts.format, uri: opts.uri },
+    capabilities: { commands: opts.commands ?? [], globalFlags: [], subcommandAliases: {} },
+    installPath: opts.installPath,
+    status: "installed",
+    installedAt: now,
+    updatedAt: now,
+  } as Tool;
 }

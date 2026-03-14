@@ -179,7 +179,13 @@ export async function buildSkillGraph(
 
   // 5. Compute LLM-inferred edges (optional, slow)
   if (opts?.includeLLM) {
-    const llmEdges = await computeLlmInferredEdges(store, skills, ioEdges, domainEdges, opts);
+    // Pre-build connected set so LLM function doesn't re-scan edge arrays
+    const connectedPairs = new Set<string>();
+    for (const e of [...ioEdges, ...domainEdges]) {
+      connectedPairs.add(`${e.sourceId}::${e.targetId}`);
+      connectedPairs.add(`${e.targetId}::${e.sourceId}`);
+    }
+    const llmEdges = await computeLlmInferredEdges(store, skills, connectedPairs, opts);
     if (llmEdges.length > 0) {
       store.bulkAddEdges(llmEdges);
       llmInferredEdges = llmEdges.length;
@@ -205,21 +211,13 @@ export async function buildSkillGraph(
  * Returns edges with weight = LLM confidence for pairs above threshold.
  */
 async function computeLlmInferredEdges(
-  store: UnifiedStore,
+  _store: UnifiedStore,
   skills: SkillRecord[],
-  ioEdges: Array<{ sourceId: string; targetId: string }>,
-  domainEdges: Array<{ sourceId: string; targetId: string }>,
+  connected: Set<string>,
   opts?: GraphBuildOptions,
 ): Promise<Array<{ sourceId: string; targetId: string; edgeType: EdgeType; weight: number; metadata: Record<string, unknown> }>> {
   const { TieredLLMClient } = await import("../composer/llm-client.js");
   const llm = new TieredLLMClient();
-
-  // Build set of already-connected pairs
-  const connected = new Set<string>();
-  for (const e of [...ioEdges, ...domainEdges]) {
-    connected.add(`${e.sourceId}::${e.targetId}`);
-    connected.add(`${e.targetId}::${e.sourceId}`);
-  }
 
   // Sample up to 50 unconnected pairs from different domains
   const pairs: Array<[SkillRecord, SkillRecord]> = [];

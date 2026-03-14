@@ -98,9 +98,9 @@ async function graphqlRequest(
   query: string,
   variables: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  const token = process.env.GITHUB_TOKEN;
+  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
   if (!token) {
-    throw new Error("GITHUB_TOKEN env var required for GitHub GraphQL API");
+    throw new Error("GITHUB_TOKEN or GH_TOKEN env var required for GitHub GraphQL API");
   }
 
   if (getPointsRemaining() < 10) {

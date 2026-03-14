@@ -6,7 +6,7 @@
  */
 
 import type { SourceAdapter, SkillCandidate, AdapterOptions } from "./types.js";
-import { toErrorMessage } from "../output.js";
+import { extractAdapterName, errorCandidate, buildCandidateTool } from "./types.js";
 
 export class CliAnythingAdapter implements SourceAdapter {
   readonly type = "cli-anything" as const;
@@ -16,13 +16,9 @@ export class CliAnythingAdapter implements SourceAdapter {
   }
 
   async analyze(source: string, opts?: AdapterOptions): Promise<SkillCandidate> {
-    const appName = source.replace(/^cli-anything:/, "").trim();
+    const appName = extractAdapterName(source, "cli-anything:");
     if (!appName) {
-      return {
-        source,
-        adapter: "cli-anything",
-        meta: { name: source, description: "Empty app name" },
-      };
+      return { source, adapter: this.type, meta: { name: source, description: "Empty app name" } };
     }
 
     try {
@@ -35,40 +31,20 @@ export class CliAnythingAdapter implements SourceAdapter {
         deep: opts?.deep,
       });
 
-      // Build a partial Tool from the pipeline result
-      const tool = {
+      const tool = buildCandidateTool({
         id: `cli-anything-${appName}`,
-        meta: {
-          name: appName,
-          version: "1.0.0",
-          description: result.profile?.description ?? `CLI harness for ${appName}`,
-          tags: ["cli-anything", ...(result.profile?.tags ?? [])],
-        },
-        source: { format: "cli-anything" as const, uri: source },
-        capabilities: {
-          commands: result.harness?.commands ?? [],
-          globalFlags: [],
-          subcommandAliases: {},
-        },
+        name: appName,
+        description: result.profile?.description ?? `CLI harness for ${appName}`,
+        tags: ["cli-anything", ...(result.profile?.tags ?? [])],
+        format: "cli-anything",
+        uri: source,
+        commands: result.harness?.commands ?? [],
         installPath: opts?.skillsDir ?? "",
-        status: "installed" as const,
-        installedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+      });
 
-      return {
-        source,
-        adapter: "cli-anything",
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        tool: tool as any,
-        pruneAfter: false,
-      };
+      return { source, adapter: this.type, tool, pruneAfter: false };
     } catch (err) {
-      return {
-        source,
-        adapter: "cli-anything",
-        meta: { name: appName, description: toErrorMessage(err) },
-      };
+      return errorCandidate(source, this.type, appName, err);
     }
   }
 }
