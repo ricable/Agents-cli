@@ -11,6 +11,7 @@ import type { VecStore } from "../db/vec-store.js";
 import type { UnifiedStore, SkillRecord } from "../db/unified-store.js";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { extractBody } from "../skills/frontmatter.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -181,9 +182,7 @@ function loadSkillBody(skill: SkillRecord): string | undefined {
   if (!skill.skill_dir) return undefined;
   try {
     const content = readFileSync(join(skill.skill_dir, "SKILL.md"), "utf-8");
-    // Strip frontmatter, return body only
-    const fmEnd = content.indexOf("---", content.indexOf("---") + 3);
-    return fmEnd >= 0 ? content.slice(fmEnd + 3).trim() : content;
+    return extractBody(content);
   } catch {
     return undefined;
   }
