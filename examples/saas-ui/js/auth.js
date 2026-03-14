@@ -46,13 +46,38 @@ export class AuthManager {
       const clerk = window.Clerk;
       if (!clerk) throw new Error('Clerk not loaded');
 
-      await clerk.load({ publishableKey });
+      // Dark appearance matching the SaaS UI design system
+      const _clerkAppearance = {
+        variables: {
+          colorPrimary: '#6366f1',
+          colorBackground: '#0f0f23',
+          colorText: '#e2e8f0',
+          colorTextSecondary: '#94a3b8',
+          colorInputBackground: '#1e1e3f',
+          colorInputText: '#e2e8f0',
+          colorDanger: '#f87171',
+          borderRadius: '0.75rem',
+          fontFamily: 'Inter, system-ui, sans-serif',
+        },
+        elements: {
+          card: 'bg-transparent shadow-none border border-white/10',
+          formButtonPrimary: 'bg-indigo-500 hover:bg-indigo-600',
+          footerActionLink: 'text-indigo-400 hover:text-indigo-300',
+          socialButtonsBlockButton: 'border-white/10 bg-white/5 hover:bg-white/10 text-white',
+        },
+      };
+
+      await clerk.load({ publishableKey, appearance: _clerkAppearance });
       this._clerk = clerk;
+      this._appearance = _clerkAppearance;
 
       // Listen for session changes.
-      // session === undefined means loading; null means signed-out; object means active.
+      // session === undefined means Clerk is still initialising — ignore it entirely.
+      // session === null  means the user is signed out.
+      // session === object means the user is signed in.
       clerk.addListener(({ session, user }) => {
-        if (session != null && user != null) {
+        if (session === undefined) return; // still loading — do not touch state
+        if (session !== null && user !== null) {
           const authUser = {
             email: user.primaryEmailAddress?.emailAddress ?? user.emailAddresses?.[0]?.emailAddress ?? '',
             name: user.fullName ?? user.firstName ?? '',
@@ -67,6 +92,7 @@ export class AuthManager {
           });
           this._notifyChange(authUser);
         } else {
+          // session === null: explicitly signed out
           this.api.setToken(null);
           this.store.set('user', null);
           this.store.set('tier', 'free');
@@ -199,15 +225,16 @@ export class AuthManager {
     await this._ready;
     if (this._clerk) {
       const redirectBack = window.location.href;
+      const opts = {
+        afterSignInUrl: redirectBack,
+        afterSignUpUrl: redirectBack,
+        fallbackRedirectUrl: redirectBack,
+        appearance: this._appearance,
+      };
       if (mountEl) {
-        // Mount with redirect props so Clerk knows where to return after OAuth
-        this._clerk.mountSignIn(mountEl, {
-          afterSignInUrl: redirectBack,
-          afterSignUpUrl: redirectBack,
-          fallbackRedirectUrl: redirectBack,
-        });
+        this._clerk.mountSignIn(mountEl, opts);
       } else {
-        this._clerk.openSignIn({ afterSignInUrl: redirectBack, afterSignUpUrl: redirectBack });
+        this._clerk.openSignIn(opts);
       }
     } else {
       this._mockLogin('email');
@@ -218,14 +245,16 @@ export class AuthManager {
     await this._ready;
     if (this._clerk) {
       const redirectBack = window.location.href;
+      const opts = {
+        afterSignInUrl: redirectBack,
+        afterSignUpUrl: redirectBack,
+        fallbackRedirectUrl: redirectBack,
+        appearance: this._appearance,
+      };
       if (mountEl) {
-        this._clerk.mountSignUp(mountEl, {
-          afterSignInUrl: redirectBack,
-          afterSignUpUrl: redirectBack,
-          fallbackRedirectUrl: redirectBack,
-        });
+        this._clerk.mountSignUp(mountEl, opts);
       } else {
-        this._clerk.openSignUp({ afterSignInUrl: redirectBack, afterSignUpUrl: redirectBack });
+        this._clerk.openSignUp(opts);
       }
     } else {
       this._mockLogin('email');

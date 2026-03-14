@@ -78,13 +78,10 @@ fi
 echo "▶  Serving saas-ui on http://localhost:$PORT"
 cd "$SAAS_DIR"
 
-if command -v python3 &>/dev/null; then
-  python3 -m http.server "$PORT" &
-  SERVER_PID=$!
-else
-  npx serve -p "$PORT" -s . &
-  SERVER_PID=$!
-fi
+# npx serve --single enables SPA routing: all paths (incl. /sso-callback) serve index.html
+# python3 -m http.server does NOT do this, breaking Clerk OAuth callbacks
+npx serve -p "$PORT" --single . &
+SERVER_PID=$!
 
 echo "✓  SaaS UI PID $SERVER_PID — http://localhost:$PORT"
 echo ""
