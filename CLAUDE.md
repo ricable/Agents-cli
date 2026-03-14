@@ -340,8 +340,10 @@ Standalone admin SPA at `/admin`, separate from the main marketplace UI. Auth-ga
 
 **Pricing checkout flow:**
 - All tiers (Starter/Pro/Enterprise) use `POST /api/billing/checkout` → Vercel serverless function → Stripe Checkout session → redirect
-- Real Stripe test price IDs: Starter ($29/mo) `price_1TAsLJ2QpzdUwTFgn4OhkLig`, Pro ($79/mo) `price_1TAsLK2QpzdUwTFgqe4HP5Jh`, Enterprise ($199/mo) `price_1TAsLK2QpzdUwTFgZQQ56NrE`
-- **50% OFF launch promo** — display-only promo prices: Starter $14.99/mo ($11.99/yr), Pro $39.99/mo ($31.99/yr), Enterprise $99/mo ($79/yr). Pricing cards use `.tier-price-promo` wrapper with `.price-original` (strikethrough) and `.promo-amount` (green glow). `.promo-ribbon` uses `clip-path: polygon()`. Stripe price IDs and actual billing amounts are unchanged — promo is UI-only
+- Original Stripe test price IDs: Starter ($29/mo) `price_1TAsLJ2QpzdUwTFgn4OhkLig`, Pro ($79/mo) `price_1TAsLK2QpzdUwTFgqe4HP5Jh`, Enterprise ($199/mo) `price_1TAsLK2QpzdUwTFgZQQ56NrE`
+- **50% OFF launch promo** Stripe price IDs (currently active): Starter ($14.99/mo) `price_1TAumR2QpzdUwTFgUWWQsbTe`, Pro ($39.99/mo) `price_1TAumW2QpzdUwTFgMyJIn89A`, Enterprise ($99/mo) `price_1TAumX2QpzdUwTFgDDWYS4V8`
+- Both original and promo price IDs are in the checkout allowlist (`checkout.js` + `web-service.ts` `PRICE_TO_TIER`). To end the promo: swap `data-price-id` in `index.html` and `handleCheckout()` in `app.js` back to originals
+- Pricing cards use `.tier-price-promo` wrapper with `.price-original` (strikethrough) and `.promo-amount` (green glow). `.promo-ribbon` uses `clip-path: polygon()`
 - `handleCheckout(priceId)` in `app.js` sends `{priceId, successUrl, cancelUrl}` → serverless fn creates `stripe.checkout.sessions.create()` in subscription mode
 - On success redirect, `?checkout=success` query param triggers a toast + URL cleanup
 - Generic button handler in `app.js` skips pricing buttons with `data-price-id` attributes
