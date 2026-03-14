@@ -1,0 +1,571 @@
+/* ==========================================================================
+   ADMIN PANEL — Command Bridge Aesthetic
+   Deep black, cyan accents, monospace data, sharp geometry
+   ========================================================================== */
+
+:root {
+  --admin-bg: #030308;
+  --admin-surface: rgba(8, 8, 18, 0.95);
+  --admin-border: rgba(0, 212, 255, 0.12);
+  --admin-cyan: #00d4ff;
+  --admin-cyan-dim: rgba(0, 212, 255, 0.25);
+  --admin-orange: #ff6b35;
+  --admin-green: #00ff88;
+  --admin-red: #ff4757;
+  --admin-text: #e0e6ed;
+  --admin-text-dim: #6b7a8d;
+  --admin-radius: 4px;
+}
+
+/* ── Layout ──────────────────────────────────────────────────── */
+
+body.admin-body {
+  background: var(--admin-bg);
+  color: var(--admin-text);
+  font-family: 'Inter', system-ui, sans-serif;
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  grid-template-rows: 52px 1fr;
+  grid-template-areas:
+    "topbar topbar"
+    "sidebar content";
+}
+
+/* ── Top Bar ─────────────────────────────────────────────────── */
+
+.admin-topbar {
+  grid-area: topbar;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  background: var(--admin-surface);
+  border-bottom: 1px solid var(--admin-border);
+  position: relative;
+  z-index: 100;
+}
+
+/* Scan-line effect */
+.admin-topbar::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--admin-cyan), transparent);
+  opacity: 0.6;
+}
+
+.admin-topbar .brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--admin-text);
+}
+
+.admin-topbar .brand-icon {
+  font-size: 18px;
+}
+
+.admin-topbar .brand-text {
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+}
+
+.admin-topbar .brand-text .accent {
+  color: var(--admin-cyan);
+}
+
+.admin-topbar .topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.admin-topbar .server-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-family: 'Fira Code', monospace;
+  color: var(--admin-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.admin-topbar .status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--admin-text-dim);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+.admin-topbar .status-dot.online {
+  background: var(--admin-green);
+  box-shadow: 0 0 6px var(--admin-green);
+}
+
+.admin-topbar .status-dot.offline {
+  background: var(--admin-red);
+  animation: none;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.admin-topbar .user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-topbar .user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--admin-radius);
+  background: var(--admin-cyan-dim);
+  color: var(--admin-cyan);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-topbar .user-name {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.admin-topbar .logout-btn {
+  background: none;
+  border: 1px solid rgba(255, 71, 87, 0.3);
+  color: var(--admin-red);
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: var(--admin-radius);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.admin-topbar .logout-btn:hover {
+  background: rgba(255, 71, 87, 0.1);
+  border-color: var(--admin-red);
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────── */
+
+.admin-sidebar {
+  grid-area: sidebar;
+  background: var(--admin-surface);
+  border-right: 1px solid var(--admin-border);
+  padding: 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-sidebar .nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  font-size: 13px;
+  color: var(--admin-text-dim);
+  cursor: pointer;
+  transition: all 0.15s;
+  border-left: 2px solid transparent;
+  text-decoration: none;
+}
+
+.admin-sidebar .nav-item:hover {
+  color: var(--admin-text);
+  background: rgba(0, 212, 255, 0.04);
+}
+
+.admin-sidebar .nav-item.active {
+  color: var(--admin-cyan);
+  background: rgba(0, 212, 255, 0.06);
+  border-left-color: var(--admin-cyan);
+}
+
+.admin-sidebar .nav-item .nav-icon {
+  font-size: 15px;
+  width: 20px;
+  text-align: center;
+}
+
+.admin-sidebar .nav-label {
+  padding: 20px 20px 8px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--admin-text-dim);
+  opacity: 0.6;
+}
+
+/* ── Content Area ────────────────────────────────────────────── */
+
+.admin-content {
+  grid-area: content;
+  padding: 28px 32px;
+  overflow-y: auto;
+  background: var(--admin-bg);
+}
+
+.admin-pane {
+  display: none;
+}
+
+.admin-pane.active {
+  display: block;
+}
+
+/* ── Cards ───────────────────────────────────────────────────── */
+
+.admin-card {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  padding: 20px;
+  transition: border-color 0.2s;
+}
+
+.admin-card:hover {
+  border-color: rgba(0, 212, 255, 0.25);
+}
+
+.admin-card h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--admin-text-dim);
+  margin-bottom: 12px;
+}
+
+/* ── Data Values ─────────────────────────────────────────────── */
+
+.data-value {
+  font-family: 'Fira Code', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.data-value.big {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--admin-text);
+}
+
+.data-value.cyan {
+  color: var(--admin-cyan);
+}
+
+.data-value.green {
+  color: var(--admin-green);
+}
+
+.data-value.orange {
+  color: var(--admin-orange);
+}
+
+/* ── Stats Grid ──────────────────────────────────────────────── */
+
+.admin-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+/* ── Heatmap (cyan variant) ──────────────────────────────────── */
+
+.admin-heatmap {
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  gap: 3px;
+}
+
+.admin-heatmap .cell {
+  aspect-ratio: 1;
+  border-radius: 2px;
+  background: rgba(0, 212, 255, 0.06);
+  transition: background 0.3s;
+}
+
+.admin-heatmap .cell.l1 { background: rgba(0, 212, 255, 0.15); }
+.admin-heatmap .cell.l2 { background: rgba(0, 212, 255, 0.30); }
+.admin-heatmap .cell.l3 { background: rgba(0, 212, 255, 0.50); }
+.admin-heatmap .cell.l4 { background: rgba(0, 212, 255, 0.75); }
+.admin-heatmap .cell.l5 { background: var(--admin-cyan); box-shadow: 0 0 6px var(--admin-cyan-dim); }
+
+/* ── Tables ──────────────────────────────────────────────────── */
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.admin-table th {
+  text-align: left;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--admin-text-dim);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(0, 212, 255, 0.05);
+  font-family: 'Fira Code', monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-table tr:hover td {
+  background: rgba(0, 212, 255, 0.03);
+}
+
+/* ── Buttons ─────────────────────────────────────────────────── */
+
+.admin-btn {
+  padding: 6px 14px;
+  border-radius: var(--admin-radius);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: 1px solid;
+}
+
+.admin-btn.primary {
+  background: var(--admin-cyan);
+  color: var(--admin-bg);
+  border-color: var(--admin-cyan);
+}
+
+.admin-btn.primary:hover {
+  background: #00bde0;
+  box-shadow: 0 0 12px var(--admin-cyan-dim);
+}
+
+.admin-btn.ghost {
+  background: transparent;
+  color: var(--admin-text-dim);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.admin-btn.ghost:hover {
+  color: var(--admin-text);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.admin-btn.danger {
+  background: transparent;
+  color: var(--admin-red);
+  border-color: rgba(255, 71, 87, 0.3);
+}
+
+.admin-btn.danger:hover {
+  background: rgba(255, 71, 87, 0.1);
+}
+
+/* ── API Key Cards ───────────────────────────────────────────── */
+
+.key-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: rgba(0, 212, 255, 0.03);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  margin-bottom: 8px;
+}
+
+.key-card .key-id {
+  font-family: 'Fira Code', monospace;
+  font-size: 12px;
+  color: var(--admin-cyan);
+}
+
+.key-card .key-scopes {
+  font-size: 11px;
+  color: var(--admin-text-dim);
+}
+
+.key-card .key-date {
+  font-size: 11px;
+  color: var(--admin-text-dim);
+  font-family: 'Fira Code', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Settings Form ───────────────────────────────────────────── */
+
+.admin-form-group {
+  margin-bottom: 20px;
+}
+
+.admin-form-group label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--admin-text-dim);
+  margin-bottom: 6px;
+}
+
+.admin-form-group input,
+.admin-form-group select {
+  width: 100%;
+  padding: 8px 12px;
+  background: rgba(0, 212, 255, 0.04);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  color: var(--admin-text);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.admin-form-group input:focus,
+.admin-form-group select:focus {
+  border-color: var(--admin-cyan);
+  box-shadow: 0 0 0 2px var(--admin-cyan-dim);
+}
+
+.admin-form-group .hint {
+  font-size: 11px;
+  color: var(--admin-text-dim);
+  margin-top: 4px;
+}
+
+/* ── Toggle Switch ───────────────────────────────────────────── */
+
+.admin-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(0, 212, 255, 0.05);
+  font-size: 13px;
+}
+
+.admin-toggle-row .toggle-switch {
+  position: relative;
+  width: 36px;
+  height: 20px;
+}
+
+.admin-toggle-row .toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.admin-toggle-row .toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  transition: 0.2s;
+}
+
+.admin-toggle-row .toggle-slider::before {
+  content: '';
+  position: absolute;
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background: var(--admin-text-dim);
+  border-radius: 50%;
+  transition: 0.2s;
+}
+
+.admin-toggle-row .toggle-switch input:checked + .toggle-slider {
+  background: var(--admin-cyan-dim);
+}
+
+.admin-toggle-row .toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(16px);
+  background: var(--admin-cyan);
+}
+
+/* ── Section Dividers ────────────────────────────────────────── */
+
+.admin-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+/* ── Empty State ─────────────────────────────────────────────── */
+
+.admin-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--admin-text-dim);
+  font-size: 13px;
+}
+
+.admin-empty .empty-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+  opacity: 0.4;
+}
+
+/* ── Responsive ──────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  body.admin-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: 52px auto 1fr;
+    grid-template-areas:
+      "topbar"
+      "sidebar"
+      "content";
+  }
+
+  .admin-sidebar {
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 8px 12px;
+    gap: 0;
+    border-right: none;
+    border-bottom: 1px solid var(--admin-border);
+  }
+
+  .admin-sidebar .nav-item {
+    padding: 8px 14px;
+    border-left: none;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+  }
+
+  .admin-sidebar .nav-item.active {
+    border-left-color: transparent;
+    border-bottom-color: var(--admin-cyan);
+  }
+
+  .admin-sidebar .nav-label {
+    display: none;
+  }
+
+  .admin-content {
+    padding: 20px 16px;
+  }
+}

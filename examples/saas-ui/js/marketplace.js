@@ -3,23 +3,7 @@
  * Renders products from catalog data into the Discover pane.
  */
 
-const PRODUCT_TYPE_ICONS = {
-  skill: '\u{1F4DC}',        // scroll
-  plugin: '\u{1F9E9}',       // puzzle
-  'hook-bundle': '\u{1F6E1}', // shield
-  'agent-def': '\u{1F916}',  // robot
-  'agent-team': '\u{1F465}', // people
-  harness: '\u{1F4BB}',      // terminal
-};
-
-const PRODUCT_TYPE_COLORS = {
-  skill: 'var(--accent-blue)',
-  plugin: 'var(--accent-purple)',
-  'hook-bundle': 'var(--accent-orange)',
-  'agent-def': 'var(--accent-green)',
-  'agent-team': 'var(--accent-pink)',
-  harness: 'var(--text-secondary)',
-};
+import { PRODUCT_TYPE_ICONS, PRODUCT_TYPE_COLORS, formatType, escapeHtml } from './utils.js';
 
 const QUALITY_COLOR = (score) => {
   if (score >= 8) return 'var(--accent-green)';
@@ -251,11 +235,6 @@ function formatPrice(pricing) {
   return `$${price.toFixed(2)}`;
 }
 
-function formatType(type) {
-  if (!type) return 'Unknown';
-  return type.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
-}
-
 function formatNum(n) {
   if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
   return String(n);
@@ -273,12 +252,6 @@ function truncate(str, len) {
   return str.slice(0, len) + '\u2026';
 }
 
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
-
 function escapeAttr(str) {
   return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -290,4 +263,4 @@ function isAgentNative(product) {
          product.agentNative === true;
 }
 
-export { PRODUCT_TYPE_ICONS, PRODUCT_TYPE_COLORS, formatPrice, formatType, escapeHtml, isAgentNative };
+export { PRODUCT_TYPE_ICONS, PRODUCT_TYPE_COLORS, formatType, escapeHtml, formatPrice, isAgentNative };

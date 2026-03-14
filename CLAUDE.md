@@ -177,21 +177,26 @@ examples/
   data/
     ai-ml-tools.json  — 502 AI/ML tool entries (was at project root, now here)
   saas-ui/            — SaaS marketplace UI, deployed to https://ui.spectredve.com
-    index.html        — main app (Agent Economy pane, API Keys pane, Forge enhancements)
+    index.html        — main app (marketplace, forge). Dashboard/economy/keys moved to admin.html
+    admin.html        — standalone admin SPA, auth-gated, hash routing (#dashboard, #economy, #keys, #settings)
     css/styles.css    — design system + economy / heatmap / bulk-select styles
-    vercel.json       — Vercel static deploy config (SPA rewrites, no-cache HTML, long-cache assets)
+    css/admin.css     — admin panel styles: fixed 220px sidebar, cyan border glow, scan-line top bar, command bridge aesthetic
+    vercel.json       — Vercel static deploy config (SPA rewrites incl. /admin→admin.html, no-cache HTML, long-cache assets)
     registry-data.json — static data for marketplace: github/npm/pypi/crates/agent_defs/harnesses/cli_anything/generated_skills
     js/
-      app.js          — bootstrap, router, auth wiring, nav state, modal logic
+      app.js          — bootstrap, router, auth wiring, nav state, modal logic, pricing checkout wiring
       store.js        — AppStore pub/sub + localStorage (searchFilters excluded — session-only)
       api.js          — AgentsApi; auto-detects baseUrl (localhost:3100 dev, '' prod)
       auth.js         — AuthManager: loginWithGoogle/Github/Email, logout, onAuthChange, mock fallback
-      marketplace.js  — product grid, agent-native filter, bulk select, Try button, catalog-updated event
+      utils.js        — shared utilities: PRODUCT_TYPE_ICONS, PRODUCT_TYPE_COLORS, formatType(), escapeHtml(), showToast()
+      marketplace.js  — product grid, agent-native filter, bulk select, Try button, catalog-updated event. Re-exports utils.js symbols
       registries.js   — registry panes (GitHub/npm/PyPI/crates/cli-anything); injects agent_defs+generated_skills into catalog
-      dashboard.js    — revenue tracker, agent wallet, heatmap, API keys section
-      product-detail.js — 3-tab detail (overview/pricing/changelog), SSE feed
+      dashboard.js    — revenue tracker, agent wallet, heatmap. Imports from utils.js. Key links → /admin#keys
+      product-detail.js — 3-tab detail (overview/pricing/changelog), SSE feed. Re-exports showToast from utils.js
       forge-ui.js     — cost estimator, quality preview, persona selector, batch CSV
-      economy.js      — agent economy: earnings, leaderboard, sparklines
+      economy.js      — agent economy: earnings, leaderboard, sparklines. Imports escapeHtml from utils.js
+      admin.js        — admin bootstrap: imports api/store/auth/dashboard/economy, auth gate, inline API key CRUD + settings
+      profile.js      — openSettingsModal() redirects to /admin#settings
     playground.html   — SaaS playground demo
 tests/                — 19 test files, 369 tests
 ```
@@ -238,13 +243,28 @@ vercel ls
 ```
 
 **Key rules:**
-- `vercel.json` rewrites all non-asset paths to `index.html` (SPA routing)
+- `vercel.json` rewrites `/admin` to `admin.html`, all other non-asset paths to `index.html` (SPA routing)
 - HTML served with `no-cache, no-store` — assets (js/css/woff/png/svg) cached 1 year immutable
 - `registry-data.json` is the static data source for all marketplace tabs — edit to add/update products
 - `api.js` auto-detects API base: `localhost:3100` when running locally, `''` (relative) in production
 - `AuthManager` falls back to mock OAuth when server unavailable — always works offline
 - `searchFilters` is **session-only state** (not persisted to localStorage) — stale filters caused 0 products bug
 - Marketplace re-renders on `catalog-updated` custom event fired by `registries.js` after async inject
+
+## SaaS Admin Panel (examples/saas-ui/admin.html)
+
+Standalone admin SPA at `/admin`, separate from the main marketplace UI. Auth-gated — redirects to `/` if not logged in.
+
+**Routing:** hash-based — `#dashboard` (revenue/wallet/heatmap), `#economy` (earnings/leaderboard), `#keys` (API key CRUD), `#settings` (profile/preferences).
+
+**Design:** "command bridge" aesthetic — deep black `#030308` background, cyan `#00d4ff` accents, monospace data display, pulsing status indicators, scan-line top bar. Separate from main site design system (`css/admin.css`).
+
+**Imports:** `admin.js` bootstraps the panel using `api.js`, `store.js`, `auth.js`, `dashboard.js`, `economy.js`. API key create/revoke and settings panel are inline in `admin.js`.
+
+**Pricing checkout flow:**
+- Starter: direct Stripe payment link (`buy.stripe.com`)
+- Pro/Enterprise: `auth.checkout(priceId)` → `POST /api/billing/checkout` → Stripe Checkout session
+- Generic button handler in `app.js` skips pricing buttons with `data-price-id` attributes
 
 ## GitHub Actions Deploy (.github/workflows/deploy.yml)
 
@@ -443,6 +463,10 @@ updateUserMetadata(userId, metadata, config: ClerkConfig): Promise<void>
 - `clerkPublishableKey: null` in `/api/config` means `CLERK_SECRET_KEY` not loaded — check `.env` is populated and `skill-forge.ts --companion --serve` was restarted after editing `.env`
 - Clerk `publicMetadata` comes from `clerk.users.getUser(userId).publicMetadata` (not session claims `public_metadata`)
 - `STRIPE_WEBHOOK_SECRET` wrong format (`sk_test_...` instead of `whsec_...`) causes all webhook verifications to fail silently
+- `showToast` canonical location is `js/utils.js` — re-exported from `product-detail.js` for backward compat
+- `PRODUCT_TYPE_ICONS`, `PRODUCT_TYPE_COLORS`, `formatType()`, `escapeHtml()` canonical location is `js/utils.js` — re-exported from `marketplace.js` for backward compat
+- Admin panel is at `examples/saas-ui/admin.html` (NOT a route handled by `index.html` SPA — it has its own `/admin` rewrite in `vercel.json`)
+- Pricing checkout: Starter uses direct Stripe payment link (`buy.stripe.com`); Pro/Enterprise use `auth.checkout(priceId)` → `POST /api/billing/checkout` → Stripe Checkout session
 
 ## Do NOT
 
@@ -458,3 +482,5 @@ updateUserMetadata(userId, metadata, config: ClerkConfig): Promise<void>
 - Import `@clerk/backend` directly in new files — use `lib/companion/clerk-auth.ts` as the canonical import location
 - Use raw fetch for Stripe API calls — `StripeProvider` in `lib/companion/billing.ts` uses the official `stripe` npm SDK
 - Set `STRIPE_WEBHOOK_SECRET` to a `sk_test_...` key — it must be `whsec_...` from `stripe listen` or the Dashboard
+- Re-add dashboard/economy/agent-keys panes to `index.html` — they live in `admin.html` now
+- Import `showToast`/`escapeHtml`/`formatType`/`PRODUCT_TYPE_ICONS` from `marketplace.js` or `product-detail.js` in new code — use `utils.js` as the canonical import location

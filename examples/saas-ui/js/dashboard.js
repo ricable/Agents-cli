@@ -2,8 +2,7 @@
  * Dashboard module — user dashboard, usage meter, billing, installed products.
  */
 
-import { PRODUCT_TYPE_ICONS, formatType, escapeHtml } from './marketplace.js';
-import { showToast } from './product-detail.js';
+import { PRODUCT_TYPE_ICONS, formatType, escapeHtml, showToast } from './utils.js';
 
 const TIER_FEATURES = {
   free: { label: 'Free', color: 'var(--text-secondary)', maxTools: 5, dailyGens: 3, deep: false, ai: false },
@@ -268,12 +267,11 @@ export function initDashboard(api, store, auth) {
 
     pane.querySelector('#dashGoToKeys')?.addEventListener('click', (e) => {
       e.preventDefault();
-      document.querySelector('[data-pane="agent-keys"]')?.click();
+      window.location.href = '/admin#keys';
     });
 
     pane.querySelector('#dashCreateKeyBtn')?.addEventListener('click', () => {
-      document.querySelector('[data-pane="agent-keys"]')?.click();
-      setTimeout(() => document.getElementById('createKeyBtn')?.click(), 100);
+      window.location.href = '/admin#keys';
     });
   }
 

@@ -8,9 +8,7 @@ import { AppStore } from './store.js';
 import { AuthManager } from './auth.js';
 import { initMarketplace } from './marketplace.js';
 import { initProductDetail, showToast } from './product-detail.js';
-import { initDashboard } from './dashboard.js';
 import { initForgeUi } from './forge-ui.js';
-import { initEconomy } from './economy.js';
 import { initRegistries } from './registries.js';
 import { initProfile } from './profile.js';
 
@@ -30,16 +28,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const marketplace = initMarketplace(api, store, showProductDetail);
 
-  // ── Dashboard ───────────────────────────────────────────────────
-
-  const dashboard = initDashboard(api, store, auth);
-
   // ── Forge UI ────────────────────────────────────────────────────
 
   initForgeUi(api, store, auth);
-
-  // ── Agent Economy ───────────────────────────────────────────────
-  initEconomy(api, store, auth);
 
   // ── Registries (auto-connect: GitHub, npm, PyPI, crates, cli-anything) ──
 
@@ -182,6 +173,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       statusEl.innerHTML = `<span class="status-indicator"></span>${serverOk ? 'Server: Active' : 'Server: Offline'}`;
     }
     const loggedIn = !!user;
+    const adminLink = document.getElementById('adminNavLink');
+    if (adminLink) adminLink.style.display = loggedIn ? '' : 'none';
     if (loginBtn) loginBtn.style.display = loggedIn ? 'none' : '';
     if (getStartedBtn) getStartedBtn.style.display = loggedIn ? 'none' : '';
     if (userProfileEl) {
@@ -225,11 +218,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // Signup / Get Started Buttons in hero section
+  // Signup / Get Started Buttons in hero section (skip pricing buttons with checkout wiring)
   document.querySelectorAll('.btn-primary, .btn-secondary, .btn-gradient').forEach(btn => {
     if (btn.id === 'getStartedBtn') return; // already handled
+    if (btn.id === 'proPricingBtn' || btn.id === 'enterprisePricingBtn') return; // handled below
+    if (btn.dataset.priceId) return; // skip all pricing buttons with Stripe links
     const text = btn.textContent.trim();
-    if (text.includes('Get Started') || text.includes('Subscribe') || text.includes('Trial') || text.includes('Build Your First Agent')) {
+    if (text.includes('Get Started') || text.includes('Build Your First Agent')) {
       btn.addEventListener('click', async (e) => {
         e.preventDefault();
         signupModal?.classList.add('active');
@@ -238,6 +233,24 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     }
   });
+
+  // ── Pricing checkout buttons (Pro & Enterprise via API) ──────────
+
+  const handleCheckout = async (priceId) => {
+    if (!auth.isLoggedIn()) {
+      signupModal?.classList.add('active');
+      const mountEl = document.getElementById('clerk-sign-up');
+      if (mountEl) await auth.openSignUp(mountEl);
+      return;
+    }
+    const result = await auth.checkout(priceId);
+    if (!result?.url) {
+      showToast('Checkout not available — please try again or contact support');
+    }
+  };
+
+  document.getElementById('proPricingBtn')?.addEventListener('click', () => handleCheckout('price_pro'));
+  document.getElementById('enterprisePricingBtn')?.addEventListener('click', () => handleCheckout('price_enterprise'));
 
   // Auth state changes close modals and update nav
   auth.onAuthChange((user) => {

@@ -43,66 +43,8 @@ function ensureSettingsModalMarkup() {
   document.body.appendChild(el);
 }
 
-function openSettingsModal(api, store) {
-  ensureSettingsModalMarkup();
-  const modal = document.getElementById('settingsModal');
-  if (!modal) return;
-
-  // Populate fields from store/localStorage
-  const ghToken = localStorage.getItem('github_token') || '';
-  const serverUrl = localStorage.getItem('companion_url') || 'http://127.0.0.1:3100';
-  const userName = store.get('user')?.name || 'Cedric';
-  const userEmail = store.get('user')?.email || 'cedric@agents-cli.com';
-  const tier = store.get('tier') || 'pro';
-
-  const nameEl = modal.querySelector('#profileName');
-  const emailEl = modal.querySelector('#profileEmail');
-  const tierEl = modal.querySelector('#profileTier');
-  const ghEl = modal.querySelector('#githubToken');
-  const urlEl = modal.querySelector('#companionUrl');
-
-  if (nameEl) nameEl.value = userName;
-  if (emailEl) emailEl.value = userEmail;
-  if (tierEl) tierEl.textContent = tier.charAt(0).toUpperCase() + tier.slice(1);
-  if (ghEl) ghEl.value = ghToken;
-  if (urlEl) urlEl.value = serverUrl;
-
-  // Update stats
-  const catalog = store.get('catalog') || [];
-  const installed = store.get('installed') || [];
-  const agentDefs = catalog.filter(p => p.productType === 'agent-def').length;
-  const skills = catalog.filter(p => p.productType === 'skill').length;
-
-  const statsEl = modal.querySelector('#profileStats');
-  if (statsEl) {
-    statsEl.innerHTML = `
-      <div class="stat-chip"><span>${installed.length}</span><label>Installed</label></div>
-      <div class="stat-chip"><span>${skills}</span><label>Skills</label></div>
-      <div class="stat-chip"><span>${agentDefs}</span><label>Agent Defs</label></div>
-      <div class="stat-chip"><span>${catalog.length}</span><label>Catalog</label></div>
-    `;
-  }
-
-  // Test server connection
-  const statusEl = modal.querySelector('#serverStatus');
-  if (statusEl) {
-    statusEl.textContent = 'Testing…';
-    statusEl.style.color = 'var(--text-muted)';
-    api.health()
-      .then(() => {
-        statusEl.textContent = '● Connected';
-        statusEl.style.color = 'var(--accent-green)';
-      })
-      .catch(() => {
-        statusEl.textContent = '● Offline (standalone mode)';
-        statusEl.style.color = 'var(--accent-orange)';
-      });
-  }
-
-  modal.classList.add('active');
-
-  // Default to profile tab
-  modal.querySelectorAll('.settings-tab-btn')[0]?.click();
+function openSettingsModal(_api, _store) {
+  window.location.href = '/admin#settings';
 }
 
 function saveSettings(store) {
