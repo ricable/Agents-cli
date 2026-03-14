@@ -626,9 +626,14 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
           clerkUserId = authed.clerkUserId;
         }
 
+        const priceId = parsed.priceId;
+        if (!priceId || !PRICE_TO_TIER[priceId]) {
+          sendError(res, 400, "INVALID_PRICE", "Invalid or missing priceId", req); return;
+        }
+
         const result = await billing.createCheckoutSession(
           customerId,
-          parsed.priceId || "price_default",
+          priceId,
           parsed.successUrl ?? `${origin}/?checkout=success`,
           clerkUserId,
         );
