@@ -144,62 +144,22 @@ function hashKey(key: string): string {
   return createHash("sha256").update(key).digest("hex");
 }
 
-// ── CORS ───────────────────────────────────────────────────────────────
-
-const ALLOWED_ORIGINS = new Set([
-  "https://ui.spectredve.com",
-]);
-
-function isAllowedOrigin(origin: string | undefined): string | null {
-  if (!origin) return null;
-  if (ALLOWED_ORIGINS.has(origin)) return origin;
-  // Allow localhost on any port for local development
-  try {
-    const url = new URL(origin);
-    if (url.hostname === "localhost" || url.hostname === "127.0.0.1") return origin;
-  } catch {
-    // Invalid URL — not allowed
-  }
-  return null;
-}
-
-function corsHeaders(req: IncomingMessage): Record<string, string> {
-  const origin = req.headers.origin;
-  const allowed = isAllowedOrigin(origin);
-  const headers: Record<string, string> = {
-    "Access-Control-Allow-Headers": "Authorization, Content-Type",
-    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-  };
-  if (allowed) {
-    headers["Access-Control-Allow-Origin"] = allowed;
-    headers["Vary"] = "Origin";
-  }
-  return headers;
-}
-
-// ── Stripe Price-to-Tier Mapping ───────────────────────────────────────
-
-const PRICE_TO_TIER: Record<string, ApiTier> = {
-  "price_1TAsLJ2QpzdUwTFgn4OhkLig": "starter",
-  "price_1TAsLK2QpzdUwTFgqe4HP5Jh": "pro",
-  "price_1TAsLK2QpzdUwTFgZQQ56NrE": "enterprise",
-};
-
 // ── Response Helpers ───────────────────────────────────────────────────
 
-function sendJson<T>(res: ServerResponse, status: number, data: CliOutput<T>, req?: IncomingMessage): void {
+function sendJson<T>(res: ServerResponse, status: number, data: CliOutput<T>): void {
   const body = JSON.stringify(data, null, 2);
-  const headers: Record<string, string> = {
+  res.writeHead(status, {
     "Content-Type": "application/json",
     "X-Content-Type-Options": "nosniff",
-    ...(req ? corsHeaders(req) : {}),
-  };
-  res.writeHead(status, headers);
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type",
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+  });
   res.end(body);
 }
 
-function sendError(res: ServerResponse, status: number, code: string, message: string, req?: IncomingMessage): void {
-  sendJson(res, status, failure("web-service", code, message, Date.now()), req);
+function sendError(res: ServerResponse, status: number, code: string, message: string): void {
+  sendJson(res, status, failure("web-service", code, message, Date.now()));
 }
 
 // ── Shared request helpers ─────────────────────────────────────────────
@@ -410,7 +370,11 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
 
     // CORS preflight
     if (method === "OPTIONS") {
-      res.writeHead(204, corsHeaders(req));
+      res.writeHead(204, {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Authorization, Content-Type",
+        "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+      });
       res.end();
       return;
     }
@@ -422,7 +386,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     if (method === "GET" && path === "/api/config") {
       sendJson(res, 200, success("config", {
         clerkPublishableKey: config.clerkConfig?.publishableKey ?? null,
-      }, Date.now()), req);
+      }, Date.now()));
       return;
     }
 
@@ -434,7 +398,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
         activeJobs: runningJobs,
         queuedJobs: jobQueue.length,
         totalJobs: jobs.size,
-      }, Date.now()), req);
+      }, Date.now()));
       return;
     }
 
@@ -444,9 +408,9 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
       if (!authed) return;
       try {
         const profile = analyzeProject(authed.description);
-        sendJson(res, 200, success("analyze", profile, Date.now()), req);
+        sendJson(res, 200, success("analyze", profile, Date.now()));
       } catch (err) {
-        sendError(res, 400, "ANALYSIS_ERROR", toErrorMessage(err), req);
+        sendError(res, 400, "ANALYSIS_ERROR", toErrorMessage(err));
       }
       return;
     }
@@ -458,9 +422,9 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
       try {
         const profile = analyzeProject(authed.description);
         const plan = mapToTools(profile, config.projectRoot);
-        sendJson(res, 200, success("plan", plan, Date.now()), req);
+        sendJson(res, 200, success("plan", plan, Date.now()));
       } catch (err) {
-        sendError(res, 400, "PLAN_ERROR", toErrorMessage(err), req);
+        sendError(res, 400, "PLAN_ERROR", toErrorMessage(err));
       }
       return;
     }
@@ -470,15 +434,15 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
       const authed = await authenticateAndParse(req, res, ip, config, keyLimiter, ipLimiter, authenticate);
       if (!authed) return;
       if (authed.keyRecord.tier === "free") {
-        sendError(res, 403, "TIER_REQUIRED", "Generation requires starter tier or above", req); return;
+        sendError(res, 403, "TIER_REQUIRED", "Generation requires starter tier or above"); return;
       }
       const keyHash = hashKey(req.headers.authorization!.slice(7));
       const tierLimits = getTierLimits(authed.keyRecord.tier);
       if (!usageMeter.recordUsage(keyHash, tierLimits.dailyGens)) {
-        sendError(res, 429, "DAILY_LIMIT", `Daily generation limit (${tierLimits.dailyGens}) exceeded`, req); return;
+        sendError(res, 429, "DAILY_LIMIT", `Daily generation limit (${tierLimits.dailyGens}) exceeded`); return;
       }
       if (jobQueue.length >= maxQueueDepth) {
-        sendError(res, 503, "QUEUE_FULL", "Job queue is full — try again later", req); return;
+        sendError(res, 503, "QUEUE_FULL", "Job queue is full — try again later"); return;
       }
 
       const job: Job = {
@@ -495,7 +459,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
       jobQueue.push(job.id);
       drainQueue();
 
-      sendJson(res, 202, success("generate", { jobId: job.id, status: "queued" }, Date.now()), req);
+      sendJson(res, 202, success("generate", { jobId: job.id, status: "queued" }, Date.now()));
       return;
     }
 
@@ -503,10 +467,10 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     const statusMatch = path.match(/^\/api\/status\/([a-f0-9-]{36})$/);
     if (method === "GET" && statusMatch) {
       const keyRecord = authenticate(req);
-      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token", req); return; }
+      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
 
       const job = jobs.get(statusMatch[1]!);
-      if (!job) { sendError(res, 404, "NOT_FOUND", "Job not found", req); return; }
+      if (!job) { sendError(res, 404, "NOT_FOUND", "Job not found"); return; }
 
       sendJson(res, 200, success("status", {
         id: job.id,
@@ -521,7 +485,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
         } : undefined,
         recommendations: job.plan ? job.plan.summary : undefined,
         report: job.report,
-      }, Date.now()), req);
+      }, Date.now()));
       return;
     }
 
@@ -529,15 +493,15 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     const dlMatch = path.match(/^\/api\/download\/([a-f0-9-]{36})$/);
     if (method === "GET" && dlMatch) {
       const keyRecord = authenticate(req);
-      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token", req); return; }
+      if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
 
       const job = jobs.get(dlMatch[1]!);
-      if (!job) { sendError(res, 404, "NOT_FOUND", "Job not found", req); return; }
+      if (!job) { sendError(res, 404, "NOT_FOUND", "Job not found"); return; }
       if (job.status !== "completed") {
-        sendError(res, 409, "NOT_READY", `Job status: ${job.status}`, req); return;
+        sendError(res, 409, "NOT_READY", `Job status: ${job.status}`); return;
       }
       if (!job.bundlePath) {
-        sendError(res, 404, "NO_BUNDLE", "Bundle not yet available — use /api/status to check progress", req); return;
+        sendError(res, 404, "NO_BUNDLE", "Bundle not yet available — use /api/status to check progress"); return;
       }
 
       // Direct stat — handle ENOENT instead of TOCTOU existsSync + statSync
@@ -551,7 +515,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
         });
         createReadStream(job.bundlePath).pipe(res);
       } catch {
-        sendError(res, 404, "NO_BUNDLE", "Bundle file not found", req);
+        sendError(res, 404, "NO_BUNDLE", "Bundle file not found");
       }
       return;
     }
@@ -559,7 +523,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     // ── GET /api/usage ──────────────────────────────────────────
     if (method === "GET" && path === "/api/usage") {
       const authed = await requireAuth(req);
-      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token", req); return; }
+      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
       const keyRecord = authed.keyRecord;
       const authHeader = req.headers.authorization ?? "";
       const keyHash = hashKey(authHeader.startsWith("Bearer ") ? authHeader.slice(7) : authed.clerkUserId ?? "");
@@ -571,7 +535,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
         used: usage.count,
         remaining: tierLimits.dailyGens < 0 ? -1 : tierLimits.dailyGens - usage.count,
         resetsAt: new Date(usage.resetAt).toISOString(),
-      }, Date.now()), req);
+      }, Date.now()));
       return;
     }
 
@@ -580,12 +544,12 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     // GET /api/auth/me — Clerk-aware user info
     if (method === "GET" && path === "/api/auth/me") {
       const authed = await requireAuth(req);
-      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token", req); return; }
+      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
       sendJson(res, 200, success("auth-me", {
         email: authed.clerkEmail ?? "user@example.com",
         userId: authed.clerkUserId ?? null,
         tier: authed.keyRecord.tier,
-      }, Date.now()), req);
+      }, Date.now()));
       return;
     }
 
@@ -598,105 +562,79 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
         const payload = await parseBody(req, config.maxBodySize);
         const signature = req.headers["stripe-signature"];
         if (!signature || Array.isArray(signature)) {
-          sendError(res, 400, "INVALID_SIGNATURE", "Missing stripe-signature header", req); return;
+          sendError(res, 400, "INVALID_SIGNATURE", "Missing stripe-signature header"); return;
         }
         const billing = createBillingProvider("stripe");
         const event = await billing.verifyWebhook(payload, signature, config.stripeWebhookSecret);
 
-        // Handle subscription events — resolve tier from Stripe price ID
-        if (event.type === "checkout.session.completed" || event.type === "customer.subscription.updated") {
-          const eventData = event.data as Record<string, unknown>;
-
-          // Extract price ID: from subscription items (subscription.updated) or line_items (checkout.completed)
-          let priceId: string | undefined;
-          const items = (eventData["items"] as { data?: Array<{ price?: { id?: string } }> })?.data;
-          if (items?.[0]?.price?.id) {
-            priceId = items[0].price.id;
-          }
-          // For checkout.session.completed, the price may be nested in line_items
-          if (!priceId) {
-            const lineItems = (eventData["line_items"] as { data?: Array<{ price?: { id?: string } }> })?.data;
-            if (lineItems?.[0]?.price?.id) {
-              priceId = lineItems[0].price.id;
-            }
-          }
-
-          const tier = priceId ? PRICE_TO_TIER[priceId] ?? "free" : "free";
-
-          // Extract Clerk user ID from metadata for reverse-lookup
-          const meta = eventData["metadata"] as Record<string, string> | undefined;
+        // Sync subscription tier → Clerk user publicMetadata
+        if (config.clerkConfig) {
+          // clerkUserId is stored in session metadata (checkout.session.completed)
+          // and in subscription metadata (customer.subscription.*)
+          const meta = event.data["metadata"] as Record<string, string> | undefined;
           const clerkUserId = meta?.["clerkUserId"];
 
-          if (clerkUserId && config.clerkConfig) {
-            try {
-              await updateUserMetadata(
-                clerkUserId,
-                { tier, stripeCustomerId: event.customerId },
-                config.clerkConfig,
-              );
-            } catch {
-              // Non-fatal — log in production
+          if (clerkUserId) {
+            let tier: ApiTier;
+            switch (event.type) {
+              case "checkout.session.completed":
+              case "customer.subscription.updated":
+                // Read tier from subscription/price metadata, default to "starter"
+                tier = (meta?.["tier"] as ApiTier | undefined) ?? "starter";
+                break;
+              case "customer.subscription.deleted":
+                tier = "free";
+                break;
+              default:
+                tier = "starter";
             }
+            await updateUserMetadata(
+              clerkUserId,
+              { tier, stripeCustomerId: event.customerId },
+              config.clerkConfig,
+            ).catch(() => { /* non-fatal */ });
           }
         }
 
-        // Handle subscription deletion — downgrade to free
-        if (event.type === "customer.subscription.deleted") {
-          const eventData = event.data as Record<string, unknown>;
-          const meta = eventData["metadata"] as Record<string, string> | undefined;
-          const clerkUserId = meta?.["clerkUserId"];
-
-          if (clerkUserId && config.clerkConfig) {
-            try {
-              await updateUserMetadata(
-                clerkUserId,
-                { tier: "free" },
-                config.clerkConfig,
-              );
-            } catch {
-              // Non-fatal
-            }
-          }
-        }
-
-        sendJson(res, 200, success("billing-webhook", { received: true, type: event.type }, Date.now()), req);
+        sendJson(res, 200, success("billing-webhook", { received: true, type: event.type }, Date.now()));
       } catch (err) {
-        sendError(res, 400, "WEBHOOK_ERROR", toErrorMessage(err), req);
+        sendError(res, 400, "WEBHOOK_ERROR", toErrorMessage(err));
       }
       return;
     }
 
-    // POST /api/billing/checkout
+    // POST /api/billing/checkout — no auth required (guest checkout supported)
     if (method === "POST" && path === "/api/billing/checkout") {
-      const authed = await requireAuth(req);
-      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token", req); return; }
       try {
         const body = await parseBody(req, config.maxBodySize);
-        const parsed = JSON.parse(body) as { priceId?: string; successUrl?: string; cancelUrl?: string };
+        const parsed = JSON.parse(body) as { priceId?: string; successUrl?: string; cancelUrl?: string; email?: string };
 
-        // Resolve Stripe customer ID
-        let customerId: string;
-        if (authed.clerkUserId) {
+        const origin = `${req.headers["x-forwarded-proto"] ?? "http"}://${req.headers.host ?? "localhost"}`;
+        const billing = createBillingProvider("stripe");
+
+        // Try optional auth — if logged in, attach Stripe customer
+        const authed = await requireAuth(req);
+        let customerId: string | undefined;
+        let clerkUserId: string | undefined;
+
+        if (authed?.clerkUserId) {
           customerId = await getOrCreateStripeCustomer(
             authed.clerkUserId,
             authed.clerkEmail,
             authed.clerkMetadata ?? {},
           );
-        } else {
-          customerId = "cus_mock";
+          clerkUserId = authed.clerkUserId;
         }
 
-        const origin = `${req.headers["x-forwarded-proto"] ?? "http"}://${req.headers.host ?? "localhost"}`;
-        const billing = createBillingProvider("stripe");
         const result = await billing.createCheckoutSession(
           customerId,
           parsed.priceId || "price_default",
           parsed.successUrl ?? `${origin}/?checkout=success`,
-          authed.clerkUserId,
+          clerkUserId,
         );
-        sendJson(res, 200, success("billing-checkout", result, Date.now()));
+        sendJson(res, 200, success("billing-checkout", result, Date.now()), req);
       } catch (err) {
-        sendError(res, 400, "BILLING_ERROR", toErrorMessage(err));
+        sendError(res, 400, "BILLING_ERROR", toErrorMessage(err), req);
       }
       return;
     }

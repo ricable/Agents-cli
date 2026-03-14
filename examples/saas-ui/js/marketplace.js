@@ -3,23 +3,26 @@
  * Renders products from catalog data into the Discover pane.
  */
 
-const PRODUCT_TYPE_ICONS = {
-  skill: '\u{1F4DC}',        // scroll
-  plugin: '\u{1F9E9}',       // puzzle
-  'hook-bundle': '\u{1F6E1}', // shield
-  'agent-def': '\u{1F916}',  // robot
-  'agent-team': '\u{1F465}', // people
-  harness: '\u{1F4BB}',      // terminal
-};
+import { PRODUCT_TYPE_ICONS, PRODUCT_TYPE_COLORS, formatType, escapeHtml, showToast } from './utils.js';
 
-const PRODUCT_TYPE_COLORS = {
-  skill: 'var(--accent-blue)',
-  plugin: 'var(--accent-purple)',
-  'hook-bundle': 'var(--accent-orange)',
-  'agent-def': 'var(--accent-green)',
-  'agent-team': 'var(--accent-pink)',
-  harness: 'var(--text-secondary)',
-};
+// ── Tier access model ───────────────────────────────────────────────
+
+const TIER_LIMITS = { free: 3, starter: 50, pro: 500, enterprise: Infinity };
+const TIER_RANK = { free: 0, starter: 1, pro: 2, enterprise: 3 };
+const ONESHOT_PRICES = { starter: 4.99, pro: 9.99 };
+
+function getRequiredTier(product) {
+  const q = product.quality || 0;
+  const t = product.productType;
+  if (t === 'agent-team') return 'enterprise';
+  if (t === 'agent-def' || q >= 9) return 'pro';
+  if (t === 'plugin' || t === 'hook-bundle' || q >= 7) return 'starter';
+  return 'free';
+}
+
+function userHasAccess(userTier, requiredTier) {
+  return (TIER_RANK[userTier] || 0) >= (TIER_RANK[requiredTier] || 0);
+}
 
 const QUALITY_COLOR = (score) => {
   if (score >= 8) return 'var(--accent-green)';
@@ -31,7 +34,7 @@ let debounceTimer = null;
 let bulkMode = false;
 const bulkSelected = new Set();
 
-export function initMarketplace(api, store, showProductDetail) {
+export function initMarketplace(api, store, showProductDetail, auth) {
   const grid = document.getElementById('productGrid');
   const searchInput = document.getElementById('marketplaceSearch');
   const resultCount = document.getElementById('resultCount');
@@ -78,8 +81,10 @@ export function initMarketplace(api, store, showProductDetail) {
       return;
     }
 
-    grid.innerHTML = results.map(p => renderCard(p)).join('');
-    attachCardListeners(grid, showProductDetail, store);
+    const userTier = store.get('tier') || 'free';
+    grid.innerHTML = results.map(p => renderCard(p, { userTier })).join('');
+    attachCardListeners(grid, showProductDetail, store, auth);
+    updateInstallCounter(store);
   }
 
   // ── Search ──────────────────────────────────────────────────────
@@ -145,6 +150,8 @@ export function initMarketplace(api, store, showProductDetail) {
 
   store.subscribe('catalog', () => renderProducts());
   store.subscribe('installed', () => renderProducts());
+  store.subscribe('tier', () => renderProducts());
+  store.subscribe('monthlyInstalls', () => updateInstallCounter(store));
 
   // Re-render when registries inject agent-defs / generated-skills
   window.addEventListener('catalog-updated', () => renderProducts());
@@ -158,18 +165,35 @@ export function initMarketplace(api, store, showProductDetail) {
 
 // ── Card renderer ───────────────────────────────────────────────────
 
-function renderCard(product) {
+function renderCard(product, opts = {}) {
+  const { userTier = 'free' } = opts;
   const icon = PRODUCT_TYPE_ICONS[product.productType] || '\u{1F4E6}';
   const typeColor = PRODUCT_TYPE_COLORS[product.productType] || 'var(--text-secondary)';
-  const price = formatPrice(product.pricing);
   const quality = product.quality || 0;
   const qColor = QUALITY_COLOR(quality);
   const rating = product.stats?.rating || 0;
   const downloads = product.stats?.downloads || 0;
   const commands = product.commands || 0;
 
+  const requiredTier = getRequiredTier(product);
+  const hasAccess = userHasAccess(userTier, requiredTier);
+  const tierBadgeClass = `tier-badge-${requiredTier === 'free' ? 'free' : requiredTier}`;
+  const tierLabel = requiredTier === 'free' ? 'FREE' : requiredTier === 'starter' && userHasAccess(userTier, 'starter') ? 'Included' : requiredTier.charAt(0).toUpperCase() + requiredTier.slice(1);
+
+  const lockOverlay = !hasAccess ? `
+      <div class="tier-lock-overlay">
+        <div class="tier-lock-content">
+          <span class="tier-lock-icon">\u{1F512}</span>
+          <span class="tier-lock-label">Requires ${requiredTier.charAt(0).toUpperCase() + requiredTier.slice(1)}</span>
+          <div class="tier-lock-actions">
+            <a href="#pricing" class="btn btn-primary btn-sm">Upgrade</a>
+            ${ONESHOT_PRICES[requiredTier] ? `<button class="btn btn-ghost btn-sm oneshot-buy-btn" data-id="${escapeAttr(product.id)}" data-tier="${requiredTier}">Buy $${ONESHOT_PRICES[requiredTier]}</button>` : ''}
+          </div>
+        </div>
+      </div>` : '';
+
   return `
-    <div class="plugin-card glass-card" data-product-id="${escapeAttr(product.id)}">
+    <div class="plugin-card glass-card${!hasAccess ? ' tier-locked' : ''}" data-product-id="${escapeAttr(product.id)}">
       <div class="plugin-header">
         <div class="plugin-icon" style="border-color:${typeColor}30;background:${typeColor}10">
           ${icon}
@@ -178,7 +202,7 @@ function renderCard(product) {
           <h4>${escapeHtml(product.name || product.id)}</h4>
           <span class="plugin-author">${escapeHtml(product.app || product.author || 'community')}</span>
         </div>
-        <span class="plugin-price ${price === 'Free' ? 'free' : ''}">${price}</span>
+        <span class="tier-badge ${tierBadgeClass}">${tierLabel}</span>
       </div>
       <p class="plugin-desc">${escapeHtml(truncate(product.description || 'No description', 120))}</p>
       <div class="plugin-footer">
@@ -188,16 +212,17 @@ function renderCard(product) {
           ${commands > 0 ? `<span class="meta-item" title="Commands">${commands} cmds</span>` : ''}
           ${rating > 0 ? `<span class="meta-item">${renderStars(rating)}</span>` : ''}
           ${downloads > 0 ? `<span class="meta-item">${formatNum(downloads)} dl</span>` : ''}
-          ${isAgentNative(product) ? '<span class="badge-agent">🤖 Agent</span>' : ''}
+          ${isAgentNative(product) ? '<span class="badge-agent">\u{1F916} Agent</span>' : ''}
           ${product.pricing?.perCall ? `<span class="cost-badge">$${product.pricing.perCall}/call</span>` : ''}
         </div>
         <div style="display:flex;gap:6px;align-items:center">
-          <button class="btn btn-ghost btn-sm try-card-btn" data-id="${escapeAttr(product.id)}">▶ Try</button>
+          <button class="btn btn-ghost btn-sm try-card-btn" data-id="${escapeAttr(product.id)}">&#x25B6; Try</button>
           <button class="btn btn-secondary btn-sm install-card-btn" data-id="${escapeAttr(product.id)}">
             View
           </button>
         </div>
       </div>
+      ${lockOverlay}
     </div>`;
 }
 
@@ -211,16 +236,17 @@ function renderSkeletons(count) {
   `).join('');
 }
 
-function attachCardListeners(grid, showProductDetail, store) {
+function attachCardListeners(grid, showProductDetail, store, auth) {
   grid.querySelectorAll('.plugin-card').forEach(card => {
     card.addEventListener('click', (e) => {
-      // Don't trigger on button click
       if (e.target.closest('.install-card-btn')) {
         const id = e.target.dataset.id;
         showProductDetail(id);
         return;
       }
       if (e.target.closest('.try-card-btn')) return;
+      if (e.target.closest('.oneshot-buy-btn')) return;
+      if (e.target.closest('.tier-lock-actions a')) return;
       const id = card.dataset.productId;
       if (id) showProductDetail(id);
     });
@@ -230,7 +256,17 @@ function attachCardListeners(grid, showProductDetail, store) {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const id = btn.dataset.id;
-      // Switch to forge pane with tool pre-filled
+      const userTier = store.get('tier') || 'free';
+      const limit = TIER_LIMITS[userTier] || 3;
+      const used = store.getMonthlyInstallCount();
+
+      if (used >= limit) {
+        showToast(`Monthly install limit reached (${limit}). Upgrade for more.`, 'error');
+        return;
+      }
+
+      store.incrementInstallCount();
+
       const forgeSidebar = document.querySelector('[data-pane="forge"]');
       if (forgeSidebar) forgeSidebar.click();
       const toolInput = document.getElementById('forgeToolInput');
@@ -240,6 +276,30 @@ function attachCardListeners(grid, showProductDetail, store) {
       }
     });
   });
+
+  grid.querySelectorAll('.oneshot-buy-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const tier = btn.dataset.tier;
+      const price = ONESHOT_PRICES[tier];
+      showToast(`One-shot purchase ($${price}) — coming soon!`);
+    });
+  });
+}
+
+function updateInstallCounter(store) {
+  const banner = document.getElementById('tierUpsellBanner');
+  if (!banner) return;
+  const userTier = store.get('tier') || 'free';
+  const limit = TIER_LIMITS[userTier] || 3;
+  const used = store.getMonthlyInstallCount();
+  const counterEl = banner.querySelector('.upsell-counter');
+  if (counterEl) {
+    counterEl.textContent = `${used} / ${limit} installs used this month`;
+    const pct = Math.min((used / limit) * 100, 100);
+    const bar = banner.querySelector('.upsell-progress-fill');
+    if (bar) bar.style.width = pct + '%';
+  }
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -249,11 +309,6 @@ function formatPrice(pricing) {
   const price = pricing.price ?? pricing.basePrice ?? 0;
   if (!price || price === 0) return 'Free';
   return `$${price.toFixed(2)}`;
-}
-
-function formatType(type) {
-  if (!type) return 'Unknown';
-  return type.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
 }
 
 function formatNum(n) {
@@ -273,12 +328,6 @@ function truncate(str, len) {
   return str.slice(0, len) + '\u2026';
 }
 
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
-
 function escapeAttr(str) {
   return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -290,4 +339,4 @@ function isAgentNative(product) {
          product.agentNative === true;
 }
 
-export { PRODUCT_TYPE_ICONS, PRODUCT_TYPE_COLORS, formatPrice, formatType, escapeHtml, isAgentNative };
+export { PRODUCT_TYPE_ICONS, PRODUCT_TYPE_COLORS, formatType, escapeHtml, formatPrice, isAgentNative, getRequiredTier, userHasAccess, TIER_LIMITS };

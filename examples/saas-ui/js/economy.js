@@ -2,6 +2,8 @@
  * Agent Economy module — publisher revenue, skill analytics, agent leaderboard.
  */
 
+import { escapeHtml } from './utils.js';
+
 const MOCK_LEADERBOARD = [
   { rank: 1, name: 'claude-opus-team', calls: 12450, earned: 124.50 },
   { rank: 2, name: 'ruff-automation-agent', calls: 9871, earned: 98.71 },
@@ -95,8 +97,3 @@ export function initEconomy(api, store, auth) {
   return { refresh: fetchAndRender };
 }
 
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = String(str);
-  return div.innerHTML;
-}

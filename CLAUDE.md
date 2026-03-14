@@ -7,7 +7,7 @@ Package manager for AI agent tools. Resolves, installs, analyzes, exposes CLI to
 ## Key Dependencies
 
 - `@clerk/backend` — Clerk JWT verification (server-side). Canonical import location: `lib/companion/clerk-auth.ts`. `ClerkConfig` now supports `authorizedParties?: string[]` (reads `CLERK_AUTHORIZED_PARTIES` env var, comma-separated). `verifyClerkToken()` gets `publicMetadata` from `clerk.users.getUser()` (not session claims).
-- `stripe` — official Stripe Node.js SDK used by `StripeProvider` in `lib/companion/billing.ts` (customers, checkout, billing portal, invoices, webhook verification). Do NOT use raw fetch for Stripe API calls. `createCheckoutSession` now accepts `clerkUserId?: string` (4th arg) — embeds it in `session.metadata` + `subscription_data.metadata` for webhook reverse-lookup.
+- `stripe` — official Stripe Node.js SDK used by `StripeProvider` in `lib/companion/billing.ts` (customers, checkout, billing portal, invoices, webhook verification) and by the Vercel serverless checkout function (`examples/saas-ui/api/billing/checkout.js`). Do NOT use raw fetch for Stripe API calls. `createCheckoutSession` now accepts `clerkUserId?: string` (4th arg) — embeds it in `session.metadata` + `subscription_data.metadata` for webhook reverse-lookup.
 
 ## Build & Test
 
@@ -177,21 +177,32 @@ examples/
   data/
     ai-ml-tools.json  — 502 AI/ML tool entries (was at project root, now here)
   saas-ui/            — SaaS marketplace UI, deployed to https://ui.spectredve.com
-    index.html        — main app (Agent Economy pane, API Keys pane, Forge enhancements)
-    css/styles.css    — design system + economy / heatmap / bulk-select styles
-    vercel.json       — Vercel static deploy config (SPA rewrites, no-cache HTML, long-cache assets)
+    package.json      — dependencies for Vercel serverless functions (stripe ^17.0.0)
+    index.html        — main app (marketplace, forge). Dashboard/economy/keys moved to admin.html
+    admin.html        — standalone admin SPA, auth-gated, hash routing (#dashboard, #economy, #keys, #settings)
+    api/              — Vercel serverless functions (Node.js, ESM)
+      health.js       — GET /api/health — returns {ok, ts}, no auth
+      config.js       — GET /api/config — returns {clerkPublishableKey}, no auth
+      billing/
+        checkout.js   — POST /api/billing/checkout — creates Stripe Checkout session, returns {url}
+    css/styles.css    — design system + economy / heatmap / bulk-select / tier badges (.tier-badge, .tier-lock-overlay, .tier-upsell-banner) / value comparison (.value-comparison-section, .value-card, .tier-compare-table, .savings-badge) styles
+    css/admin.css     — admin panel styles: fixed 220px sidebar, cyan border glow, scan-line top bar, command bridge aesthetic
+    vercel.json       — Vercel deploy config (SPA rewrites incl. /admin→admin.html, /api/* → serverless, no-cache HTML, long-cache assets)
     registry-data.json — static data for marketplace: github/npm/pypi/crates/agent_defs/harnesses/cli_anything/generated_skills
     js/
-      app.js          — bootstrap, router, auth wiring, nav state, modal logic
-      store.js        — AppStore pub/sub + localStorage (searchFilters excluded — session-only)
+      app.js          — bootstrap, router, auth wiring, nav state, modal logic, pricing checkout wiring, tier-based upsell visibility
+      store.js        — AppStore pub/sub + localStorage (searchFilters excluded — session-only). Monthly install tracking
       api.js          — AgentsApi; auto-detects baseUrl (localhost:3100 dev, '' prod)
       auth.js         — AuthManager: loginWithGoogle/Github/Email, logout, onAuthChange, mock fallback
-      marketplace.js  — product grid, agent-native filter, bulk select, Try button, catalog-updated event
+      utils.js        — shared utilities: PRODUCT_TYPE_ICONS, PRODUCT_TYPE_COLORS, formatType(), escapeHtml(), showToast()
+      marketplace.js  — product grid, agent-native filter, bulk select, Try button, tier access gating, catalog-updated event. Re-exports utils.js symbols
       registries.js   — registry panes (GitHub/npm/PyPI/crates/cli-anything); injects agent_defs+generated_skills into catalog
-      dashboard.js    — revenue tracker, agent wallet, heatmap, API keys section
-      product-detail.js — 3-tab detail (overview/pricing/changelog), SSE feed
+      dashboard.js    — revenue tracker, agent wallet, heatmap. Imports from utils.js. Key links → /admin#keys
+      product-detail.js — 3-tab detail (overview/pricing/changelog), SSE feed. Re-exports showToast from utils.js
       forge-ui.js     — cost estimator, quality preview, persona selector, batch CSV
-      economy.js      — agent economy: earnings, leaderboard, sparklines
+      economy.js      — agent economy: earnings, leaderboard, sparklines. Imports escapeHtml from utils.js
+      admin.js        — admin bootstrap: imports api/store/auth/dashboard/economy, auth gate, inline API key CRUD + settings
+      profile.js      — openSettingsModal() redirects to /admin#settings
     playground.html   — SaaS playground demo
 tests/                — 19 test files, 369 tests
 ```
@@ -238,13 +249,31 @@ vercel ls
 ```
 
 **Key rules:**
-- `vercel.json` rewrites all non-asset paths to `index.html` (SPA routing)
+- `vercel.json` rewrites `/admin` to `admin.html`, `/api/*` routes to serverless functions, all other non-asset paths to `index.html` (SPA routing)
+- Serverless functions in `api/` use the `stripe` dependency from `examples/saas-ui/package.json`
 - HTML served with `no-cache, no-store` — assets (js/css/woff/png/svg) cached 1 year immutable
 - `registry-data.json` is the static data source for all marketplace tabs — edit to add/update products
 - `api.js` auto-detects API base: `localhost:3100` when running locally, `''` (relative) in production
 - `AuthManager` falls back to mock OAuth when server unavailable — always works offline
 - `searchFilters` is **session-only state** (not persisted to localStorage) — stale filters caused 0 products bug
 - Marketplace re-renders on `catalog-updated` custom event fired by `registries.js` after async inject
+
+## SaaS Admin Panel (examples/saas-ui/admin.html)
+
+Standalone admin SPA at `/admin`, separate from the main marketplace UI. Auth-gated — redirects to `/` if not logged in.
+
+**Routing:** hash-based — `#dashboard` (revenue/wallet/heatmap), `#economy` (earnings/leaderboard), `#keys` (API key CRUD), `#settings` (profile/preferences).
+
+**Design:** "command bridge" aesthetic — deep black `#030308` background, cyan `#00d4ff` accents, monospace data display, pulsing status indicators, scan-line top bar. Separate from main site design system (`css/admin.css`).
+
+**Imports:** `admin.js` bootstraps the panel using `api.js`, `store.js`, `auth.js`, `dashboard.js`, `economy.js`. API key create/revoke and settings panel are inline in `admin.js`.
+
+**Pricing checkout flow:**
+- All tiers (Starter/Pro/Enterprise) use `POST /api/billing/checkout` → Vercel serverless function → Stripe Checkout session → redirect
+- Real Stripe test price IDs: Starter ($29/mo) `price_1TAsLJ2QpzdUwTFgn4OhkLig`, Pro ($79/mo) `price_1TAsLK2QpzdUwTFgqe4HP5Jh`, Enterprise ($199/mo) `price_1TAsLK2QpzdUwTFgZQQ56NrE`
+- `handleCheckout(priceId)` in `app.js` sends `{priceId, successUrl, cancelUrl}` → serverless fn creates `stripe.checkout.sessions.create()` in subscription mode
+- On success redirect, `?checkout=success` query param triggers a toast + URL cleanup
+- Generic button handler in `app.js` skips pricing buttons with `data-price-id` attributes
 
 ## GitHub Actions Deploy (.github/workflows/deploy.yml)
 
@@ -254,6 +283,8 @@ vercel ls
 | Push tag `v*` | Vercel production deploy → ui.spectredve.com |
 
 Required secrets: `VERCEL_TOKEN`, `VERCEL_ORG_ID` (`team_sPtjjiJVOLGPrwDr8PCCHqqU`), `VERCEL_PROJECT_ID` (`prj_a8P8OO3AkotB3hR5Yoq4F01oXyve`)
+
+Required Vercel env vars (set in Vercel Dashboard → Settings → Environment Variables): `STRIPE_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`
 
 ```bash
 # Release to production
@@ -316,7 +347,10 @@ store.set(key, value)        // write + notify + autoPersist
 store.update(key, fn)        // set(key, fn(current))
 store.subscribe(key, cb)     // → unsubscribe fn; cb(value, old)
 store.subscribe('*', cb)     // wildcard: cb(key, value, old)
-// Persisted keys: user, tier, installed, earnings, agentKeys
+store.getMonthlyInstallCount() // → number; auto-resets when month changes
+store.incrementInstallCount()  // bumps monthly count, persisted
+// State: monthlyInstalls: { count: number, month: "YYYY-MM" }
+// Persisted keys: user, tier, installed, earnings, agentKeys, monthlyInstalls
 // NOT persisted: searchFilters (session-only to prevent stale filter bugs)
 ```
 
@@ -443,6 +477,15 @@ updateUserMetadata(userId, metadata, config: ClerkConfig): Promise<void>
 - `clerkPublishableKey: null` in `/api/config` means `CLERK_SECRET_KEY` not loaded — check `.env` is populated and `skill-forge.ts --companion --serve` was restarted after editing `.env`
 - Clerk `publicMetadata` comes from `clerk.users.getUser(userId).publicMetadata` (not session claims `public_metadata`)
 - `STRIPE_WEBHOOK_SECRET` wrong format (`sk_test_...` instead of `whsec_...`) causes all webhook verifications to fail silently
+- `showToast` canonical location is `js/utils.js` — re-exported from `product-detail.js` for backward compat
+- `PRODUCT_TYPE_ICONS`, `PRODUCT_TYPE_COLORS`, `formatType()`, `escapeHtml()` canonical location is `js/utils.js` — re-exported from `marketplace.js` for backward compat
+- `TIER_LIMITS`, `getRequiredTier()`, `userHasAccess()` canonical location is `js/marketplace.js`
+- Admin panel is at `examples/saas-ui/admin.html` (NOT a route handled by `index.html` SPA — it has its own `/admin` rewrite in `vercel.json`)
+- Pricing checkout: all tiers use `POST /api/billing/checkout` → Vercel serverless → Stripe Checkout session (no more direct payment links)
+- `initMarketplace(api, store, showProductDetail, auth)` takes 4 args — `auth` is required for tier-gated install checks
+- `TIER_LIMITS` in `marketplace.js`: `{ free: 3, starter: 50, pro: 500, enterprise: Infinity }` — monthly install caps per tier
+- `getRequiredTier(product)` and `userHasAccess(userTier, requiredTier)` are in `marketplace.js` — do not duplicate logic elsewhere
+- Tier upsell banner (`#tierUpsellBanner`) and value comparison (`#valueComparisonSection`) are hidden when user tier is not `free`
 
 ## Do NOT
 
@@ -458,3 +501,8 @@ updateUserMetadata(userId, metadata, config: ClerkConfig): Promise<void>
 - Import `@clerk/backend` directly in new files — use `lib/companion/clerk-auth.ts` as the canonical import location
 - Use raw fetch for Stripe API calls — `StripeProvider` in `lib/companion/billing.ts` uses the official `stripe` npm SDK
 - Set `STRIPE_WEBHOOK_SECRET` to a `sk_test_...` key — it must be `whsec_...` from `stripe listen` or the Dashboard
+- Re-add dashboard/economy/agent-keys panes to `index.html` — they live in `admin.html` now
+- Import `showToast`/`escapeHtml`/`formatType`/`PRODUCT_TYPE_ICONS` from `marketplace.js` or `product-detail.js` in new code — use `utils.js` as the canonical import location
+- Use direct Stripe payment links (`buy.stripe.com`) for pricing checkout — all tiers now go through `POST /api/billing/checkout` serverless function
+- Hardcode Stripe price IDs outside `app.js` — the canonical price ID mapping is in the `handleCheckout` wiring in `app.js`
+- Duplicate tier access logic — use `getRequiredTier()` and `userHasAccess()` from `marketplace.js`

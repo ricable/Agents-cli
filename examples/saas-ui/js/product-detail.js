@@ -3,7 +3,8 @@
  * reviews, versions, install action.
  */
 
-import { PRODUCT_TYPE_ICONS, PRODUCT_TYPE_COLORS, formatPrice, formatType, escapeHtml } from './marketplace.js';
+import { PRODUCT_TYPE_ICONS, PRODUCT_TYPE_COLORS, formatType, escapeHtml, showToast } from './utils.js';
+import { formatPrice } from './marketplace.js';
 
 
 export function initProductDetail(api, store, auth) {
@@ -294,20 +295,6 @@ function formatNum(n) {
 
 function escapeAttr(str) {
   return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
-function showToast(message) {
-  const container = document.getElementById('toastContainer');
-  if (!container) return;
-  const toast = document.createElement('div');
-  toast.className = 'toast toast-success';
-  toast.textContent = message;
-  container.appendChild(toast);
-  requestAnimationFrame(() => toast.classList.add('show'));
-  setTimeout(() => {
-    toast.classList.remove('show');
-    setTimeout(() => toast.remove(), 300);
-  }, 3000);
 }
 
 export { showToast };

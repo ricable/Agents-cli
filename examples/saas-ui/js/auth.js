@@ -17,6 +17,11 @@ export class AuthManager {
   // ── Init ────────────────────────────────────────────────────────
 
   async _init() {
+    // Capture URL state immediately — before any async ops (clerk.load clears the hash).
+    const _initPathname = window.location.pathname;
+    const _initHash = window.location.hash;
+    const _initSearch = window.location.search;
+
     // Priority 1: inline window.__CLERK_KEY set by index.html <script> tag
     // Priority 2: fetch from /api/config serverless function
     // Priority 3: fall through to mock mode
@@ -100,35 +105,47 @@ export class AuthManager {
         }
       });
 
-      // Handle SSO callback redirect (/sso-callback path)
-      if (window.location.pathname === '/sso-callback') {
+      // Handle SSO callback — Clerk uses either path-based (/sso-callback)
+      // or hash-based (/#/sso-callback?after_sign_in_url=...) depending on how
+      // the OAuth flow was initiated (embedded modal vs Account Portal).
+      // IMPORTANT: use _initHash/_initPathname captured before clerk.load()
+      // because clerk.load() clears the hash before our code can read it.
+      const _isClerkCallback = (
+        _initPathname === '/sso-callback' ||
+        _initHash.includes('sso-callback') ||
+        _initHash.includes('after_sign_in_url') ||
+        _initSearch.includes('__clerk_status') ||
+        _initSearch.includes('after_sign_in_url')
+      );
+
+      console.log('[Clerk] _isClerkCallback:', _isClerkCallback, { _initPathname, _initHash: _initHash.slice(0, 80) });
+
+      if (_isClerkCallback) {
         try {
+          console.log('[Clerk] calling handleRedirectCallback...');
           await clerk.handleRedirectCallback();
+          console.log('[Clerk] handleRedirectCallback done, user:', clerk.user?.id ?? null);
+          // Persist user to store before navigating so restoreAuthSession finds it immediately.
+          if (clerk.user) {
+            const u = clerk.user;
+            this.store.set('user', {
+              email: u.primaryEmailAddress?.emailAddress ?? u.emailAddresses?.[0]?.emailAddress ?? '',
+              name: u.fullName ?? u.firstName ?? '',
+              avatar: (u.fullName ?? u.firstName ?? 'U')[0].toUpperCase(),
+              userId: u.id,
+            });
+            this.store.set('tier', 'pro');
+          }
+          // handleRedirectCallback navigates to after_sign_in_url on success.
+          // If still here (no navigation happened), go home.
+          window.location.replace('/');
         } catch (err) {
           console.error('[Clerk] handleRedirectCallback failed:', err);
-          window.location.href = '/';
+          window.location.replace('/');
         }
-        // handleRedirectCallback navigates away on success; if still here, go home
-        window.location.href = '/';
         return;
       }
 
-      // Restore existing session immediately if signed in
-      if (clerk.session) {
-        const user = clerk.user;
-        if (user) {
-          const authUser = {
-            email: user.primaryEmailAddress?.emailAddress ?? '',
-            name: user.fullName ?? user.firstName ?? '',
-            avatar: (user.fullName ?? user.firstName ?? 'U')[0].toUpperCase(),
-            userId: user.id,
-          };
-          this.store.set('user', authUser);
-          const token = await clerk.session.getToken();
-          if (token) this.api.setToken(token);
-          this._notifyChange(authUser);
-        }
-      }
     } catch {
       // Clerk failed to load — fall back to mock mode
       this._restoreSession();

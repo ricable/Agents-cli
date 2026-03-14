@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin — Agents-CLI</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <script>window.__CLERK_KEY = window.__CLERK_KEY || null;</script>
+</head>
+<body class="admin-body">
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Top Bar -->
+    <header class="admin-topbar">
+        <a href="/" class="brand">
+            <span class="brand-icon">&#x2728;</span>
+            <span class="brand-text">Agents<span class="accent">-CLI</span> Admin</span>
+        </a>
+        <div class="topbar-right">
+            <div class="server-status">
+                <span class="status-dot" id="serverDot"></span>
+                <span id="serverLabel">Checking...</span>
+            </div>
+            <div class="user-info">
+                <div class="user-avatar" id="adminAvatar">?</div>
+                <span class="user-name" id="adminUserName"></span>
+            </div>
+            <button class="logout-btn" id="adminLogoutBtn">Logout</button>
+        </div>
+    </header>
+
+    <!-- Sidebar -->
+    <nav class="admin-sidebar">
+        <div class="nav-label">Manage</div>
+        <a class="nav-item active" data-pane="dashboard" href="#dashboard">
+            <span class="nav-icon">&#x1F4CA;</span> Dashboard
+        </a>
+        <a class="nav-item" data-pane="economy" href="#economy">
+            <span class="nav-icon">&#x1F4B0;</span> Economy
+        </a>
+        <a class="nav-item" data-pane="keys" href="#keys">
+            <span class="nav-icon">&#x1F511;</span> API Keys
+        </a>
+        <a class="nav-item" data-pane="settings" href="#settings">
+            <span class="nav-icon">&#x2699;</span> Settings
+        </a>
+    </nav>
+
+    <!-- Content -->
+    <main class="admin-content">
+
+        <!-- Pane: Dashboard -->
+        <div class="admin-pane active" id="pane-dashboard">
+            <!-- Rendered dynamically by dashboard.js initDashboard() -->
+        </div>
+
+        <!-- Pane: Economy -->
+        <div class="admin-pane" id="pane-economy">
+            <h2 class="admin-section-title">Agent Economy</h2>
+            <div class="admin-stats-grid">
+                <div class="admin-card">
+                    <h3>Total Earned</h3>
+                    <div class="data-value big green" id="econTotalEarned">$0.00</div>
+                </div>
+                <div class="admin-card">
+                    <h3>Pending Payout</h3>
+                    <div class="data-value big orange" id="econPendingPayout">$0.00</div>
+                </div>
+                <div class="admin-card">
+                    <h3>Next Payout</h3>
+                    <div class="data-value big" id="econNextPayout">--</div>
+                </div>
+                <div class="admin-card">
+                    <h3>Published Skills</h3>
+                    <div class="data-value big cyan" id="econSkillCount">0</div>
+                </div>
+            </div>
+            <div class="admin-card" style="margin-bottom:20px">
+                <h3>Published Skills</h3>
+                <table class="admin-table" id="econSkillsTable">
+                    <thead><tr><th>Skill</th><th>Calls</th><th>Earned</th><th>Trend</th></tr></thead>
+                    <tbody id="econSkillsBody">
+                        <tr><td colspan="4" style="text-align:center;color:var(--admin-text-dim)">No published skills yet</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="admin-card">
+                <h3>Agent Leaderboard</h3>
+                <div id="econLeaderboard"></div>
+            </div>
+        </div>
+
+        <!-- Pane: API Keys -->
+        <div class="admin-pane" id="pane-keys">
+            <h2 class="admin-section-title">API Keys</h2>
+            <div class="admin-card">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                    <p style="color:var(--admin-text-dim);font-size:13px">Manage agent API keys for programmatic access.</p>
+                    <button class="admin-btn primary" id="createKeyBtn">+ Create Key</button>
+                </div>
+                <div id="agentKeysList">
+                    <div class="admin-empty">
+                        <div class="empty-icon">&#x1F511;</div>
+                        <p>No API keys yet. Create one to get started.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pane: Settings -->
+        <div class="admin-pane" id="pane-settings">
+            <h2 class="admin-section-title">Settings</h2>
+
+            <div class="admin-card" style="margin-bottom:20px">
+                <h3>Profile</h3>
+                <div class="admin-form-group">
+                    <label>Display Name</label>
+                    <input type="text" id="profileName" placeholder="Your name" />
+                </div>
+                <div class="admin-form-group">
+                    <label>Email</label>
+                    <input type="email" id="profileEmail" placeholder="you@example.com" />
+                </div>
+                <div style="margin-top:4px">
+                    <span style="font-size:11px;color:var(--admin-text-dim);text-transform:uppercase;letter-spacing:1px">Tier: </span>
+                    <span class="data-value cyan" id="profileTier" style="font-size:13px">Free</span>
+                </div>
+            </div>
+
+            <div class="admin-card" style="margin-bottom:20px">
+                <h3>Connections</h3>
+                <div class="admin-form-group">
+                    <label>Companion Server URL</label>
+                    <input type="text" id="companionUrl" placeholder="http://127.0.0.1:3100" />
+                    <div class="hint" id="serverStatus">...</div>
+                </div>
+                <div class="admin-form-group">
+                    <label>MCP Bridge Port</label>
+                    <input type="text" value="3100" placeholder="3100" />
+                </div>
+            </div>
+
+            <div class="admin-card" style="margin-bottom:20px">
+                <h3>API Keys</h3>
+                <div class="admin-form-group">
+                    <label>GitHub Personal Access Token</label>
+                    <input type="password" id="githubToken" placeholder="ghp_..." autocomplete="off" />
+                    <div class="hint">For higher rate limits on GitHub registry.</div>
+                </div>
+                <div class="admin-form-group">
+                    <label>Anthropic API Key</label>
+                    <input type="password" id="anthropicKey" placeholder="sk-ant-..." autocomplete="off" />
+                    <div class="hint">Used for AI skill generation in Skill Forge.</div>
+                </div>
+                <div class="admin-form-group">
+                    <label>OpenAI API Key (optional)</label>
+                    <input type="password" id="openaiKey" placeholder="sk-..." autocomplete="off" />
+                </div>
+            </div>
+
+            <div class="admin-card" style="margin-bottom:20px">
+                <h3>Preferences</h3>
+                <div class="admin-form-group">
+                    <label>Default Skill Domain</label>
+                    <select id="prefDomain">
+                        <option>Auto-detect</option>
+                        <option>ai-ml</option>
+                        <option>devops</option>
+                        <option>code-quality</option>
+                        <option>testing</option>
+                    </select>
+                </div>
+                <div class="admin-toggle-row">
+                    <span>Enable AI Generation</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" checked />
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="admin-toggle-row">
+                    <span>Auto-index on install</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" checked />
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="admin-toggle-row">
+                    <span>Dark mode</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" checked disabled />
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <button class="admin-btn primary" id="saveSettingsBtn" style="margin-top:8px">Save Changes</button>
+        </div>
+
+    </main>
+
+    <script type="module" src="js/admin.js"></script>
+</body>
+</html>

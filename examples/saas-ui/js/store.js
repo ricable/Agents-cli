@@ -24,6 +24,7 @@ export class AppStore {
       activeAgent: null,
       invocationFeed: [],
       agentMetrics: {},
+      monthlyInstalls: { count: 0, month: new Date().toISOString().slice(0, 7) },
     };
     this._listeners = new Map();
     this.restore();
@@ -61,7 +62,7 @@ export class AppStore {
   // Persist only certain keys to localStorage
   _autoPersist(key) {
     // searchFilters intentionally excluded — session-only state, stale filters break the UI
-    const persistKeys = ['user', 'tier', 'installed', 'earnings', 'agentKeys'];
+    const persistKeys = ['user', 'tier', 'installed', 'earnings', 'agentKeys', 'monthlyInstalls'];
     if (persistKeys.includes(key)) this.persist();
   }
 
@@ -74,6 +75,7 @@ export class AppStore {
         searchFilters: this.state.searchFilters,
         earnings: this.state.earnings,
         agentKeys: this.state.agentKeys,
+        monthlyInstalls: this.state.monthlyInstalls,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch { /* quota exceeded or private browsing */ }
@@ -90,6 +92,7 @@ export class AppStore {
       if (data.searchFilters) this.state.searchFilters = { ...this.state.searchFilters, ...data.searchFilters };
       if (data.earnings) this.state.earnings = data.earnings;
       if (data.agentKeys) this.state.agentKeys = data.agentKeys;
+      if (data.monthlyInstalls) this.state.monthlyInstalls = data.monthlyInstalls;
     } catch { /* corrupted data */ }
   }
 
@@ -115,6 +118,26 @@ export class AppStore {
 
   uninstall(productId) {
     this.update('installed', list => list.filter(id => id !== productId));
+  }
+
+  getMonthlyInstallCount() {
+    const current = this.state.monthlyInstalls;
+    const now = new Date().toISOString().slice(0, 7);
+    if (current.month !== now) {
+      this.set('monthlyInstalls', { count: 0, month: now });
+      return 0;
+    }
+    return current.count;
+  }
+
+  incrementInstallCount() {
+    const now = new Date().toISOString().slice(0, 7);
+    const current = this.state.monthlyInstalls;
+    if (current.month !== now) {
+      this.set('monthlyInstalls', { count: 1, month: now });
+    } else {
+      this.set('monthlyInstalls', { count: current.count + 1, month: now });
+    }
   }
 
   clear() {
