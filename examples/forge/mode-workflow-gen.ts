@@ -8,7 +8,7 @@
 import { existsSync, mkdirSync, writeFileSync, copyFileSync, readdirSync } from "node:fs";
 import { join, basename, resolve, extname } from "node:path";
 import { rejectPathTraversal } from "../../lib/guards.js";
-import { success, failure, emit } from "../../lib/output.js";
+import { success, failure, emit, toErrorMessage } from "../../lib/output.js";
 import { analyzeAgentDirectory } from "../../lib/pipeline/agent-analyzer.js";
 import { inferWorkflowManifest } from "../../lib/pipeline/workflow-manifest-inference.js";
 import { generateWorkflowSkillMd, generateRunScript, generateSetupScript, generateWorkflowReference } from "../../lib/pipeline/workflow-skill-gen.js";
@@ -136,7 +136,7 @@ export async function workflowGenMode(args: CliArgs, startTime: number): Promise
       copied++;
     }
   } catch (err) {
-    log(`  ⚠ Failed to copy some agent scripts: ${err instanceof Error ? err.message : String(err)}`);
+    log(`  ⚠ Failed to copy some agent scripts: ${toErrorMessage(err)}`);
   }
 
   log(`  ✅ Generated: SKILL.md + scripts + references + ${copied} agent scripts`);

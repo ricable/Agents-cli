@@ -90,6 +90,18 @@ agents-cli mcp start | list
 
 # Plugin (Claude Code spec)
 agents-cli plugin init | publish <name> | test [dir] | group | factory | pipeline <prompt> | index <source>
+
+# Crawl (scale discovery)
+agents-cli crawl seed [--registry pypi|npm|crates|github|mcp] [--limit N] [--all]
+agents-cli crawl start [--concurrency N] [--limit N] [--registry X]
+agents-cli crawl status [--json]
+
+# Compose (agentic workflow generation)
+agents-cli compose "Python CI pipeline" [--iterations 5] [--sandbox] [--creative] [--domain X]
+agents-cli compose --from-skills src-ruff,src-pytest [--creative --output <dir>]
+
+# Stats (system monitoring)
+agents-cli stats [--json]
 ```
 
 ## Skill Forge (`npx tsx examples/skill-forge.ts`)
@@ -129,8 +141,8 @@ agents-cli plugin init | publish <name> | test [dir] | group | factory | pipelin
 bin/
   agents-cli.ts       — 67-line dispatcher; all logic in bin/commands/
   agent-run.ts        — tool execution engine
-  commands/           — 22 command files (one registerXCommand per file)
-    shared.ts         — isJsonMode(), pickFields(), DATA_DIR
+  commands/           — 25 command files (one registerXCommand per file)
+    shared.ts         — isJsonMode(), pickFields(), DATA_DIR, getStore()
     add.ts / list.ts / describe.ts / schema.ts / run.ts
     remove.ts / update.ts / search.ts / scan.ts / info.ts
     freeze.ts / install.ts / verify.ts
@@ -138,6 +150,9 @@ bin/
     mcp.ts            — mcp subcommand group
     plugin.ts         — plugin subcommand group
     generate.ts / init.ts / pipeline.ts / publish.ts / index-cmd.ts
+    crawl.ts          — crawl seed/start/status subcommands
+    compose.ts        — agentic workflow composition
+    stats.ts          — system stats display
 lib/
   types.ts            — CliOutput, Tool, ManifestEntry, etc.
   index.ts            — public SDK entry (re-exports everything)
@@ -146,7 +161,7 @@ lib/
   resolver.ts         — source detection + metadata (github/npm/pypi/crates/local)
   installer.ts        — download, extract, build (branch fallback: main→master→develop)
   analyzer.ts         — --help probing, deepProbe(), detectInteractionMode()
-  store.ts            — flat-file JSON store + CONTEXT.md
+  store.ts            — flat-file JSON store + CONTEXT.md + createSqliteStore() factory
   registry.ts         — 4-layer cascade (local→community→github→npm)
   skills.ts           — backward-compat barrel → lib/skills/index.ts
   skills/             — split from monolithic skills.ts (3105 → 5 focused modules)
@@ -163,15 +178,23 @@ lib/
   mcp.ts              — MCP bridge
   extractor.ts        — README parsing, inferBinaryNames(), readSourceVersion()
   curated-tools.ts    — 91 general tools; loadAllTools() reads examples/data/ai-ml-tools.json
-  search.ts / indexer.ts / indexes.ts / domains.ts / cache.ts / chunker.ts
-  classifier/         — npm.ts, github.ts, crates.ts, pypi.ts
+  search.ts           — hybridSearch(), FTS5 + sqlite-vec KNN integration
+  concurrency.ts      — AdaptiveSemaphore, TokenBucketRateLimiter, mapConcurrent()
+  indexer.ts / indexes.ts / domains.ts / cache.ts / chunker.ts
+  classifier/         — npm.ts, github.ts, crates.ts, pypi.ts, libraries-io.ts, github-graphql.ts
   pipeline/           — intent.ts, entity-extractor.ts, prompt-parser.ts, capability-map.ts,
                         agent-analyzer.ts (script parser: imports, env vars, SDK calls, cross-deps),
                         workflow-manifest-inference.ts (topo sort, data flow, env merge, duration est),
                         workflow-composer.ts (WorkflowEnvVar, DataFlowEdge, SkillWorkflow extensions)
   hooks/              — types.ts, generator.ts, validator.ts, templates/
   plugin/             — builder.ts, publisher.ts, marketplace.ts, audit-report.ts, versioning.ts, ...
-  db/                 — domain-db.ts, aggregated-db.ts, sqlite.ts
+  db/                 — domain-db.ts, aggregated-db.ts, sqlite.ts, unified-store.ts, vec-store.ts, migrate.ts
+  adapters/           — types.ts (SourceAdapter), registry-adapter.ts, pipeline.ts (UnifiedPipeline)
+  intelligence/       — embeddings.ts, io-extractor.ts, graph-builder.ts, discovery.ts, auto-repair.ts
+  composer/           — schema.ts, llm-client.ts, proposer.ts, validator.ts, iteration-loop.ts, script-generator.ts, Dockerfile.sandbox
+  crawler/            — worker.ts (crawl queue worker), seeders.ts (registry seeders)
+  marketplace/        — export.ts (SQLite -> registry-data.json)
+  monitoring/         — stats.ts (system stats aggregator)
   companion/          — web-service.ts, billing.ts, oauth.ts, metering.ts, tiers.ts, clerk-auth.ts, ...
 examples/
   skill-forge.ts      — thin dispatcher → forge/ modules
@@ -224,6 +247,114 @@ tests/                — 19 test files, 369 tests
 8. **Factory** — `runSkillFactory()` optional 3-layer
 9. **MCP** — `McpBridge` exposes tools
 10. **Workflow Gen** — `--workflow-gen <dir>` analyzes agent scripts → infers manifest (topo sort + data flow) → generates SKILL.md + run.sh + setup.sh + workflow.md + copies scripts
+
+## Scaling Infrastructure (SQLite + Crawlers + Intelligence + Composer)
+
+### Unified SQLite Store (`lib/db/unified-store.ts`)
+- Tables: `tools`, `skills`, `workflows`, `skill_edges`, `crawl_queue`, `domains` + FTS5 indexes + `vec_skills` (sqlite-vec)
+- Implements `ToolStore` interface for backward compatibility
+- Singleton factory: `createUnifiedStore(dataDir)` — detects dataDir mismatch
+- Prepared statements for hot-path queries
+- Atomic `dequeue()` with transaction wrapper
+- `searchProducts()` — UNION across skills+workflows with FTS5/pagination
+- `listDomainsWithCounts()` — domain hierarchy with skill counts
+- `bulkAddEdges()` — batch insert skill graph edges
+- `CrawlStatus`: `"pending" | "processing" | "done" | "failed"`
+- `EdgeType`: `"io_chain" | "same_domain" | "embedding_similar" | "llm_inferred"`
+
+### sqlite-vec (`lib/db/vec-store.ts`)
+- Graceful fallback when `sqlite-vec` not installed (dynamic import)
+- `createVecStore(db, dimension)` — KNN search, filtered search, brute-force cosine fallback
+- `cosine()` function lives in `lib/guards.ts` (DRY)
+
+### Migration (`lib/db/migrate.ts`)
+- `migrateToSqlite(dataDir)` — tools.json + .skill-cache.json + generated-skills -> SQLite
+- Seeds hierarchical domain taxonomy (27 flat + 20 sub-domains)
+
+### Crawl System (`lib/crawler/`)
+- `CrawlWorker` — adaptive concurrency, exponential backoff (1min -> 5min -> 30min)
+- Install-analyze-prune cycle: delete `package/` dir after skill generation
+- `seedFromPyPI/Npm/Crates/GitHub/MCPRegistry()` — generic `seedFromLibrariesIo()` base
+- `seedAll()` — parallelize across all registries
+
+### Classifiers
+- `lib/classifier/libraries-io.ts` — Libraries.io unified connector (npm/PyPI/crates), 55 req/min rate limited
+- `lib/classifier/github-graphql.ts` — cursor-based pagination beyond 1000, cost tracking (4500pt budget)
+
+### Concurrency (`lib/concurrency.ts`)
+- `AdaptiveSemaphore` — auto-detect CPU count, ramp up/down based on p95 latency
+- `TokenBucketRateLimiter` — configurable tokens/interval, `.unref()` timer
+- `mapConcurrent(items, fn, concurrency)` — concurrent map with back-pressure
+
+### Intelligence Layer (`lib/intelligence/`)
+- `embeddings.ts` — `embedText()`, `embedBatch()` (Ollama batch API), `embedAllSkills()`
+- `io-extractor.ts` — `extractIOProfile(skillMd)` -> `{inputs, outputs, sideEffects, categories}`
+- `graph-builder.ts` — pre-computes 4 edge types via inverted index (O(n*k) not O(n^2))
+- `discovery.ts` — 4 methods: `semantic`, `domain-semantic`, `multi-hop-llm`, `graph-traversal`
+- `auto-repair.ts` — LLM-powered quality repair (up to 3 retries)
+
+### Agentic Composer (`lib/composer/`)
+- `schema.ts` — `WorkflowYAML` interface + template-based YAML serializer (no yaml dependency)
+- `llm-client.ts` — `TieredLLMClient`: Ollama (propose/repair) + Claude API (validate/refine)
+- `proposer.ts` — uses 4 discovery methods, builds context, prompts LLM for workflow.yaml
+- `validator.ts` — 7 static validation checks + optional Docker sandbox
+- `iteration-loop.ts` — `composeWorkflow()`: propose -> validate -> refine (3-5 iterations, target quality >= 0.8)
+- `script-generator.ts` — `generateRunScript()`, `generateSetupScript()`, `generateSkillMd()`
+- `Dockerfile.sandbox` — Docker container definition for sandbox validation
+
+### Source Adapters (`lib/adapters/`)
+- `types.ts` — `SourceAdapter` interface + `SkillCandidate` intermediate format
+- `registry-adapter.ts` — wraps existing resolve-install-analyze pipeline
+- `pipeline.ts` — `UnifiedPipeline` routes to correct adapter by source prefix
+
+### Store Factory (`lib/store.ts`)
+- `createSqliteStore(dataDir)` — tries SQLite, falls back to flat-file JSON
+- `createStore(dataDir)` — original flat-file store (still available)
+
+### Key Functions (new)
+```typescript
+// Guards (lib/guards.ts) — new additions
+validateOllamaUrl(url): void            // Ollama endpoint validation
+cosine(a, b: Float32Array): number      // cosine similarity (DRY extraction)
+
+// Store (lib/store.ts)
+createSqliteStore(dataDir): Promise<ToolStore>   // SQLite with fallback
+
+// Concurrency (lib/concurrency.ts)
+AdaptiveSemaphore(opts): { acquire, release }
+TokenBucketRateLimiter(tokens, intervalMs): { acquire }
+mapConcurrent<T,R>(items, fn, concurrency): Promise<R[]>
+
+// Intelligence (lib/intelligence/)
+embedText(text, ollamaUrl?): Promise<Float32Array>
+embedBatch(texts, ollamaUrl?): Promise<Float32Array[]>
+embedAllSkills(store, vecStore, opts?): Promise<EmbedResult>
+extractIOProfile(skillMd, commands?): IOProfile
+buildSkillGraph(store, vecStore, opts?): Promise<GraphBuildResult>
+discoverSkills(store, vecStore, { method, query }): Promise<DiscoveredSkill[]>
+autoRepairSkill(skillDir, store, opts?): Promise<RepairResult>
+
+// Composer (lib/composer/)
+composeWorkflow(opts): Promise<ComposeResult>
+proposeWorkflow(opts): Promise<WorkflowYAML>
+validateWorkflow(workflow, store): ValidationReport
+TieredLLMClient.generate(tier, prompt): Promise<LLMResponse>
+
+// Crawler (lib/crawler/)
+CrawlWorker.start(opts): Promise<CrawlResult>
+seedFromPyPI/Npm/Crates/GitHub/MCPRegistry(store, opts): Promise<number>
+seedAll(store, opts): Promise<SeedResult>
+
+// Classifiers (new)
+searchLibrariesIo(query, opts): Promise<LibrariesIoResult[]>
+crawlTopicRepos(topic, opts): AsyncGenerator<GraphQLRepo>
+
+// Monitoring (lib/monitoring/stats.ts)
+gatherStats(dataDir): Promise<SystemStats>
+
+// Marketplace (lib/marketplace/export.ts)
+exportRegistryData(dataDir, outputPath): Promise<void>
+```
 
 ## Skill Quality
 
@@ -458,6 +589,9 @@ GET  /api/agents/:id/heatmap           — 24h invocation heatmap stub
 POST /api/agent-keys                   — create key {id, secret, scopes, createdAt}
 DELETE /api/agent-keys/:id             — revoke key
 GET  /api/invocations/stream?skill=X   — SSE: live invocation events (mock every 3-8s)
+GET  /api/catalog?page=1&limit=50&domain=X&type=Y&sort=quality&q=Z — paginated catalog (SQLite-backed)
+GET  /api/catalog/domains              — domain tree with counts
+GET  /api/graph/:skillId               — skill graph neighbors
 ```
 
 ## Key Functions
@@ -531,8 +665,9 @@ updateUserMetadata(userId, metadata, config: ClerkConfig): Promise<void>
 ## Data Directory
 
 ```
-~/.agents-cli/tools.json              — metadata store
-~/.agents-cli/tools/<id>/package/     — installed files
+~/.agents-cli/tools.json              — flat-file metadata store (legacy, migrated to SQLite)
+~/.agents-cli/agents-cli.db           — unified SQLite database (tools, skills, workflows, edges, crawl queue)
+~/.agents-cli/tools/<id>/package/     — installed files (pruned after skill generation in crawl mode)
 ~/.agents-cli/tools/<id>/CONTEXT.md   — auto-docs
 ~/.agents-cli/skills/<name>/skill.json + CONTEXT.md
 ```
@@ -574,6 +709,13 @@ updateUserMetadata(userId, metadata, config: ClerkConfig): Promise<void>
 - `.promo-ribbon` uses `clip-path: polygon()` — test in target browsers before modifying
 - Workflow detail modal defaults to Pipeline tab (not Overview) for workflow products — do not reset this behavior
 - `#workflowShowcase` section is positioned between Chrome Extension and Marketplace sections in `index.html`
+- `createUnifiedStore(dataDir)` is a singleton — calling with a different `dataDir` throws. Use `getStore()` from `bin/commands/shared.ts` in commands
+- `sqlite-vec` and `@anthropic-ai/sdk` are optional deps — use dynamic import via variable name (`const m = "sqlite-vec"; await import(m)`) to bypass TSC module resolution
+- `validateOllamaUrl()` and `cosine()` canonical location is `lib/guards.ts` — do not duplicate
+- `CrawlWorker` uses TOCTOU-safe patterns: `rmSync(force: true)` without prior `existsSync`, `try/catch readFileSync` instead of `existsSync+readFileSync`
+- `seedFromLibrariesIo()` is the generic base — `seedFromPyPI/Npm/Crates` are one-liner wrappers
+- `TieredLLMClient` routes: `"propose"/"repair"` -> Ollama (free), `"validate"/"refine"` -> Claude API (quality)
+- `composeWorkflow()` iteration loop targets quality >= 0.8, max 5 iterations — do not lower the threshold
 
 ## Do NOT
 
@@ -600,3 +742,8 @@ updateUserMetadata(userId, metadata, config: ClerkConfig): Promise<void>
 - Change promo display prices without updating all 3 views (monthly cards, yearly cards, value comparison table)
 - Remove or reorder `#workflowShowcase` section — it is intentionally between Chrome Extension and Marketplace for conversion flow
 - Override workflow detail modal's default Pipeline tab — workflows should always open to Pipeline, not Overview
+- Import `cosine` or `validateOllamaUrl` from anywhere except `lib/guards.ts`
+- Use `existsSync` before `rmSync(force: true)` or before `readFileSync` with error handling — TOCTOU anti-pattern
+- Add `yaml`/`js-yaml` for workflow YAML — `lib/composer/schema.ts` uses template-based serialization
+- Call `createUnifiedStore()` directly in commands — use `getStore()` from `bin/commands/shared.ts`
+- Bypass the crawl queue for batch processing — use `CrawlWorker` with adaptive concurrency

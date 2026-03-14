@@ -173,6 +173,41 @@ export class AgentsApi {
     return this.catalog;
   }
 
+  async searchProductsPaginated(query, { offset = 0, limit = 50, domain, productType, sort, minQuality } = {}) {
+    const params = new URLSearchParams();
+    if (query) params.set('q', query);
+    params.set('offset', String(offset));
+    params.set('limit', String(limit));
+    if (domain?.length) domain.forEach(d => params.append('domain', d));
+    if (productType?.length) productType.forEach(t => params.append('productType', t));
+    if (sort) params.set('sort', sort);
+    if (minQuality > 0) params.set('minQuality', String(minQuality));
+    try {
+      const res = await this._fetch(`/api/catalog?${params.toString()}`);
+      return res?.data || { products: [], total: 0, offset: 0, limit, hasMore: false };
+    } catch {
+      return { products: [], total: 0, offset: 0, limit, hasMore: false };
+    }
+  }
+
+  async getDomainTree() {
+    try {
+      const res = await this._fetch('/api/catalog/domains');
+      return res?.data?.domains || [];
+    } catch {
+      return [];
+    }
+  }
+
+  async getSkillGraph(skillId) {
+    try {
+      const res = await this._fetch(`/api/graph/${encodeURIComponent(skillId)}`);
+      return res?.data || { skillId, edges: [] };
+    } catch {
+      return { skillId, edges: [] };
+    }
+  }
+
   searchProducts(query, filters = {}) {
     let results = [...this.catalog];
     if (query) {

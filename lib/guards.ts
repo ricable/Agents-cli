@@ -234,3 +234,33 @@ export function validateFullFrontmatter(content: string): string[] {
 export function shellQuote(s: string): string {
   return "'" + s.replace(/'/g, "'\\''") + "'";
 }
+
+// =============================================================================
+// Network & math helpers (shared across intelligence, composer, db modules)
+// =============================================================================
+
+import { isPrivateUrl } from "./resolver.js";
+
+/** Validate Ollama URL points to localhost or public host */
+export function validateOllamaUrl(url: string): void {
+  const parsed = new URL(url);
+  const host = parsed.hostname;
+  if (host === "localhost" || host === "127.0.0.1" || host === "[::1]") return;
+  if (isPrivateUrl(url)) {
+    throw new Error(`Ollama URL "${url}" points to a private network — only localhost allowed`);
+  }
+}
+
+/** Cosine similarity between two Float32Array vectors */
+export function cosine(a: Float32Array, b: Float32Array): number {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    const ai = a[i]!;
+    const bi = b[i]!;
+    dot += ai * bi;
+    na += ai * ai;
+    nb += bi * bi;
+  }
+  const denom = Math.sqrt(na) * Math.sqrt(nb);
+  return denom === 0 ? 0 : dot / denom;
+}

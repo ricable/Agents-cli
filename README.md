@@ -153,6 +153,30 @@ agents-cli scan ./dir [--deep]         # discover tools in a local directory
 agents-cli info <name>                 # show registry info for a package
 ```
 
+### Crawl — scale discovery to 100K+ tools
+
+```bash
+agents-cli crawl seed --registry pypi --limit 1000        # seed crawl queue from PyPI
+agents-cli crawl seed --all                                # seed from all registries
+agents-cli crawl start --concurrency 8 --limit 100        # process crawl queue
+agents-cli crawl status --json                             # queue stats
+```
+
+### Compose — agentic workflow generation
+
+```bash
+agents-cli compose "Python CI with linting, testing, coverage"    # NL prompt → workflow
+agents-cli compose --from-skills src-ruff,src-pytest --creative   # compose from existing skills
+agents-cli compose "deploy pipeline" --iterations 5 --sandbox     # with Docker validation
+```
+
+### Stats — system monitoring
+
+```bash
+agents-cli stats                       # system overview (tools, skills, workflows, edges, embeddings)
+agents-cli stats --json                # machine-readable metrics
+```
+
 ## Skill Forge — generate skills from any CLI tool
 
 The skill forge resolves, installs, analyzes, and generates rich SKILL.md files from any package registry.
@@ -441,12 +465,21 @@ agents-cli mcp start   # → open http://localhost:3100
 
 ```
 bin/
-  agents-cli.ts         — 67-line dispatcher (thin shell)
-  commands/             — 22 registerXCommand files
+  agents-cli.ts         — dispatcher (25 commands registered)
+  commands/             — 25 registerXCommand files (incl. crawl, compose, stats)
 lib/
   skills/               — 5 focused modules (frontmatter / lockfile / description / lifecycle / generators)
-  guards.ts             — security guards + shellQuote (canonical location)
+  guards.ts             — security guards + shellQuote + cosine + validateOllamaUrl
   companion/            — SaaS HTTP server, billing, OAuth, metering
+  db/                   — unified-store.ts (SQLite), vec-store.ts (sqlite-vec), migrate.ts
+  intelligence/         — embeddings, IO extraction, skill graph, 4 discovery methods, auto-repair
+  composer/             — tiered LLM client, workflow proposer, validator, iteration loop
+  crawler/              — crawl queue worker, registry seeders
+  adapters/             — source adapter interface, registry adapter, unified pipeline
+  concurrency.ts        — AdaptiveSemaphore, TokenBucketRateLimiter
+  classifier/           — npm, github, crates, pypi, libraries-io, github-graphql
+  marketplace/          — export.ts (SQLite → registry-data.json)
+  monitoring/           — stats.ts (system metrics aggregator)
 examples/
   forge/                — 16 mode modules (incl. mode-workflow-gen.ts)
   saas-ui/              — SaaS marketplace UI
@@ -458,13 +491,30 @@ examples/
 1. **Resolve** — detect source format, fetch metadata from appropriate registry
 2. **Install** — download, extract, install deps, auto-build (monorepo-aware, branch fallback)
 3. **Analyze** — probe `--help` recursively (depth 3, up to 500 commands)
-4. **Store** — persist metadata in `~/.agents-cli/` (JSON + CONTEXT.md)
+4. **Store** — persist metadata in SQLite (unified store with FTS5 + vector search)
 5. **Generate** — produce SKILL.md with trigger-aware descriptions and domain content
 6. **Quality** — gate on trigger score ≥ 0.80, quality ≥ 6/10, content ≥ 5
-7. **Plugin** — build Claude Code plugins (hooks, agents, commands, settings)
-8. **Marketplace** — generate marketplace.json + plugin distribution
-9. **Expose** — MCP bridge + SaaS API
-10. **Workflow Gen** — analyze agent scripts → infer manifest (topo sort + data flow) → generate workflow SKILL.md + scripts
+7. **Embed** — batch-embed skills via Ollama for semantic search
+8. **Graph** — pre-compute skill graph edges (IO chain, same domain, embedding similarity, LLM-inferred)
+9. **Plugin** — build Claude Code plugins (hooks, agents, commands, settings)
+10. **Marketplace** — generate marketplace.json + plugin distribution
+11. **Expose** — MCP bridge + SaaS API
+12. **Workflow Gen** — analyze agent scripts → infer manifest → generate workflow SKILL.md + scripts
+13. **Compose** — agentic LLM loop: propose → validate → refine → re-validate (3-5 iterations)
+
+### Scaling infrastructure
+
+The system is designed to scale from hundreds to millions of skills:
+
+- **SQLite unified store** — replaces flat-file `tools.json` with O(1) lookups, FTS5 full-text search, transactional writes
+- **sqlite-vec** — HNSW-like KNN vector search for semantic skill discovery
+- **Crawl queue** — persistent queue with exponential backoff, adaptive concurrency, install-analyze-prune cycle
+- **Libraries.io connector** — unified access to npm, PyPI, crates.io (55 req/min rate limited)
+- **GitHub GraphQL** — cursor-based pagination beyond REST API's 1000-result limit (4500pt budget)
+- **Skill graph** — 4 edge types pre-computed via inverted index: IO chain, same domain, embedding similarity, LLM-inferred
+- **4 discovery methods** — semantic KNN, domain-filtered KNN, multi-hop LLM decomposition, graph traversal (BFS)
+- **Tiered LLM** — Ollama for batch/draft (free), Claude API for validation/refinement (quality)
+- **Agentic composer** — fully generative workflow creation with Docker sandbox validation
 
 ## Development
 

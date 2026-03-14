@@ -188,6 +188,10 @@ const PRICE_TO_TIER: Record<string, ApiTier> = {
   "price_1TAumX2QpzdUwTFgDDWYS4V8": "enterprise", // $99/mo (50% OFF launch promo)
 };
 
+function tierFromPriceId(priceId: string | undefined): ApiTier | undefined {
+  return priceId ? PRICE_TO_TIER[priceId] : undefined;
+}
+
 // ── Response Helpers ───────────────────────────────────────────────────
 
 function sendJson<T>(res: ServerResponse, status: number, data: CliOutput<T>, req?: IncomingMessage): void {
@@ -606,59 +610,36 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
         const billing = createBillingProvider("stripe");
         const event = await billing.verifyWebhook(payload, signature, config.stripeWebhookSecret);
 
-        // Handle subscription events — resolve tier from Stripe price ID
-        if (event.type === "checkout.session.completed" || event.type === "customer.subscription.updated") {
-          const eventData = event.data as Record<string, unknown>;
+        // Extract metadata shared across all subscription event types
+        const eventData = event.data as Record<string, unknown>;
+        const meta = eventData["metadata"] as Record<string, string> | undefined;
+        const clerkUserId = meta?.["clerkUserId"];
 
-          // Extract price ID: from subscription items (subscription.updated) or line_items (checkout.completed)
-          let priceId: string | undefined;
-          const items = (eventData["items"] as { data?: Array<{ price?: { id?: string } }> })?.data;
-          if (items?.[0]?.price?.id) {
-            priceId = items[0].price.id;
-          }
-          // For checkout.session.completed, the price may be nested in line_items
-          if (!priceId) {
-            const lineItems = (eventData["line_items"] as { data?: Array<{ price?: { id?: string } }> })?.data;
-            if (lineItems?.[0]?.price?.id) {
-              priceId = lineItems[0].price.id;
+        // Resolve tier update for Clerk (fire-and-forget — respond to Stripe immediately)
+        if (clerkUserId && config.clerkConfig) {
+          let tierUpdate: Record<string, unknown> | undefined;
+
+          if (event.type === "checkout.session.completed" || event.type === "customer.subscription.updated") {
+            // Primary: read priceId from metadata (embedded at checkout creation — always available)
+            // Fallback: subscription items (unreliable for checkout.session.completed, Stripe may not expand line_items)
+            let priceId = meta?.["priceId"];
+            if (!priceId) {
+              const items = (eventData["items"] as { data?: Array<{ price?: { id?: string } }> })?.data;
+              priceId = items?.[0]?.price?.id;
             }
+            if (!priceId) {
+              const lineItems = (eventData["line_items"] as { data?: Array<{ price?: { id?: string } }> })?.data;
+              priceId = lineItems?.[0]?.price?.id;
+            }
+            tierUpdate = { tier: tierFromPriceId(priceId) ?? "free", stripeCustomerId: event.customerId };
+          } else if (event.type === "customer.subscription.deleted") {
+            tierUpdate = { tier: "free" };
           }
 
-          const tier = priceId ? PRICE_TO_TIER[priceId] ?? "free" : "free";
-
-          // Extract Clerk user ID from metadata for reverse-lookup
-          const meta = eventData["metadata"] as Record<string, string> | undefined;
-          const clerkUserId = meta?.["clerkUserId"];
-
-          if (clerkUserId && config.clerkConfig) {
-            try {
-              await updateUserMetadata(
-                clerkUserId,
-                { tier, stripeCustomerId: event.customerId },
-                config.clerkConfig,
-              );
-            } catch {
-              // Non-fatal — log in production
-            }
-          }
-        }
-
-        // Handle subscription deletion — downgrade to free
-        if (event.type === "customer.subscription.deleted") {
-          const eventData = event.data as Record<string, unknown>;
-          const meta = eventData["metadata"] as Record<string, string> | undefined;
-          const clerkUserId = meta?.["clerkUserId"];
-
-          if (clerkUserId && config.clerkConfig) {
-            try {
-              await updateUserMetadata(
-                clerkUserId,
-                { tier: "free" },
-                config.clerkConfig,
-              );
-            } catch {
-              // Non-fatal
-            }
+          if (tierUpdate) {
+            // Fire-and-forget: don't block the webhook 200 response on Clerk API latency
+            updateUserMetadata(clerkUserId, tierUpdate, config.clerkConfig)
+              .catch((err) => console.error("[webhook] Failed to sync Clerk tier:", toErrorMessage(err)));
           }
         }
 
@@ -874,18 +855,72 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
       return;
     }
 
-    // ── Catalog endpoint ───────────────────────────────────────
+    // ── Catalog endpoints ──────────────────────────────────────
 
-    // GET /api/catalog
+    // GET /api/catalog/domains — domain tree with counts
+    if (method === "GET" && path === "/api/catalog/domains") {
+      try {
+        const { createUnifiedStore } = await import("../db/unified-store.js");
+        const homeDir = (await import("os")).homedir();
+        const uStore = createUnifiedStore(join(homeDir, ".agents-cli"));
+        const tree = uStore.listDomainsWithCounts();
+        sendJson(res, 200, success("catalog-domains", { domains: tree }, Date.now()), req);
+      } catch (err) {
+        sendError(res, 500, "CATALOG_ERROR", toErrorMessage(err), req);
+      }
+      return;
+    }
+
+    // GET /api/graph/:skillId — skill graph neighbors
+    if (method === "GET" && path.startsWith("/api/graph/")) {
+      const skillId = decodeURIComponent(path.slice("/api/graph/".length));
+      if (!skillId) { sendError(res, 400, "BAD_REQUEST", "Missing skillId", req); return; }
+      try {
+        const { createUnifiedStore } = await import("../db/unified-store.js");
+        const homeDir = (await import("os")).homedir();
+        const uStore = createUnifiedStore(join(homeDir, ".agents-cli"));
+        const edges = uStore.getNeighbors(skillId);
+        sendJson(res, 200, success("graph", { skillId, edges }, Date.now()), req);
+      } catch (err) {
+        sendError(res, 500, "GRAPH_ERROR", toErrorMessage(err), req);
+      }
+      return;
+    }
+
+    // GET /api/catalog — paginated with filters
     if (method === "GET" && path === "/api/catalog") {
       try {
-        const marketplacePath = join(config.projectRoot, "marketplace.json");
-        if (existsSync(marketplacePath)) {
-          const data = JSON.parse(readFileSync(marketplacePath, "utf-8"));
-          sendJson(res, 200, success("catalog", data, Date.now()), req);
-        } else {
-          sendJson(res, 200, success("catalog", { products: [] }, Date.now()), req);
+        const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+        const q = url.searchParams.get("q") ?? undefined;
+        const offsetParam = parseInt(url.searchParams.get("offset") ?? "0", 10);
+        const limitParam = parseInt(url.searchParams.get("limit") ?? "50", 10);
+        const domainFilter = url.searchParams.getAll("domain");
+        const productTypeFilter = url.searchParams.getAll("productType");
+        const sort = url.searchParams.get("sort") as "name" | "quality" | "newest" | undefined;
+        const minQuality = url.searchParams.has("minQuality") ? parseFloat(url.searchParams.get("minQuality")!) : undefined;
+
+        let result;
+        try {
+          const { createUnifiedStore } = await import("../db/unified-store.js");
+          const homeDir = (await import("os")).homedir();
+          const uStore = createUnifiedStore(join(homeDir, ".agents-cli"));
+          result = uStore.searchProducts({
+            q, offset: offsetParam, limit: limitParam,
+            domain: domainFilter.length ? domainFilter : undefined,
+            productType: productTypeFilter.length ? productTypeFilter : undefined,
+            minQuality, sort: sort ?? undefined,
+          });
+        } catch {
+          const marketplacePath = join(config.projectRoot, "marketplace.json");
+          if (existsSync(marketplacePath)) {
+            const data = JSON.parse(readFileSync(marketplacePath, "utf-8"));
+            const allProducts = data.products ?? [];
+            result = { products: allProducts.slice(offsetParam, offsetParam + limitParam), total: allProducts.length, offset: offsetParam, limit: limitParam, hasMore: offsetParam + limitParam < allProducts.length };
+          } else {
+            result = { products: [], total: 0, offset: 0, limit: limitParam, hasMore: false };
+          }
         }
+        sendJson(res, 200, success("catalog", result, Date.now()), req);
       } catch (err) {
         sendError(res, 500, "CATALOG_ERROR", toErrorMessage(err), req);
       }
@@ -977,7 +1012,9 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     console.log("    POST /api/billing/checkout — Stripe checkout session");
     console.log("    GET  /api/billing/portal   — Billing portal");
     console.log("    GET  /api/billing/invoices — Invoice history");
-    console.log("    GET  /api/catalog          — Marketplace catalog");
+    console.log("    GET  /api/catalog          — Marketplace catalog (paginated)");
+    console.log("    GET  /api/catalog/domains  — Domain tree with counts");
+    console.log("    GET  /api/graph/:id        — Skill graph neighbors");
     console.log("    *    /*                    — Static files (saas-ui/)");
     console.log("");
   });

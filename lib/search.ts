@@ -255,6 +255,48 @@ function toSearchResults(rows: any[]): SearchResult[] {
   }));
 }
 
+// ── sqlite-vec KNN helper ──────────────────────────────────────────────
+
+/**
+ * Try to use VecStore for KNN search. Returns null if unavailable.
+ * Falls back gracefully — callers should use brute-force vectorScan as backup.
+ */
+async function tryVecStoreSearch(
+  queryVec: Float32Array,
+  limit: number,
+  pkg?: string,
+): Promise<SearchResult[] | null> {
+  try {
+    const { createVecStore, isVecAvailable } = await import("./db/vec-store.js");
+    if (!isVecAvailable()) return null;
+
+    const { createUnifiedStore } = await import("./db/unified-store.js");
+    const dataDir = (await import("os")).homedir() + "/.agents-cli";
+    const store = createUnifiedStore(dataDir);
+    const vecStore = createVecStore(store.getDb(), queryVec.length);
+    if (!vecStore || vecStore.count() === 0) return null;
+
+    const neighbors = vecStore.search(queryVec, limit * 2);
+    let results = neighbors.map((n) => ({
+      id: n.id,
+      pkg: pkg ?? n.id.split("-")[0] ?? "",
+      file: "",
+      chunkIndex: 0,
+      tokens: 0,
+      snippet: "",
+      score: 1 - n.distance,
+    }));
+
+    if (pkg) {
+      results = results.filter((r) => r.pkg === pkg);
+    }
+
+    return results.slice(0, limit);
+  } catch {
+    return null;
+  }
+}
+
 // ── Public API ─────────────────────────────────────────────────────────
 
 /**
@@ -310,11 +352,16 @@ export async function hybridSearch(
     }
 
     if (mode === "vector") {
+      // Try sqlite-vec KNN first, fall back to brute-force scan
+      const vecResults = await tryVecStoreSearch(queryVec, limit, pkg);
+      if (vecResults) return vecResults;
       const rows = vectorScan(db, queryVec, pkg, limit);
       return toSearchResults(rows);
     }
 
-    // hybrid: FTS pre-filter -> cosine re-rank + FTS backfill
+    // hybrid: try sqlite-vec KNN merge, then FTS pre-filter -> cosine re-rank + FTS backfill
+    const vecHybridResults = await tryVecStoreSearch(queryVec, Math.ceil(limit / 2), pkg);
+
     const candidateRows = ftsSearch(db, query, pkg, candidates, true);
     if (!candidateRows.length) return [];
 
@@ -334,6 +381,14 @@ export async function hybridSearch(
       const backfill = withoutEmb.filter((r) => !rerankedIds.has(r.id));
       final = [...reranked, ...backfill].slice(0, limit);
     }
+
+    // Merge vec store results with FTS results (dedup by id)
+    if (vecHybridResults && vecHybridResults.length > 0) {
+      const ftsIds = new Set(final.map((r: { id: string }) => r.id));
+      const novel = vecHybridResults.filter((r) => !ftsIds.has(r.id));
+      final = [...final, ...novel].slice(0, limit);
+    }
+
     return toSearchResults(final);
   } finally {
     db.close();

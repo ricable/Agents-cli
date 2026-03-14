@@ -1,0 +1,28 @@
+# Sandbox container for workflow validation
+# Used by the compose command's --sandbox flag to validate generated workflows
+#
+# Usage:
+#   docker build -t agents-cli-sandbox -f lib/composer/Dockerfile.sandbox .
+#   docker run --rm -v ./workflow:/workspace agents-cli-sandbox bash scripts/setup.sh && bash scripts/run.sh
+
+FROM node:20-slim
+
+# Install common CLI tools that workflows might depend on
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash \
+    curl \
+    git \
+    jq \
+    python3 \
+    python3-pip \
+    python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create workspace
+WORKDIR /workspace
+
+# Copy workflow files
+COPY . /workspace/
+
+# Default: run setup then run
+CMD ["bash", "-c", "bash scripts/setup.sh && bash scripts/run.sh"]

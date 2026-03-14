@@ -3,7 +3,7 @@
  * reviews, versions, install action.
  */
 
-import { PRODUCT_TYPE_ICONS, PRODUCT_TYPE_COLORS, formatType, escapeHtml, showToast } from './utils.js';
+import { PRODUCT_TYPE_ICONS, PRODUCT_TYPE_COLORS, formatType, escapeHtml, escapeAttr, showToast } from './utils.js';
 import { formatPrice } from './marketplace.js';
 import { renderWorkflowDag, renderStepTable, renderEnvVarsTable } from './workflow-dag.js';
 
@@ -326,10 +326,6 @@ function qualityColor(score) {
 function formatNum(n) {
   if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
   return String(n);
-}
-
-function escapeAttr(str) {
-  return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 export { showToast };

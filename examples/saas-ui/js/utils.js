@@ -34,6 +34,9 @@ export function escapeHtml(str) {
   return div.innerHTML;
 }
 
+const ATTR_ESC = { '&': '&amp;', '"': '&quot;', "'": '&#39;', '<': '&lt;', '>': '&gt;' };
+export const escapeAttr = (str) => String(str).replace(/[&"'<>]/g, c => ATTR_ESC[c]);
+
 export function showToast(message, type = 'success') {
   const container = document.getElementById('toastContainer');
   if (!container) return;

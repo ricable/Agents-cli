@@ -3,7 +3,7 @@
  * Renders products from catalog data into the Discover pane.
  */
 
-import { PRODUCT_TYPE_ICONS, PRODUCT_TYPE_COLORS, formatType, escapeHtml, showToast } from './utils.js';
+import { PRODUCT_TYPE_ICONS, PRODUCT_TYPE_COLORS, formatType, escapeHtml, escapeAttr, showToast } from './utils.js';
 
 // ── Tier access model ───────────────────────────────────────────────
 
@@ -157,9 +157,96 @@ export function initMarketplace(api, store, showProductDetail, auth) {
   // Re-render when registries inject agent-defs / generated-skills
   window.addEventListener('catalog-updated', () => renderProducts());
 
+  // ── Faceted sidebar (domain tree) ────────────────────────────────
+
+  const domainTreeContainer = document.querySelector('.domain-tree');
+  let activeDomains = [];
+
+  async function loadDomainTree() {
+    if (!domainTreeContainer) return;
+    try {
+      const domains = await api.getDomainTree();
+      renderDomainTree(domains);
+    } catch { /* domain tree unavailable */ }
+  }
+
+  function renderDomainTree(domains) {
+    if (!domainTreeContainer || !domains.length) return;
+    domainTreeContainer.innerHTML = domains
+      .filter(d => d.total > 0)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 30)
+      .map(d => `
+        <label class="domain-tree-item" style="padding-left:${12 + d.depth * 16}px">
+          <input type="checkbox" value="${escapeAttr(d.id)}" class="domain-checkbox">
+          <span class="domain-label">${escapeHtml(d.label)}</span>
+          <span class="domain-count">${d.total}</span>
+        </label>
+      `).join('');
+
+    domainTreeContainer.addEventListener('change', () => {
+      activeDomains = [...domainTreeContainer.querySelectorAll('.domain-checkbox:checked')].map(cb => cb.value);
+      store.update('searchFilters', f => ({ ...f, domains: activeDomains }));
+      renderProducts();
+    });
+  }
+
+  // ── Infinite scroll ─────────────────────────────────────────────
+
+  let currentOffset = 0;
+  let isLoadingMore = false;
+  let hasMoreProducts = false;
+  const PAGE_SIZE = 50;
+
+  function setupInfiniteScroll() {
+    const trigger = document.querySelector('.infinite-scroll-trigger');
+    if (!trigger) return;
+
+    const observer = new IntersectionObserver(async (entries) => {
+      const entry = entries[0];
+      if (!entry.isIntersecting || isLoadingMore || !hasMoreProducts) return;
+
+      isLoadingMore = true;
+      trigger.classList.add('loading');
+      currentOffset += PAGE_SIZE;
+
+      try {
+        const query = store.get('searchQuery') || '';
+        const filters = store.get('searchFilters') || {};
+        const result = await api.searchProductsPaginated(query, {
+          offset: currentOffset,
+          limit: PAGE_SIZE,
+          domain: filters.domains,
+          productType: filters.productType && filters.productType !== 'all' ? [filters.productType] : undefined,
+          sort: filters.sort,
+        });
+
+        if (result.products?.length) {
+          const userTier = store.get('tier') || 'free';
+          const html = result.products.map(p => renderCard(p, { userTier })).join('');
+          grid.insertAdjacentHTML('beforeend', html);
+          attachCardListeners(grid, showProductDetail, store, auth);
+          hasMoreProducts = result.hasMore;
+        } else {
+          hasMoreProducts = false;
+        }
+      } catch {
+        hasMoreProducts = false;
+      }
+
+      trigger.classList.remove('loading');
+      isLoadingMore = false;
+    }, { rootMargin: '200px' });
+
+    observer.observe(trigger);
+  }
+
+  setupInfiniteScroll();
+
   // ── Initial load ────────────────────────────────────────────────
 
   loadAndRender();
+  loadDomainTree();
 
   return { renderProducts, loadAndRender };
 }
@@ -345,10 +432,6 @@ function renderStars(rating) {
 function truncate(str, len) {
   if (str.length <= len) return str;
   return str.slice(0, len) + '\u2026';
-}
-
-function escapeAttr(str) {
-  return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function isAgentNative(product) {

@@ -6,6 +6,28 @@ import { randomBytes } from "node:crypto";
 const TOOLS_DIR = "tools";
 const STORE_FILE = "tools.json";
 
+/**
+ * Create a SQLite-backed store if better-sqlite3 is available.
+ * Falls back to flat-file JSON store otherwise.
+ *
+ * The SQLite store provides:
+ * - O(1) lookups instead of O(n) full-file reads
+ * - FTS5 full-text search
+ * - Transactional writes
+ * - Skills, workflows, crawl queue, and skill graph tables
+ */
+export async function createSqliteStore(dataDir: string): Promise<ToolStore> {
+  try {
+    const { ensureSqlite } = await import("./db/sqlite.js");
+    await ensureSqlite();
+    const { createUnifiedStore } = await import("./db/unified-store.js");
+    return createUnifiedStore(dataDir);
+  } catch {
+    // better-sqlite3 not available — fall back to JSON store
+    return createStore(dataDir);
+  }
+}
+
 /** Validate a tool ID to prevent path traversal */
 function validateToolId(id: string): void {
   if (!id || id.includes("..") || /[\x00-\x1f]/.test(id) || /^[/\\]/.test(id)) {

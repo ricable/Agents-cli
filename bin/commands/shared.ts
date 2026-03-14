@@ -19,3 +19,13 @@ export function pickFields<T extends Record<string, unknown>>(obj: T, fields?: s
   }
   return result as Partial<T>;
 }
+
+import type { UnifiedStore } from "../../lib/db/unified-store.js";
+
+/** Initialize the unified SQLite store. Call in any command that needs DB access. */
+export async function getStore(): Promise<UnifiedStore> {
+  const { ensureSqlite } = await import("../../lib/db/sqlite.js");
+  await ensureSqlite();
+  const { createUnifiedStore } = await import("../../lib/db/unified-store.js");
+  return createUnifiedStore(DATA_DIR);
+}
