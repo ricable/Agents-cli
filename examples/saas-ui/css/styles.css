@@ -2765,6 +2765,28 @@ textarea.form-control {
     animation: artifactFloat 3s ease-in-out infinite;
 }
 
+/* Pipeline CTA */
+.wf-pipeline-cta {
+    margin-top: 24px;
+    padding: 16px;
+    border-radius: 12px;
+    background: rgba(0,212,255,0.05);
+    border: 1px solid rgba(0,212,255,0.15);
+    text-align: center;
+}
+.wf-pipeline-cta p {
+    color: var(--text-secondary);
+    margin-bottom: 0;
+}
+.wf-cta-link {
+    color: var(--accent-cyan);
+    font-weight: 600;
+    text-decoration: none;
+}
+.wf-cta-link:hover {
+    color: #fff;
+}
+
 /* Enhanced Step Table */
 .wf-step-table-enhanced tr:nth-child(even) td {
     background: rgba(255,255,255,0.02);

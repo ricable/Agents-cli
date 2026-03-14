@@ -46,9 +46,7 @@ export async function workflowGenMode(args: CliArgs, startTime: number): Promise
   }
 
   // Infer workflow manifest
-  const workflowName = args.domain
-    ? basename(resolvedDir)
-    : basename(resolvedDir);
+  const workflowName = basename(resolvedDir);
 
   const workflow = inferWorkflowManifest(analyses, {
     name: workflowName,
@@ -137,7 +135,9 @@ export async function workflowGenMode(args: CliArgs, startTime: number): Promise
       copyFileSync(join(resolvedDir, entry.name), join(outDir, "agents", entry.name));
       copied++;
     }
-  } catch { /* ignore copy errors */ }
+  } catch (err) {
+    log(`  ⚠ Failed to copy some agent scripts: ${err instanceof Error ? err.message : String(err)}`);
+  }
 
   log(`  ✅ Generated: SKILL.md + scripts + references + ${copied} agent scripts`);
 

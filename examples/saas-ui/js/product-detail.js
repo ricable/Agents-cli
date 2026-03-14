@@ -214,7 +214,7 @@ export function initProductDetail(api, store, auth) {
         </div>
 
         ${p.productType === 'workflow' ? `
-        <div class="detail-tab-content" id="detailTabPipeline"
+        <div class="detail-tab-content" id="detailTabPipeline">
           <div style="padding:20px">
             <div class="detail-section">
               <h3>Pipeline Visualization</h3>
@@ -228,8 +228,8 @@ export function initProductDetail(api, store, auth) {
               <h3>Environment Variables</h3>
               ${renderEnvVarsTable(p.envVars)}
             </div>
-            <div class="wf-pipeline-cta" style="margin-top:24px;padding:16px;border-radius:12px;background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.15);text-align:center">
-              <p style="color:var(--text-secondary);margin-bottom:8px">Unlock workflow execution — <a href="#pricing" style="color:var(--accent-cyan,#00d4ff);font-weight:600" onclick="document.getElementById('productDetailPanel').classList.remove('active');document.getElementById('productDetailOverlay')?.classList.remove('active');document.body.style.overflow=''">Upgrade to Starter</a></p>
+            <div class="wf-pipeline-cta">
+              <p>Unlock workflow execution — <a href="#pricing" class="wf-cta-link">Upgrade to Starter</a></p>
             </div>
             ${p.dependencies?.length ? `
             <div class="detail-section">
@@ -243,6 +243,11 @@ export function initProductDetail(api, store, auth) {
       </div>`;
 
     // Event listeners
+    panel.querySelector('.wf-cta-link')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      hide();
+      document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
+    });
     panel.querySelector('#detailCloseBtn')?.addEventListener('click', hide);
     panel.querySelector('#detailInstallBtn')?.addEventListener('click', (e) => {
       const id = e.target.dataset.id;
