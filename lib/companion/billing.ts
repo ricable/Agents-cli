@@ -243,15 +243,17 @@ export class StripeProvider implements BillingProvider {
       return { url: `https://checkout.stripe.com/mock?customer=${customerId ?? "guest"}&price=${priceId}&return=${encodeURIComponent(returnUrl)}` };
     }
     try {
-      // Embed clerkUserId in session + subscription metadata so webhooks can resolve the Clerk user
-      const meta = clerkUserId ? { clerkUserId } : undefined;
+      // Embed clerkUserId + priceId in metadata so webhooks can resolve the Clerk user
+      // and derive the tier (line_items is NOT included in webhook payloads by default).
+      const meta: Record<string, string> = { priceId };
+      if (clerkUserId) meta.clerkUserId = clerkUserId;
       const sessionParams: Stripe.Checkout.SessionCreateParams = {
         line_items: [{ price: priceId, quantity: 1 }],
         mode: "subscription",
         success_url: returnUrl,
         cancel_url: returnUrl,
         metadata: meta,
-        subscription_data: meta ? { metadata: meta } : undefined,
+        subscription_data: { metadata: meta },
       };
       // Attach existing Stripe customer if authenticated, otherwise Stripe collects email at checkout
       if (customerId) {

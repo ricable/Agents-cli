@@ -607,25 +607,21 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
         if (event.type === "checkout.session.completed" || event.type === "customer.subscription.updated") {
           const eventData = event.data as Record<string, unknown>;
 
-          // Extract price ID: from subscription items (subscription.updated) or line_items (checkout.completed)
-          let priceId: string | undefined;
-          const items = (eventData["items"] as { data?: Array<{ price?: { id?: string } }> })?.data;
-          if (items?.[0]?.price?.id) {
-            priceId = items[0].price.id;
-          }
-          // For checkout.session.completed, the price may be nested in line_items
-          if (!priceId) {
-            const lineItems = (eventData["line_items"] as { data?: Array<{ price?: { id?: string } }> })?.data;
-            if (lineItems?.[0]?.price?.id) {
-              priceId = lineItems[0].price.id;
-            }
-          }
-
-          const tier = priceId ? PRICE_TO_TIER[priceId] ?? "free" : "free";
-
-          // Extract Clerk user ID from metadata for reverse-lookup
+          // Extract Clerk user ID and priceId from metadata (set by createCheckoutSession).
+          // priceId in metadata is the reliable path — line_items is NOT in webhook payloads by default.
           const meta = eventData["metadata"] as Record<string, string> | undefined;
           const clerkUserId = meta?.["clerkUserId"];
+          const metaPriceId = meta?.["priceId"];
+
+          // Derive tier: prefer metadata priceId, fall back to subscription items
+          let tier: ApiTier;
+          if (metaPriceId && PRICE_TO_TIER[metaPriceId]) {
+            tier = PRICE_TO_TIER[metaPriceId];
+          } else {
+            const items = (eventData["items"] as { data?: Array<{ price?: { id?: string } }> })?.data;
+            const itemPriceId = items?.[0]?.price?.id;
+            tier = (itemPriceId ? PRICE_TO_TIER[itemPriceId] : undefined) ?? "starter";
+          }
 
           if (clerkUserId && config.clerkConfig) {
             try {
@@ -634,8 +630,8 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
                 { tier, stripeCustomerId: event.customerId },
                 config.clerkConfig,
               );
-            } catch {
-              // Non-fatal — log in production
+            } catch (err) {
+              console.error(`[webhook] Failed to update Clerk user ${clerkUserId}:`, toErrorMessage(err));
             }
           }
         }
@@ -653,8 +649,8 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
                 { tier: "free" },
                 config.clerkConfig,
               );
-            } catch {
-              // Non-fatal
+            } catch (err) {
+              console.error(`[webhook] Failed to downgrade Clerk user ${clerkUserId}:`, toErrorMessage(err));
             }
           }
         }
