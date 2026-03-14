@@ -7,11 +7,11 @@
  */
 import Stripe from 'stripe';
 
-const ALLOWED_PRICE_IDS = new Set([
-  'price_1TAsLJ2QpzdUwTFgn4OhkLig', // Starter $29/mo
-  'price_1TAsLK2QpzdUwTFgqe4HP5Jh', // Pro $79/mo
-  'price_1TAsLK2QpzdUwTFgZQQ56NrE', // Enterprise $199/mo
-]);
+const PRICE_TO_TIER = {
+  'price_1TAsLJ2QpzdUwTFgn4OhkLig': 'starter',    // $29/mo
+  'price_1TAsLK2QpzdUwTFgqe4HP5Jh': 'pro',         // $79/mo
+  'price_1TAsLK2QpzdUwTFgZQQ56NrE': 'enterprise',  // $199/mo
+};
 
 const ALLOWED_ORIGINS = new Set([
   'https://ui.spectredve.com',
@@ -62,7 +62,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ success: false, error: 'priceId is required' });
   }
 
-  if (!ALLOWED_PRICE_IDS.has(priceId)) {
+  if (!PRICE_TO_TIER[priceId]) {
     return res.status(400).json({ success: false, error: 'Invalid priceId' });
   }
 
@@ -80,16 +80,21 @@ export default async function handler(req, res) {
   const stripe = new Stripe(secretKey);
 
   try {
+    // Embed priceId in metadata so the webhook can reliably derive the tier
+    // (line_items is NOT included in checkout.session.completed webhook payloads by default)
+    const meta = { priceId };
     const session = await stripe.checkout.sessions.create({
       line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',
       success_url,
       cancel_url,
+      metadata: meta,
+      subscription_data: { metadata: meta },
     });
 
     return res.status(200).json({ success: true, data: { url: session.url } });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Checkout failed';
-    return res.status(400).json({ success: false, error: message });
+    console.error('[checkout] Stripe error:', err instanceof Error ? err.message : err);
+    return res.status(400).json({ success: false, error: 'Checkout session creation failed' });
   }
 }

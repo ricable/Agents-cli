@@ -29,7 +29,7 @@ export interface WebhookEvent {
 export interface BillingProvider {
   name: string;
   createCustomer(email: string, tier: string, metadata?: Record<string, string>): Promise<{ customerId: string }>;
-  createCheckoutSession(customerId: string | undefined, priceId: string, returnUrl: string, clerkUserId?: string): Promise<{ url: string }>;
+  createCheckoutSession(customerId: string | undefined, priceId: string, returnUrl: string, clerkUserId?: string, extraMetadata?: Record<string, string>): Promise<{ url: string }>;
   getPortalUrl(customerId: string): Promise<{ url: string }>;
   listInvoices(customerId: string, limit?: number): Promise<{ invoices: Invoice[] }>;
   verifyWebhook(payload: string, signature: string, secret?: string): Promise<WebhookEvent>;
@@ -238,20 +238,22 @@ export class StripeProvider implements BillingProvider {
     }
   }
 
-  async createCheckoutSession(customerId: string | undefined, priceId: string, returnUrl: string, clerkUserId?: string): Promise<{ url: string }> {
+  async createCheckoutSession(customerId: string | undefined, priceId: string, returnUrl: string, clerkUserId?: string, extraMetadata?: Record<string, string>): Promise<{ url: string }> {
     if (this.isMock) {
       return { url: `https://checkout.stripe.com/mock?customer=${customerId ?? "guest"}&price=${priceId}&return=${encodeURIComponent(returnUrl)}` };
     }
     try {
-      // Embed clerkUserId in session + subscription metadata so webhooks can resolve the Clerk user
-      const meta = clerkUserId ? { clerkUserId } : undefined;
+      // Embed clerkUserId + priceId + extra fields (e.g. tier) in session + subscription
+      // metadata so webhooks can resolve the Clerk user and derive the correct tier.
+      const meta: Record<string, string> = { priceId, ...extraMetadata };
+      if (clerkUserId) meta.clerkUserId = clerkUserId;
       const sessionParams: Stripe.Checkout.SessionCreateParams = {
         line_items: [{ price: priceId, quantity: 1 }],
         mode: "subscription",
         success_url: returnUrl,
         cancel_url: returnUrl,
         metadata: meta,
-        subscription_data: meta ? { metadata: meta } : undefined,
+        subscription_data: { metadata: meta },
       };
       // Attach existing Stripe customer if authenticated, otherwise Stripe collects email at checkout
       if (customerId) {

@@ -25,6 +25,30 @@ import type { CompanionToolPlan } from "./mapper.js";
 import type { PipelineReport } from "../types.js";
 import type { CliOutput } from "../types.js";
 
+// ── Price → Tier mapping ───────────────────────────────────────────────
+
+const PRICE_TO_TIER: Record<string, ApiTier> = {
+  "price_1TAsLJ2QpzdUwTFgn4OhkLig": "starter",  // $29/mo
+  "price_1TAsLK2QpzdUwTFgqe4HP5Jh": "pro",       // $79/mo
+  "price_1TAsLK2QpzdUwTFgZQQ56NrE": "enterprise", // $199/mo
+};
+
+// ── CORS allowed origins ───────────────────────────────────────────────
+
+const ALLOWED_ORIGINS = new Set([
+  "https://ui.spectredve.com",
+  "http://localhost:8080",
+  "http://localhost:3000",
+  "http://localhost:3100",
+  "http://127.0.0.1:8080",
+  "http://127.0.0.1:3100",
+]);
+
+function getAllowedCorsOrigin(origin: string | undefined): string {
+  if (origin && ALLOWED_ORIGINS.has(origin)) return origin;
+  return "https://ui.spectredve.com";
+}
+
 // ── Types ──────────────────────────────────────────────────────────────
 
 export type ApiTier = "free" | "starter" | "pro" | "enterprise";
@@ -146,20 +170,22 @@ function hashKey(key: string): string {
 
 // ── Response Helpers ───────────────────────────────────────────────────
 
-function sendJson<T>(res: ServerResponse, status: number, data: CliOutput<T>): void {
+function sendJson<T>(res: ServerResponse, status: number, data: CliOutput<T>, origin?: string): void {
   const body = JSON.stringify(data, null, 2);
   res.writeHead(status, {
     "Content-Type": "application/json",
     "X-Content-Type-Options": "nosniff",
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Origin": getAllowedCorsOrigin(origin),
     "Access-Control-Allow-Headers": "Authorization, Content-Type",
     "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+    "Vary": "Origin",
   });
   res.end(body);
 }
 
-function sendError(res: ServerResponse, status: number, code: string, message: string): void {
-  sendJson(res, status, failure("web-service", code, message, Date.now()));
+function sendError(res: ServerResponse, status: number, code: string, message: string, reqOrOrigin?: IncomingMessage | string): void {
+  const origin = typeof reqOrOrigin === "string" ? reqOrOrigin : reqOrOrigin?.headers.origin;
+  sendJson(res, status, failure("web-service", code, message, Date.now()), origin);
 }
 
 // ── Shared request helpers ─────────────────────────────────────────────
@@ -369,11 +395,13 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     const method = req.method ?? "GET";
 
     // CORS preflight
+    const requestOrigin = req.headers.origin;
     if (method === "OPTIONS") {
       res.writeHead(204, {
-        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Origin": getAllowedCorsOrigin(requestOrigin),
         "Access-Control-Allow-Headers": "Authorization, Content-Type",
         "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+        "Vary": "Origin",
       });
       res.end();
       return;
@@ -572,16 +600,27 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
           // clerkUserId is stored in session metadata (checkout.session.completed)
           // and in subscription metadata (customer.subscription.*)
           const meta = event.data["metadata"] as Record<string, string> | undefined;
-          const clerkUserId = meta?.["clerkUserId"];
+          const subMeta = event.data["subscription_data"]?.["metadata"] as Record<string, string> | undefined;
+          const clerkUserId = meta?.["clerkUserId"] ?? subMeta?.["clerkUserId"];
 
           if (clerkUserId) {
             let tier: ApiTier;
             switch (event.type) {
               case "checkout.session.completed":
-              case "customer.subscription.updated":
-                // Read tier from subscription/price metadata, default to "starter"
-                tier = (meta?.["tier"] as ApiTier | undefined) ?? "starter";
+              case "customer.subscription.updated": {
+                // Derive tier from priceId in metadata (set by createCheckoutSession).
+                // This is the reliable path — line_items is NOT in webhook payloads by default.
+                const metaPriceId = meta?.["priceId"] ?? subMeta?.["priceId"];
+                if (metaPriceId && PRICE_TO_TIER[metaPriceId]) {
+                  tier = PRICE_TO_TIER[metaPriceId];
+                } else {
+                  // Fallback: subscription items (works for customer.subscription.updated)
+                  const items = event.data["items"]?.["data"] as Array<{ price?: { id?: string } }> | undefined;
+                  const itemPriceId = items?.[0]?.price?.id;
+                  tier = (itemPriceId ? PRICE_TO_TIER[itemPriceId] : undefined) ?? "starter";
+                }
                 break;
+              }
               case "customer.subscription.deleted":
                 tier = "free";
                 break;
@@ -592,7 +631,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
               clerkUserId,
               { tier, stripeCustomerId: event.customerId },
               config.clerkConfig,
-            ).catch(() => { /* non-fatal */ });
+            ).catch((err) => { console.error(`[webhook] Failed to update Clerk user ${clerkUserId}:`, toErrorMessage(err)); });
           }
         }
 
@@ -628,14 +667,17 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
 
         const priceId = parsed.priceId;
         if (!priceId || !PRICE_TO_TIER[priceId]) {
-          sendError(res, 400, "INVALID_PRICE", "Invalid or missing priceId", req); return;
+          sendError(res, 400, "INVALID_PRICE", "Invalid or missing priceId", requestOrigin); return;
         }
 
+        // Include tier in checkout metadata so webhooks can resolve it
+        const checkoutTier = PRICE_TO_TIER[priceId];
         const result = await billing.createCheckoutSession(
           customerId,
           priceId,
           parsed.successUrl ?? `${origin}/?checkout=success`,
           clerkUserId,
+          { tier: checkoutTier },
         );
         sendJson(res, 200, success("billing-checkout", result, Date.now()));
       } catch (err) {
