@@ -243,8 +243,9 @@ export class StripeProvider implements BillingProvider {
       return { url: `https://checkout.stripe.com/mock?customer=${customerId}&price=${priceId}&return=${encodeURIComponent(returnUrl)}` };
     }
     try {
-      // Embed clerkUserId in session + subscription metadata so webhooks can resolve the Clerk user
-      const meta = clerkUserId ? { clerkUserId } : undefined;
+      // Embed priceId + clerkUserId in session + subscription metadata so webhooks can resolve tier & user
+      const meta: Record<string, string> = { priceId };
+      if (clerkUserId) meta.clerkUserId = clerkUserId;
       const session = await this.stripe!.checkout.sessions.create({
         customer: customerId,
         line_items: [{ price: priceId, quantity: 1 }],
@@ -252,7 +253,7 @@ export class StripeProvider implements BillingProvider {
         success_url: returnUrl,
         cancel_url: returnUrl,
         metadata: meta,
-        subscription_data: meta ? { metadata: meta } : undefined,
+        subscription_data: { metadata: meta },
       });
       if (!session.url) throw new Error("Stripe returned no checkout URL");
       return { url: session.url };

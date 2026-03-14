@@ -159,20 +159,49 @@ function hashKey(key: string): string {
 
 // ── Response Helpers ───────────────────────────────────────────────────
 
+/** Allowed CORS origins — restrict to known UI deployments + local dev. */
+const ALLOWED_ORIGINS = new Set([
+  "https://ui.spectredve.com",
+  "http://localhost:8080",
+  "http://localhost:3000",
+  "http://localhost:3100",
+  "http://127.0.0.1:8080",
+  "http://127.0.0.1:3100",
+]);
+
+function getAllowedCorsOrigin(origin: string | undefined): string {
+  if (origin && ALLOWED_ORIGINS.has(origin)) return origin;
+  // Allow any localhost port for local development
+  if (origin) {
+    try {
+      const url = new URL(origin);
+      if (url.hostname === "localhost" || url.hostname === "127.0.0.1") return origin;
+    } catch { /* invalid URL */ }
+  }
+  return "https://ui.spectredve.com";
+}
+
 function sendJson<T>(res: ServerResponse, status: number, data: CliOutput<T>): void {
   const body = JSON.stringify(data, null, 2);
+  // CORS headers are set per-request in setCorsHeaders() at the start of handleRequest
   res.writeHead(status, {
     "Content-Type": "application/json",
     "X-Content-Type-Options": "nosniff",
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Authorization, Content-Type",
-    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
   });
   res.end(body);
 }
 
 function sendError(res: ServerResponse, status: number, code: string, message: string): void {
   sendJson(res, status, failure("web-service", code, message, Date.now()));
+}
+
+/** Set CORS headers on the response for the lifetime of the request. */
+function setCorsHeaders(req: IncomingMessage, res: ServerResponse): void {
+  const origin = req.headers.origin;
+  res.setHeader("Access-Control-Allow-Origin", getAllowedCorsOrigin(origin));
+  res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+  res.setHeader("Vary", "Origin");
 }
 
 // ── Shared request helpers ─────────────────────────────────────────────
@@ -381,13 +410,12 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     const path = url.pathname;
     const method = req.method ?? "GET";
 
+    // Set CORS headers for all responses (origin-restricted)
+    setCorsHeaders(req, res);
+
     // CORS preflight
     if (method === "OPTIONS") {
-      res.writeHead(204, {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Authorization, Content-Type",
-        "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-      });
+      res.writeHead(204);
       res.end();
       return;
     }
@@ -589,20 +617,30 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
 
           if (clerkUserId) {
             let tier: ApiTier;
+
+            // Primary: read priceId from metadata (embedded at checkout creation)
+            const metaPriceId = meta?.["priceId"];
+
             switch (event.type) {
               case "checkout.session.completed": {
-                // Derive tier from the price ID in the line items or subscription
-                const lineItems = event.data["line_items"] as { data?: Array<{ price?: { id?: string } }> } | undefined;
-                const priceId = lineItems?.data?.[0]?.price?.id
-                  ?? (event.data["subscription"] as { items?: { data?: Array<{ price?: { id?: string } }> } } | undefined)?.items?.data?.[0]?.price?.id;
-                tier = tierFromPriceId(priceId) ?? "starter";
+                if (metaPriceId && tierFromPriceId(metaPriceId)) {
+                  tier = tierFromPriceId(metaPriceId)!;
+                } else {
+                  // Fallback: subscription items (less reliable, Stripe may not expand line_items)
+                  const items = event.data["items"]?.["data"] as Array<{ price?: { id?: string } }> | undefined;
+                  const itemPriceId = items?.[0]?.price?.id;
+                  tier = tierFromPriceId(itemPriceId) ?? "starter";
+                }
                 break;
               }
               case "customer.subscription.updated": {
-                // Extract price ID from subscription items
-                const items = event.data["items"] as { data?: Array<{ price?: { id?: string } }> } | undefined;
-                const subPriceId = items?.data?.[0]?.price?.id;
-                tier = tierFromPriceId(subPriceId) ?? "starter";
+                if (metaPriceId && tierFromPriceId(metaPriceId)) {
+                  tier = tierFromPriceId(metaPriceId)!;
+                } else {
+                  const items = event.data["items"] as { data?: Array<{ price?: { id?: string } }> } | undefined;
+                  const subPriceId = items?.data?.[0]?.price?.id;
+                  tier = tierFromPriceId(subPriceId) ?? "starter";
+                }
                 break;
               }
               case "customer.subscription.deleted":
@@ -615,7 +653,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
               clerkUserId,
               { tier, stripeCustomerId: event.customerId },
               config.clerkConfig,
-            ).catch(() => { /* non-fatal */ });
+            ).catch((err) => { console.error("[webhook] Failed to update Clerk metadata:", err); });
           }
         }
 
@@ -734,7 +772,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     if (method === "GET" && agentMetricsMatch) {
       const authed = await requireAuth(req);
       if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
-      res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+      res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({
         success: true,
         data: {
@@ -753,7 +791,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     if (method === "GET" && agentHeatmapMatch) {
       const authed = await requireAuth(req);
       if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
-      res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+      res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({
         success: true,
         data: {
@@ -808,7 +846,6 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         "Connection": "keep-alive",
-        "Access-Control-Allow-Origin": "*",
       });
 
       const agents = ["claude-sonnet-4-6", "gpt-4o", "gemini-1.5-pro", "local-agent"];
