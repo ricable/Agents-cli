@@ -3,7 +3,7 @@
  * Renders products from catalog data into the Discover pane.
  */
 
-import { PRODUCT_TYPE_ICONS, PRODUCT_TYPE_COLORS, formatType, escapeHtml, showToast } from './utils.js';
+import { PRODUCT_TYPE_ICONS, PRODUCT_TYPE_COLORS, formatType, escapeHtml, escapeAttr, showToast } from './utils.js';
 
 // ── Tier access model ───────────────────────────────────────────────
 
@@ -16,6 +16,7 @@ function getRequiredTier(product) {
   const t = product.productType;
   if (t === 'agent-team') return 'enterprise';
   if (t === 'agent-def' || q >= 9) return 'pro';
+  if (t === 'workflow') return 'starter';
   if (t === 'plugin' || t === 'hook-bundle' || q >= 7) return 'starter';
   return 'free';
 }
@@ -43,6 +44,9 @@ export function initMarketplace(api, store, showProductDetail, auth) {
   const priceFilter = document.getElementById('priceFilter');
 
   if (!grid) return;
+
+  // Set up event delegation once (prevents listener stacking on infinite scroll)
+  setupGridDelegation(grid, showProductDetail, store, auth);
 
   // ── Load catalog ────────────────────────────────────────────────
 
@@ -83,7 +87,7 @@ export function initMarketplace(api, store, showProductDetail, auth) {
 
     const userTier = store.get('tier') || 'free';
     grid.innerHTML = results.map(p => renderCard(p, { userTier })).join('');
-    attachCardListeners(grid, showProductDetail, store, auth);
+
     updateInstallCounter(store);
   }
 
@@ -156,11 +160,132 @@ export function initMarketplace(api, store, showProductDetail, auth) {
   // Re-render when registries inject agent-defs / generated-skills
   window.addEventListener('catalog-updated', () => renderProducts());
 
+  // ── Faceted sidebar (domain tree) ────────────────────────────────
+
+  const domainTreeContainer = document.querySelector('.domain-tree');
+  let activeDomains = [];
+  let domainListenerAttached = false;
+
+  async function loadDomainTree() {
+    if (!domainTreeContainer) return;
+    try {
+      const domains = await api.getDomainTree();
+      renderDomainTree(domains);
+    } catch { /* domain tree unavailable */ }
+  }
+
+  function renderDomainTree(domains) {
+    if (!domainTreeContainer || !domains.length) return;
+    domainTreeContainer.innerHTML = domains
+      .filter(d => d.total > 0)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 30)
+      .map(d => `
+        <label class="domain-tree-item" style="padding-left:${12 + d.depth * 16}px">
+          <input type="checkbox" value="${escapeAttr(d.id)}" class="domain-checkbox">
+          <span class="domain-label">${escapeHtml(d.label)}</span>
+          <span class="domain-count">${d.total}</span>
+        </label>
+      `).join('');
+
+    // Register change listener once to prevent stacking
+    if (!domainListenerAttached) {
+      domainTreeContainer.addEventListener('change', () => {
+        activeDomains = [...domainTreeContainer.querySelectorAll('.domain-checkbox:checked')].map(cb => cb.value);
+        store.update('searchFilters', f => ({ ...f, domains: activeDomains }));
+        renderProducts();
+      });
+      domainListenerAttached = true;
+    }
+  }
+
+  // ── Infinite scroll ─────────────────────────────────────────────
+
+  let currentOffset = 0;
+  let isLoadingMore = false;
+  let hasMoreProducts = false;
+  const PAGE_SIZE = 50;
+  let scrollObserver = null;
+
+  function setupInfiniteScroll() {
+    const trigger = document.querySelector('.infinite-scroll-trigger');
+    if (!trigger) return;
+
+    // Disconnect previous observer if re-init
+    if (scrollObserver) scrollObserver.disconnect();
+
+    scrollObserver = new IntersectionObserver(async (entries) => {
+      const entry = entries[0];
+      if (!entry.isIntersecting || isLoadingMore || !hasMoreProducts) return;
+
+      isLoadingMore = true;
+      trigger.classList.add('loading');
+      currentOffset += PAGE_SIZE;
+
+      try {
+        const query = store.get('searchQuery') || '';
+        const filters = store.get('searchFilters') || {};
+        const result = await api.searchProductsPaginated(query, {
+          offset: currentOffset,
+          limit: PAGE_SIZE,
+          domain: filters.domains,
+          productType: filters.productType && filters.productType !== 'all' ? [filters.productType] : undefined,
+          sort: filters.sort,
+        });
+
+        if (result.products?.length) {
+          const userTier = store.get('tier') || 'free';
+          const html = result.products.map(p => renderCard(p, { userTier })).join('');
+          grid.insertAdjacentHTML('beforeend', html);
+      
+          hasMoreProducts = result.hasMore;
+        } else {
+          hasMoreProducts = false;
+        }
+      } catch {
+        hasMoreProducts = false;
+      }
+
+      trigger.classList.remove('loading');
+      isLoadingMore = false;
+    }, { rootMargin: '200px' });
+
+    scrollObserver.observe(trigger);
+  }
+
+  // Set hasMoreProducts=true when catalog is large enough to paginate
+  function resetScrollState() {
+    currentOffset = 0;
+    hasMoreProducts = api.catalog.length >= PAGE_SIZE;
+  }
+
+  // Reset scroll state on filter/search changes
+  store.subscribe('searchFilters', resetScrollState);
+  store.subscribe('searchQuery', resetScrollState);
+
+  setupInfiniteScroll();
+
   // ── Initial load ────────────────────────────────────────────────
 
   loadAndRender();
+  loadDomainTree();
 
   return { renderProducts, loadAndRender };
+}
+
+// ── Workflow mini pipeline ──────────────────────────────────────────
+
+function renderWorkflowMiniPipeline(product) {
+  if (product.productType !== 'workflow' || !product.workflowSteps?.length) return '';
+  const maxVisible = 4;
+  const steps = product.workflowSteps;
+  const visible = steps.slice(0, maxVisible);
+  const overflow = steps.length > maxVisible ? `<span class="wf-more">+${steps.length - maxVisible}</span>` : '';
+  return `<div class="wf-mini-pipeline">
+    ${visible.map((s, i) =>
+      `<span class="wf-step">${escapeHtml(s.name)}</span>${i < visible.length - 1 ? '<span class="wf-arrow wf-pulse">\u2192</span>' : ''}`
+    ).join('')}${overflow}
+  </div>`;
 }
 
 // ── Card renderer ───────────────────────────────────────────────────
@@ -193,7 +318,7 @@ function renderCard(product, opts = {}) {
       </div>` : '';
 
   return `
-    <div class="plugin-card glass-card${!hasAccess ? ' tier-locked' : ''}" data-product-id="${escapeAttr(product.id)}">
+    <div class="plugin-card glass-card${!hasAccess ? ' tier-locked' : ''}${product.productType === 'workflow' ? ' workflow-card' : ''}" data-product-id="${escapeAttr(product.id)}">
       <div class="plugin-header">
         <div class="plugin-icon" style="border-color:${typeColor}30;background:${typeColor}10">
           ${icon}
@@ -205,6 +330,7 @@ function renderCard(product, opts = {}) {
         <span class="tier-badge ${tierBadgeClass}">${tierLabel}</span>
       </div>
       <p class="plugin-desc">${escapeHtml(truncate(product.description || 'No description', 120))}</p>
+      ${renderWorkflowMiniPipeline(product)}
       <div class="plugin-footer">
         <div class="plugin-meta">
           <span class="badge" style="background:${typeColor}20;color:${typeColor}">${formatType(product.productType)}</span>
@@ -212,6 +338,8 @@ function renderCard(product, opts = {}) {
           ${commands > 0 ? `<span class="meta-item" title="Commands">${commands} cmds</span>` : ''}
           ${rating > 0 ? `<span class="meta-item">${renderStars(rating)}</span>` : ''}
           ${downloads > 0 ? `<span class="meta-item">${formatNum(downloads)} dl</span>` : ''}
+          ${product.workflowSteps ? `<span class="meta-item">${product.workflowSteps.length} steps</span>` : ''}
+          ${product.estimatedDuration ? `<span class="meta-item">~${escapeHtml(product.estimatedDuration)}</span>` : ''}
           ${isAgentNative(product) ? '<span class="badge-agent">\u{1F916} Agent</span>' : ''}
           ${product.pricing?.perCall ? `<span class="cost-badge">$${product.pricing.perCall}/call</span>` : ''}
         </div>
@@ -236,54 +364,60 @@ function renderSkeletons(count) {
   `).join('');
 }
 
-function attachCardListeners(grid, showProductDetail, store, auth) {
-  grid.querySelectorAll('.plugin-card').forEach(card => {
-    card.addEventListener('click', (e) => {
-      if (e.target.closest('.install-card-btn')) {
-        const id = e.target.dataset.id;
-        showProductDetail(id);
-        return;
-      }
-      if (e.target.closest('.try-card-btn')) return;
-      if (e.target.closest('.oneshot-buy-btn')) return;
-      if (e.target.closest('.tier-lock-actions a')) return;
-      const id = card.dataset.productId;
-      if (id) showProductDetail(id);
-    });
-  });
+/** Set up event delegation on grid (call once, not per render). */
+let _gridDelegated = false;
+function setupGridDelegation(grid, showProductDetail, store, auth) {
+  if (_gridDelegated) return;
+  _gridDelegated = true;
 
-  grid.querySelectorAll('.try-card-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+  grid.addEventListener('click', (e) => {
+    // Try button
+    const tryBtn = e.target.closest('.try-card-btn');
+    if (tryBtn) {
       e.stopPropagation();
-      const id = btn.dataset.id;
+      const id = tryBtn.dataset.id;
       const userTier = store.get('tier') || 'free';
       const limit = TIER_LIMITS[userTier] || 3;
       const used = store.getMonthlyInstallCount();
-
       if (used >= limit) {
         showToast(`Monthly install limit reached (${limit}). Upgrade for more.`, 'error');
         return;
       }
-
       store.incrementInstallCount();
-
       const forgeSidebar = document.querySelector('[data-pane="forge"]');
       if (forgeSidebar) forgeSidebar.click();
       const toolInput = document.getElementById('forgeToolInput');
-      if (toolInput) {
-        toolInput.value = id;
-        toolInput.dispatchEvent(new Event('blur'));
-      }
-    });
-  });
+      if (toolInput) { toolInput.value = id; toolInput.dispatchEvent(new Event('blur')); }
+      return;
+    }
 
-  grid.querySelectorAll('.oneshot-buy-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+    // Oneshot buy button
+    const buyBtn = e.target.closest('.oneshot-buy-btn');
+    if (buyBtn) {
       e.stopPropagation();
-      const tier = btn.dataset.tier;
+      const tier = buyBtn.dataset.tier;
       const price = ONESHOT_PRICES[tier];
       showToast(`One-shot purchase ($${price}) — coming soon!`);
-    });
+      return;
+    }
+
+    // Tier lock actions
+    if (e.target.closest('.tier-lock-actions a')) return;
+
+    // Install button
+    const installBtn = e.target.closest('.install-card-btn');
+    if (installBtn) {
+      const id = installBtn.dataset.id;
+      showProductDetail(id);
+      return;
+    }
+
+    // Card click → product detail
+    const card = e.target.closest('.plugin-card');
+    if (card) {
+      const id = card.dataset.productId;
+      if (id) showProductDetail(id);
+    }
   });
 }
 
@@ -326,10 +460,6 @@ function renderStars(rating) {
 function truncate(str, len) {
   if (str.length <= len) return str;
   return str.slice(0, len) + '\u2026';
-}
-
-function escapeAttr(str) {
-  return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function isAgentNative(product) {

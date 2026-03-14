@@ -66,6 +66,7 @@ const FREE_PRODUCTS: Record<ProductType, ProductEntitlement> = {
   "hook-bundle":  entitlement(false,  0,    0,  false, false),
   "agent-def":    entitlement(false,  0,    0,  false, false),
   "agent-team":   entitlement(false,  0,    0,  false, false),
+  workflow:     entitlement(true,   0,    0,  false, false),
 };
 
 const STARTER_PRODUCTS: Record<ProductType, ProductEntitlement> = {
@@ -75,6 +76,7 @@ const STARTER_PRODUCTS: Record<ProductType, ProductEntitlement> = {
   "hook-bundle":  entitlement(true,   3,   10,  false, false),
   "agent-def":    entitlement(true,   5,   20,  false, false),
   "agent-team":   entitlement(false,  0,    0,  false, false),
+  workflow:     entitlement(true,   2,    5,  false, false),
 };
 
 const PRO_PRODUCTS: Record<ProductType, ProductEntitlement> = {
@@ -84,6 +86,7 @@ const PRO_PRODUCTS: Record<ProductType, ProductEntitlement> = {
   "hook-bundle":  entitlement(true,  20,  100,  true,  true),
   "agent-def":    entitlement(true,  30,  150,  true,  true),
   "agent-team":   entitlement(true,  10,   50,  true,  true),
+  workflow:     entitlement(true,  -1,   -1,  true,  true),
 };
 
 const ENTERPRISE_PRODUCTS: Record<ProductType, ProductEntitlement> = {
@@ -93,6 +96,7 @@ const ENTERPRISE_PRODUCTS: Record<ProductType, ProductEntitlement> = {
   "hook-bundle":  entitlement(true,  -1,   -1,  true,  true),
   "agent-def":    entitlement(true,  -1,   -1,  true,  true),
   "agent-team":   entitlement(true,  -1,   -1,  true,  true),
+  workflow:     entitlement(true,  -1,   -1,  true,  true),
 };
 
 // ── Full tier config map ───────────────────────────────────────────────

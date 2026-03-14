@@ -92,6 +92,8 @@ export interface CliArgs {
   marketplaceV2: boolean;
   // Full pipeline mode
   fullPipeline: boolean;
+  // Workflow generation mode
+  workflowGen: string;
 }
 
 export interface ChunkStats {

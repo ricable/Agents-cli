@@ -11,7 +11,8 @@
 
 import path from "node:path";
 import { ensureSqlite } from "./db/sqlite.js";
-import { isPrivateUrl } from "./resolver.js";
+import { validateOllamaUrl, DEFAULT_OLLAMA_URL, cosine } from "./guards.js";
+import { embedText } from "./intelligence/embeddings.js";
 
 // ── Public types ───────────────────────────────────────────────────────
 
@@ -41,10 +42,7 @@ type SqliteDb = any;
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
-const OLLAMA_URL =
-  typeof process !== "undefined"
-    ? (process.env.OLLAMA_URL ?? "http://127.0.0.1:11434")
-    : "http://127.0.0.1:11434";
+const OLLAMA_URL = DEFAULT_OLLAMA_URL;
 const OLLAMA_MODEL = "nomic-embed-text";
 const LOCAL_MODEL = "Xenova/all-MiniLM-L6-v2";
 
@@ -52,50 +50,8 @@ function fromBlob(buf: Buffer): Float32Array {
   return new Float32Array(buf.buffer, buf.byteOffset, buf.byteLength / 4);
 }
 
-function cosine(a: Float32Array, b: Float32Array): number {
-  let dot = 0,
-    na = 0,
-    nb = 0;
-  for (let i = 0; i < a.length; i++) {
-    const ai = a[i]!;
-    const bi = b[i]!;
-    dot += ai * bi;
-    na += ai * ai;
-    nb += bi * bi;
-  }
-  const denom = Math.sqrt(na) * Math.sqrt(nb);
-  return denom === 0 ? 0 : dot / denom;
-}
-
-/** Validate that OLLAMA_URL points to localhost or a public host (not private network). */
-function validateOllamaUrl(url: string): void {
-  try {
-    const parsed = new URL(url);
-    const host = parsed.hostname;
-    // Allow localhost — the expected Ollama host
-    if (host === "localhost" || host === "127.0.0.1" || host === "[::1]") return;
-    // Block private/internal network IPs (e.g. 10.x, 172.16.x, 192.168.x)
-    if (isPrivateUrl(url)) {
-      throw new Error(
-        `Ollama URL "${url}" points to a private network — only localhost or public hosts allowed`
-      );
-    }
-  } catch (e) {
-    if (e instanceof Error && e.message.includes("private network")) throw e;
-    throw new Error(`Invalid Ollama URL: ${url}`);
-  }
-}
-
 async function embedViaOllama(text: string): Promise<Float32Array> {
-  validateOllamaUrl(OLLAMA_URL);
-  const res = await fetch(`${OLLAMA_URL}/api/embed`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: OLLAMA_MODEL, input: [text] }),
-  });
-  if (!res.ok) throw new Error(`Ollama ${res.status}: ${await res.text()}`);
-  const data = (await res.json()) as { embeddings?: number[][] };
-  return new Float32Array(data.embeddings?.[0] ?? []);
+  return embedText(text, { ollamaUrl: OLLAMA_URL, model: OLLAMA_MODEL });
 }
 
 function normalise(v: Float32Array): Float32Array {
@@ -255,6 +211,48 @@ function toSearchResults(rows: any[]): SearchResult[] {
   }));
 }
 
+// ── sqlite-vec KNN helper ──────────────────────────────────────────────
+
+/**
+ * Try to use VecStore for KNN search. Returns null if unavailable.
+ * Falls back gracefully — callers should use brute-force vectorScan as backup.
+ */
+async function tryVecStoreSearch(
+  queryVec: Float32Array,
+  limit: number,
+  pkg?: string,
+): Promise<SearchResult[] | null> {
+  try {
+    const { createVecStore, isVecAvailable } = await import("./db/vec-store.js");
+    if (!isVecAvailable()) return null;
+
+    const { createUnifiedStore } = await import("./db/unified-store.js");
+    const dataDir = (await import("os")).homedir() + "/.agents-cli";
+    const store = createUnifiedStore(dataDir);
+    const vecStore = createVecStore(store.getDb(), queryVec.length);
+    if (!vecStore || vecStore.count() === 0) return null;
+
+    const neighbors = vecStore.search(queryVec, limit * 2);
+    let results = neighbors.map((n) => ({
+      id: n.id,
+      pkg: pkg ?? n.id.split("-")[0] ?? "",
+      file: "",
+      chunkIndex: 0,
+      tokens: 0,
+      snippet: "",
+      score: 1 - n.distance,
+    }));
+
+    if (pkg) {
+      results = results.filter((r) => r.pkg === pkg);
+    }
+
+    return results.slice(0, limit);
+  } catch {
+    return null;
+  }
+}
+
 // ── Public API ─────────────────────────────────────────────────────────
 
 /**
@@ -310,11 +308,16 @@ export async function hybridSearch(
     }
 
     if (mode === "vector") {
+      // Try sqlite-vec KNN first, fall back to brute-force scan
+      const vecResults = await tryVecStoreSearch(queryVec, limit, pkg);
+      if (vecResults) return vecResults;
       const rows = vectorScan(db, queryVec, pkg, limit);
       return toSearchResults(rows);
     }
 
-    // hybrid: FTS pre-filter -> cosine re-rank + FTS backfill
+    // hybrid: try sqlite-vec KNN merge, then FTS pre-filter -> cosine re-rank + FTS backfill
+    const vecHybridResults = await tryVecStoreSearch(queryVec, Math.ceil(limit / 2), pkg);
+
     const candidateRows = ftsSearch(db, query, pkg, candidates, true);
     if (!candidateRows.length) return [];
 
@@ -334,6 +337,14 @@ export async function hybridSearch(
       const backfill = withoutEmb.filter((r) => !rerankedIds.has(r.id));
       final = [...reranked, ...backfill].slice(0, limit);
     }
+
+    // Merge vec store results with FTS results (dedup by id)
+    if (vecHybridResults && vecHybridResults.length > 0) {
+      const ftsIds = new Set(final.map((r: { id: string }) => r.id));
+      const novel = vecHybridResults.filter((r) => !ftsIds.has(r.id));
+      final = [...final, ...novel].slice(0, limit);
+    }
+
     return toSearchResults(final);
   } finally {
     db.close();

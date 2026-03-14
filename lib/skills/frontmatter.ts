@@ -115,6 +115,16 @@ export function parseFrontmatter(content: string): SkillFrontmatter | null {
   return { name, version, description, ingredients, tags, compatibility, domain };
 }
 
+/**
+ * Extract the body content from a SKILL.md (everything after the closing ---).
+ * Returns the full content if no frontmatter is found.
+ */
+export function extractBody(content: string): string {
+  const match = /^---\r?\n[\s\S]*?\r?\n---/.exec(content);
+  if (!match) return content;
+  return content.slice(match[0].length).trim();
+}
+
 // =============================================================================
 // Bundled Resources
 // =============================================================================

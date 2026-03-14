@@ -1,0 +1,1275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marketplace — Agents-CLI</title>
+    <link rel="stylesheet" href="css/marketplace-page.css">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script>window.__CLERK_KEY = window.__CLERK_KEY || null;</script>
+</head>
+<body>
+
+    <!-- Scan-line overlay -->
+    <div class="scanlines"></div>
+
+    <!-- Grid background -->
+    <div class="grid-bg"></div>
+
+    <!-- Toast -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         NAVIGATION
+         ═══════════════════════════════════════════════════════════════ -->
+    <nav class="mp-nav">
+        <div class="mp-nav-inner">
+            <a href="/" class="mp-brand">
+                <span class="mp-brand-icon">&#x2728;</span>
+                <span class="mp-brand-text">Agents<span class="mp-brand-accent">-CLI</span></span>
+            </a>
+            <div class="mp-nav-links">
+                <a href="#walkthrough" class="mp-nav-link">How It Works</a>
+                <a href="#sources" class="mp-nav-link">Sources</a>
+                <a href="#workflows" class="mp-nav-link">Workflows</a>
+                <a href="#demos" class="mp-nav-link">Demos</a>
+                <a href="#browse" class="mp-nav-link">Browse</a>
+                <a href="#pricing" class="mp-nav-link mp-nav-link-accent">Subscribe</a>
+            </div>
+            <div class="mp-nav-actions">
+                <a href="/" class="mp-btn mp-btn-ghost">Back to Home</a>
+                <button class="mp-btn mp-btn-primary" id="mpGetStarted">Get Started</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         HERO
+         ═══════════════════════════════════════════════════════════════ -->
+    <section class="mp-hero">
+        <div class="mp-hero-grid">
+            <div class="mp-hero-content">
+                <div class="mp-hero-badge">
+                    <span class="mp-badge-dot"></span>
+                    LIVE MARKETPLACE
+                </div>
+                <h1 class="mp-hero-title">
+                    The Universal<br>
+                    <span class="mp-text-gradient">Agent Marketplace</span>
+                </h1>
+                <p class="mp-hero-sub">
+                    Every package manager. Every registry. Every tool. One unified platform
+                    that resolves, installs, analyzes, and exposes CLI tools as AI-native skills.
+                </p>
+                <div class="mp-hero-actions">
+                    <a href="#browse" class="mp-btn mp-btn-primary mp-btn-lg">
+                        <span class="mp-btn-icon">&#x1F50D;</span> Explore Marketplace
+                    </a>
+                    <a href="#workflows" class="mp-btn mp-btn-outline mp-btn-lg">
+                        <span class="mp-btn-icon">&#x26A1;</span> View Workflows
+                    </a>
+                </div>
+            </div>
+            <div class="mp-hero-stats">
+                <div class="mp-stat-card">
+                    <div class="mp-stat-number" data-target="559">0</div>
+                    <div class="mp-stat-label">Installed Tools</div>
+                    <div class="mp-stat-bar"><div class="mp-stat-fill" style="width:87%"></div></div>
+                </div>
+                <div class="mp-stat-card">
+                    <div class="mp-stat-number" data-target="393">0</div>
+                    <div class="mp-stat-label">Generated Skills</div>
+                    <div class="mp-stat-bar"><div class="mp-stat-fill" style="width:72%"></div></div>
+                </div>
+                <div class="mp-stat-card">
+                    <div class="mp-stat-number" data-target="534">0</div>
+                    <div class="mp-stat-label">MCP Tools</div>
+                    <div class="mp-stat-bar"><div class="mp-stat-fill" style="width:94%"></div></div>
+                </div>
+                <div class="mp-stat-card mp-stat-accent">
+                    <div class="mp-stat-number" data-target="7">0</div>
+                    <div class="mp-stat-label">Source Registries</div>
+                    <div class="mp-stat-bar"><div class="mp-stat-fill" style="width:100%"></div></div>
+                </div>
+            </div>
+        </div>
+        <div class="mp-hero-terminal">
+            <div class="mp-terminal-bar">
+                <span class="mp-term-dot red"></span>
+                <span class="mp-term-dot yellow"></span>
+                <span class="mp-term-dot green"></span>
+                <span class="mp-term-title">agents-cli</span>
+            </div>
+            <div class="mp-terminal-body" id="heroTerminal">
+                <div class="mp-term-line"><span class="mp-term-prompt">$</span> agents-cli search "AI workflow automation"</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         SOCIAL PROOF
+         ═══════════════════════════════════════════════════════════════ -->
+    <section class="mp-proof-section" id="proof">
+        <div class="mp-proof-strip">
+            <div class="mp-proof-stat">
+                <div class="mp-proof-number" data-target="559">0</div>
+                <div class="mp-proof-label">Tools Installed</div>
+            </div>
+            <div class="mp-proof-stat">
+                <div class="mp-proof-number" data-target="393">0</div>
+                <div class="mp-proof-label">Skills Generated</div>
+            </div>
+            <div class="mp-proof-stat">
+                <div class="mp-proof-number" data-target="534">0</div>
+                <div class="mp-proof-label">MCP Tools</div>
+            </div>
+            <div class="mp-proof-stat">
+                <div class="mp-proof-number" data-target="52">0</div>
+                <div class="mp-proof-label">Domain Plugins</div>
+            </div>
+            <div class="mp-proof-stat">
+                <div class="mp-proof-number" data-target="7">0</div>
+                <div class="mp-proof-label">Registries</div>
+            </div>
+        </div>
+        <p class="mp-proof-tagline">Trusted by developers building the agentic future</p>
+        <div class="mp-proof-logos">
+            <span class="mp-proof-logo" title="GitHub">&#x1F419; GitHub</span>
+            <span class="mp-proof-logo" title="npm">&#x1F4E6; npm</span>
+            <span class="mp-proof-logo" title="PyPI">&#x1F40D; PyPI</span>
+            <span class="mp-proof-logo" title="crates.io">&#x1F980; crates.io</span>
+            <span class="mp-proof-logo" title="Rust">&#x2699;&#xFE0F; Rust</span>
+            <span class="mp-proof-logo" title="Python">&#x1F40D; Python</span>
+            <span class="mp-proof-logo" title="Node.js">&#x1F7E2; Node.js</span>
+            <span class="mp-proof-logo" title="MCP">&#x1F310; MCP</span>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         HOW IT WORKS
+         ═══════════════════════════════════════════════════════════════ -->
+    <section class="mp-walkthrough" id="walkthrough">
+        <div class="mp-section-header">
+            <span class="mp-section-tag">HOW IT WORKS</span>
+            <h2 class="mp-section-title">Five Steps to <span class="mp-text-gradient">Agent-Ready</span></h2>
+            <p class="mp-section-sub">Every tool follows the same battle-tested pipeline — from raw source to AI-native skill.</p>
+        </div>
+        <div class="mp-walk-steps">
+            <div class="mp-walk-step" data-step="1">
+                <div class="mp-walk-icon">&#x1F50D;</div>
+                <div class="mp-walk-connector"></div>
+                <div class="mp-walk-name">Resolve</div>
+                <div class="mp-walk-desc">Detect source format, fetch metadata, discover versions across 7 registries</div>
+                <code class="mp-walk-cmd">agents-cli add pypi:ruff</code>
+            </div>
+            <div class="mp-walk-step" data-step="2">
+                <div class="mp-walk-icon">&#x1F4E5;</div>
+                <div class="mp-walk-connector"></div>
+                <div class="mp-walk-name">Install</div>
+                <div class="mp-walk-desc">Download, extract, build with branch fallback (main → master → develop)</div>
+                <code class="mp-walk-cmd">pip install ruff → ~/.agents-cli/</code>
+            </div>
+            <div class="mp-walk-step" data-step="3">
+                <div class="mp-walk-icon">&#x1F9EA;</div>
+                <div class="mp-walk-connector"></div>
+                <div class="mp-walk-name">Analyze</div>
+                <div class="mp-walk-desc">Deep --help parsing, recursive probing, schema introspection, smoke test</div>
+                <code class="mp-walk-cmd">deepProbe(bin, {maxDepth: 5})</code>
+            </div>
+            <div class="mp-walk-step" data-step="4">
+                <div class="mp-walk-icon">&#x2728;</div>
+                <div class="mp-walk-connector"></div>
+                <div class="mp-walk-name">Generate</div>
+                <div class="mp-walk-desc">SKILL.md with frontmatter, refs, scripts. Quality gates: trigger ≥ 0.80</div>
+                <code class="mp-walk-cmd">generateSkillDirectory(tool)</code>
+            </div>
+            <div class="mp-walk-step" data-step="5">
+                <div class="mp-walk-icon">&#x1F680;</div>
+                <div class="mp-walk-name">Expose</div>
+                <div class="mp-walk-desc">MCP bridge server, Claude Code native integration, agent-ready API</div>
+                <code class="mp-walk-cmd">agents-cli mcp start</code>
+                <div class="mp-walk-badges">
+                    <span class="mp-walk-badge">MCP v1.0</span>
+                    <span class="mp-walk-badge">Claude Code</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         SOURCE REGISTRIES — All 7 Types
+         ═══════════════════════════════════════════════════════════════ -->
+    <section class="mp-section" id="sources">
+        <div class="mp-section-header">
+            <span class="mp-section-tag">7 REGISTRIES</span>
+            <h2 class="mp-section-title">Every Source. <span class="mp-text-gradient">One Command.</span></h2>
+            <p class="mp-section-sub">Agents-CLI unifies the fragmented tool ecosystem. Install from any registry with a single, consistent interface. No more juggling package managers.</p>
+        </div>
+
+        <div class="mp-sources-grid">
+            <!-- GitHub -->
+            <div class="mp-source-card mp-source-github">
+                <div class="mp-source-header">
+                    <span class="mp-source-icon">&#x1F419;</span>
+                    <div>
+                        <h3 class="mp-source-name">GitHub</h3>
+                        <span class="mp-source-prefix">owner/repo</span>
+                    </div>
+                </div>
+                <p class="mp-source-desc">Direct repository access. Clones, builds, and analyzes any GitHub project. Supports branch fallback (main &rarr; master &rarr; develop), release detection, and automatic binary inference.</p>
+                <div class="mp-source-features">
+                    <span class="mp-feature-tag">Auto-build</span>
+                    <span class="mp-feature-tag">Release tracking</span>
+                    <span class="mp-feature-tag">Binary inference</span>
+                    <span class="mp-feature-tag">README extraction</span>
+                </div>
+                <div class="mp-source-example">
+                    <code>agents-cli add anthropics/claude-code</code>
+                </div>
+                <div class="mp-source-stats">
+                    <span>&#x2B50; Most versatile</span>
+                    <span>200+ tools</span>
+                </div>
+            </div>
+
+            <!-- npm -->
+            <div class="mp-source-card mp-source-npm">
+                <div class="mp-source-header">
+                    <span class="mp-source-icon">&#x1F4E6;</span>
+                    <div>
+                        <h3 class="mp-source-name">npm</h3>
+                        <span class="mp-source-prefix">npm: / @scope/</span>
+                    </div>
+                </div>
+                <p class="mp-source-desc">Node.js ecosystem. CLI tools, frameworks, and libraries. Scoped packages supported natively. Automatic dependency resolution and global binary detection.</p>
+                <div class="mp-source-features">
+                    <span class="mp-feature-tag">Scoped packages</span>
+                    <span class="mp-feature-tag">npx support</span>
+                    <span class="mp-feature-tag">Version pinning</span>
+                    <span class="mp-feature-tag">Lockfile integrity</span>
+                </div>
+                <div class="mp-source-example">
+                    <code>agents-cli add npm:eslint</code>
+                    <code>agents-cli add @anthropic-ai/sdk</code>
+                </div>
+                <div class="mp-source-stats">
+                    <span>&#x1F680; Fastest installs</span>
+                    <span>2.5M+ packages</span>
+                </div>
+            </div>
+
+            <!-- PyPI -->
+            <div class="mp-source-card mp-source-pypi">
+                <div class="mp-source-header">
+                    <span class="mp-source-icon">&#x1F40D;</span>
+                    <div>
+                        <h3 class="mp-source-name">PyPI</h3>
+                        <span class="mp-source-prefix">pypi:</span>
+                    </div>
+                </div>
+                <p class="mp-source-desc">Python Package Index. AI/ML tools, data science utilities, automation agents. Virtual environment isolation. Bare names auto-resolve to PyPI.</p>
+                <div class="mp-source-features">
+                    <span class="mp-feature-tag">venv isolation</span>
+                    <span class="mp-feature-tag">AI/ML focused</span>
+                    <span class="mp-feature-tag">Auto-resolve bare names</span>
+                    <span class="mp-feature-tag">Entry point detection</span>
+                </div>
+                <div class="mp-source-example">
+                    <code>agents-cli add pypi:ruff</code>
+                    <code>agents-cli add httpie</code>
+                </div>
+                <div class="mp-source-stats">
+                    <span>&#x1F9E0; AI/ML leader</span>
+                    <span>500K+ packages</span>
+                </div>
+            </div>
+
+            <!-- crates.io -->
+            <div class="mp-source-card mp-source-crates">
+                <div class="mp-source-header">
+                    <span class="mp-source-icon">&#x1F980;</span>
+                    <div>
+                        <h3 class="mp-source-name">crates.io</h3>
+                        <span class="mp-source-prefix">crates:</span>
+                    </div>
+                </div>
+                <p class="mp-source-desc">Rust ecosystem. High-performance CLI binaries with zero-cost abstractions. Cargo.toml [[bin]] parsing for multi-binary crates. Native compilation.</p>
+                <div class="mp-source-features">
+                    <span class="mp-feature-tag">Native binaries</span>
+                    <span class="mp-feature-tag">Multi-binary support</span>
+                    <span class="mp-feature-tag">Cargo.toml parsing</span>
+                    <span class="mp-feature-tag">Zero-cost performance</span>
+                </div>
+                <div class="mp-source-example">
+                    <code>agents-cli add crates:ripgrep</code>
+                </div>
+                <div class="mp-source-stats">
+                    <span>&#x26A1; Fastest runtime</span>
+                    <span>150K+ crates</span>
+                </div>
+            </div>
+
+            <!-- CLI-Anything -->
+            <div class="mp-source-card mp-source-cli-anything mp-source-premium">
+                <div class="mp-premium-badge">PREMIUM</div>
+                <div class="mp-source-header">
+                    <span class="mp-source-icon">&#x1F916;</span>
+                    <div>
+                        <h3 class="mp-source-name">CLI-Anything</h3>
+                        <span class="mp-source-prefix">cli-anything:</span>
+                    </div>
+                </div>
+                <p class="mp-source-desc">Revolutionary. Wraps <em>any</em> GUI or desktop application with AI-generated CLI bindings. Blender, Photoshop, Figma, VS Code &mdash; turn any app into a scriptable agent tool.</p>
+                <div class="mp-source-features">
+                    <span class="mp-feature-tag">GUI &rarr; CLI</span>
+                    <span class="mp-feature-tag">AI harness generation</span>
+                    <span class="mp-feature-tag">App profiling</span>
+                    <span class="mp-feature-tag">Any desktop app</span>
+                    <span class="mp-feature-tag mp-feature-new">NEW</span>
+                </div>
+                <div class="mp-source-example">
+                    <code>agents-cli add cli-anything:blender</code>
+                    <code>agents-cli add cli-anything:figma</code>
+                </div>
+                <div class="mp-source-stats">
+                    <span>&#x1F4A5; Game changer</span>
+                    <span>Unlimited apps</span>
+                </div>
+            </div>
+
+            <!-- MCP-to-CLI -->
+            <div class="mp-source-card mp-source-mcp2cli mp-source-premium">
+                <div class="mp-premium-badge">PREMIUM</div>
+                <div class="mp-source-header">
+                    <span class="mp-source-icon">&#x1F310;</span>
+                    <div>
+                        <h3 class="mp-source-name">MCP-to-CLI</h3>
+                        <span class="mp-source-prefix">mcp:</span>
+                    </div>
+                </div>
+                <p class="mp-source-desc">Bridge Model Context Protocol servers into CLI tools. Introspects MCP servers, extracts tool schemas, and generates agent-consumable skill definitions. The glue between MCP and everything else.</p>
+                <div class="mp-source-features">
+                    <span class="mp-feature-tag">MCP introspection</span>
+                    <span class="mp-feature-tag">Schema extraction</span>
+                    <span class="mp-feature-tag">Auto skill gen</span>
+                    <span class="mp-feature-tag">Bidirectional bridge</span>
+                    <span class="mp-feature-tag mp-feature-new">NEW</span>
+                </div>
+                <div class="mp-source-example">
+                    <code>agents-cli add mcp:filesystem</code>
+                    <code>agents-cli add mcp:sqlite</code>
+                </div>
+                <div class="mp-source-stats">
+                    <span>&#x1F517; MCP native</span>
+                    <span>534 tools</span>
+                </div>
+            </div>
+
+            <!-- Local -->
+            <div class="mp-source-card mp-source-local">
+                <div class="mp-source-header">
+                    <span class="mp-source-icon">&#x1F4C1;</span>
+                    <div>
+                        <h3 class="mp-source-name">Local</h3>
+                        <span class="mp-source-prefix">./ or /</span>
+                    </div>
+                </div>
+                <p class="mp-source-desc">Your own tools. Point at any directory to analyze, generate skills, and expose to agents. Perfect for proprietary internal tools and private repositories.</p>
+                <div class="mp-source-features">
+                    <span class="mp-feature-tag">Private tools</span>
+                    <span class="mp-feature-tag">Instant analysis</span>
+                    <span class="mp-feature-tag">No upload needed</span>
+                    <span class="mp-feature-tag">Enterprise ready</span>
+                </div>
+                <div class="mp-source-example">
+                    <code>agents-cli add ./my-internal-tool</code>
+                </div>
+                <div class="mp-source-stats">
+                    <span>&#x1F512; Air-gapped OK</span>
+                    <span>Any directory</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Unified Pipeline Visual -->
+        <div class="mp-pipeline-visual">
+            <h3 class="mp-pipeline-title">Unified Pipeline &mdash; Every Source, Same Process</h3>
+            <div class="mp-pipeline-flow">
+                <div class="mp-pipeline-step">
+                    <div class="mp-pipeline-step-num">01</div>
+                    <div class="mp-pipeline-step-name">Resolve</div>
+                    <div class="mp-pipeline-step-desc">Detect format, fetch metadata, version detection</div>
+                </div>
+                <div class="mp-pipeline-arrow">&rarr;</div>
+                <div class="mp-pipeline-step">
+                    <div class="mp-pipeline-step-num">02</div>
+                    <div class="mp-pipeline-step-name">Install</div>
+                    <div class="mp-pipeline-step-desc">Download, extract, build with branch fallback</div>
+                </div>
+                <div class="mp-pipeline-arrow">&rarr;</div>
+                <div class="mp-pipeline-step">
+                    <div class="mp-pipeline-step-num">03</div>
+                    <div class="mp-pipeline-step-name">Analyze</div>
+                    <div class="mp-pipeline-step-desc">--help parsing, deep probe, schema introspection</div>
+                </div>
+                <div class="mp-pipeline-arrow">&rarr;</div>
+                <div class="mp-pipeline-step">
+                    <div class="mp-pipeline-step-num">04</div>
+                    <div class="mp-pipeline-step-name">Generate</div>
+                    <div class="mp-pipeline-step-desc">SKILL.md, refs, scripts, quality gates</div>
+                </div>
+                <div class="mp-pipeline-arrow">&rarr;</div>
+                <div class="mp-pipeline-step mp-pipeline-step-glow">
+                    <div class="mp-pipeline-step-num">05</div>
+                    <div class="mp-pipeline-step-name">Expose</div>
+                    <div class="mp-pipeline-step-desc">MCP bridge, agent-ready, AI-native</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         WORKFLOWS — Deep Dive
+         ═══════════════════════════════════════════════════════════════ -->
+    <section class="mp-section mp-section-dark" id="workflows">
+        <div class="mp-section-header">
+            <span class="mp-section-tag mp-tag-cyan">&#x26A1; WORKFLOWS</span>
+            <h2 class="mp-section-title">Orchestrate <span class="mp-text-cyan">Multi-Agent Pipelines</span></h2>
+            <p class="mp-section-sub">Workflows chain multiple skills into automated pipelines. Scout data, generate content, process media, deploy &mdash; all in one composable flow. AI-composed or hand-crafted.</p>
+        </div>
+
+        <!-- Workflow Architecture -->
+        <div class="mp-wf-architecture">
+            <div class="mp-wf-arch-card">
+                <div class="mp-wf-arch-icon">&#x1F9E0;</div>
+                <h4>AI Composition</h4>
+                <p>Describe what you want in natural language. The agentic composer analyzes your installed skills, discovers compatible tools, and proposes an optimized workflow.</p>
+                <code class="mp-wf-cmd">agents-cli compose "Python CI pipeline"</code>
+            </div>
+            <div class="mp-wf-arch-card">
+                <div class="mp-wf-arch-icon">&#x1F504;</div>
+                <h4>Iterative Refinement</h4>
+                <p>3-5 iteration loops with validation. Each round improves step completeness, data flow validity, env var documentation, and setup runnability. Target quality &ge; 0.8.</p>
+                <code class="mp-wf-cmd">--iterations 5 --sandbox --creative</code>
+            </div>
+            <div class="mp-wf-arch-card">
+                <div class="mp-wf-arch-icon">&#x1F3AF;</div>
+                <h4>4-Axis Quality Gates</h4>
+                <p>Every workflow must pass: step completeness, data flow validity, env var documentation, and setup runnability. Each axis &ge; 0.5 to ship.</p>
+                <div class="mp-quality-bars">
+                    <div class="mp-qbar">
+                        <span>Step Completeness</span>
+                        <div class="mp-qbar-track"><div class="mp-qbar-fill" style="width:92%"></div></div>
+                        <span>0.92</span>
+                    </div>
+                    <div class="mp-qbar">
+                        <span>Data Flow Validity</span>
+                        <div class="mp-qbar-track"><div class="mp-qbar-fill" style="width:88%"></div></div>
+                        <span>0.88</span>
+                    </div>
+                    <div class="mp-qbar">
+                        <span>Env Documentation</span>
+                        <div class="mp-qbar-track"><div class="mp-qbar-fill" style="width:95%"></div></div>
+                        <span>0.95</span>
+                    </div>
+                    <div class="mp-qbar">
+                        <span>Setup Runnability</span>
+                        <div class="mp-qbar-track"><div class="mp-qbar-fill" style="width:85%"></div></div>
+                        <span>0.85</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Example Workflows -->
+        <h3 class="mp-wf-examples-title">Featured Workflows</h3>
+        <div class="mp-wf-grid" id="workflowGrid">
+            <!-- Populated by JS -->
+        </div>
+
+        <!-- Workflow Features -->
+        <div class="mp-wf-features">
+            <div class="mp-wf-feat">
+                <div class="mp-wf-feat-icon">&#x1F50D;</div>
+                <h4>Topological Sorting</h4>
+                <p>Steps are ordered by dependency analysis. Cross-script imports and file I/O chains determine execution order automatically.</p>
+            </div>
+            <div class="mp-wf-feat">
+                <div class="mp-wf-feat-icon">&#x1F4CA;</div>
+                <h4>Data Flow Inference</h4>
+                <p>Outputs from one step automatically connect to inputs of the next. Artifact tracking across the entire pipeline.</p>
+            </div>
+            <div class="mp-wf-feat">
+                <div class="mp-wf-feat-icon">&#x1F6E1;&#xFE0F;</div>
+                <h4>Sandbox Validation</h4>
+                <p>Docker-based sandbox testing ensures workflows run correctly before deployment. Isolated execution environment.</p>
+            </div>
+            <div class="mp-wf-feat">
+                <div class="mp-wf-feat-icon">&#x2699;&#xFE0F;</div>
+                <h4>Env Var Merging</h4>
+                <p>All environment variables across steps are collected, deduplicated, and documented. setup.sh validates every requirement.</p>
+            </div>
+            <div class="mp-wf-feat">
+                <div class="mp-wf-feat-icon">&#x23F1;&#xFE0F;</div>
+                <h4>Duration Estimation</h4>
+                <p>Intelligent estimation of total pipeline runtime based on step analysis. Plan resource allocation accurately.</p>
+            </div>
+            <div class="mp-wf-feat">
+                <div class="mp-wf-feat-icon">&#x1F4DD;</div>
+                <h4>Script Generation</h4>
+                <p>Auto-generates run.sh orchestrator, setup.sh validator, SKILL.md documentation, and workflow.md with pipeline diagrams.</p>
+            </div>
+        </div>
+
+        <!-- Compose Command -->
+        <div class="mp-compose-demo">
+            <div class="mp-compose-left">
+                <h3>Compose Workflows in Seconds</h3>
+                <p>Natural language &rarr; validated pipeline. The composer discovers skills across all registries, infers data flow, and generates production-ready scripts.</p>
+                <div class="mp-compose-modes">
+                    <div class="mp-compose-mode">
+                        <span class="mp-compose-flag">--from-skills</span>
+                        <span>Compose from specific installed skills</span>
+                    </div>
+                    <div class="mp-compose-mode">
+                        <span class="mp-compose-flag">--creative</span>
+                        <span>Use all 4 discovery methods for maximum coverage</span>
+                    </div>
+                    <div class="mp-compose-mode">
+                        <span class="mp-compose-flag">--sandbox</span>
+                        <span>Validate in Docker before shipping</span>
+                    </div>
+                    <div class="mp-compose-mode">
+                        <span class="mp-compose-flag">--domain</span>
+                        <span>Scope discovery to a specific domain</span>
+                    </div>
+                </div>
+            </div>
+            <div class="mp-compose-right">
+                <div class="mp-terminal-bar">
+                    <span class="mp-term-dot red"></span>
+                    <span class="mp-term-dot yellow"></span>
+                    <span class="mp-term-dot green"></span>
+                    <span class="mp-term-title">compose</span>
+                </div>
+                <div class="mp-terminal-body mp-compose-terminal">
+                    <div class="mp-term-line"><span class="mp-term-prompt">$</span> agents-cli compose "content creation pipeline" --creative --sandbox</div>
+                    <div class="mp-term-line mp-term-info">&#x279C; Discovering skills across 7 registries...</div>
+                    <div class="mp-term-line mp-term-info">&#x279C; Found 12 compatible skills (semantic + domain + graph)</div>
+                    <div class="mp-term-line mp-term-info">&#x279C; Proposing workflow with TieredLLMClient...</div>
+                    <div class="mp-term-line mp-term-success">&#x2713; Iteration 1/5 &mdash; quality: 0.72</div>
+                    <div class="mp-term-line mp-term-success">&#x2713; Iteration 2/5 &mdash; quality: 0.81</div>
+                    <div class="mp-term-line mp-term-success">&#x2713; Iteration 3/5 &mdash; quality: 0.89 &#x2714;&#xFE0F;</div>
+                    <div class="mp-term-line mp-term-info">&#x279C; Running sandbox validation...</div>
+                    <div class="mp-term-line mp-term-success">&#x2713; All 4 quality axes passed (&ge; 0.5)</div>
+                    <div class="mp-term-line mp-term-info">&#x279C; Generated: SKILL.md, run.sh, setup.sh, workflow.md</div>
+                    <div class="mp-term-line mp-term-highlight">&#x1F389; Workflow "content-creation-pipeline" ready!</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         PRODUCT TYPES — All 7
+         ═══════════════════════════════════════════════════════════════ -->
+    <section class="mp-section" id="products">
+        <div class="mp-section-header">
+            <span class="mp-section-tag">7 PRODUCT TYPES</span>
+            <h2 class="mp-section-title">Build Anything. <span class="mp-text-gradient">Ship Everything.</span></h2>
+            <p class="mp-section-sub">From atomic skills to enterprise agent teams &mdash; every building block for the agentic future.</p>
+        </div>
+
+        <div class="mp-product-types">
+            <div class="mp-ptype" style="--ptype-color: var(--accent-blue)">
+                <div class="mp-ptype-icon">&#x1F4DC;</div>
+                <h4>Skills</h4>
+                <p>Atomic agent capabilities. SKILL.md with frontmatter, references, scripts. Quality-gated with trigger score &ge; 0.80.</p>
+                <span class="mp-ptype-count">393 available</span>
+            </div>
+            <div class="mp-ptype" style="--ptype-color: var(--accent-purple)">
+                <div class="mp-ptype-icon">&#x1F9E9;</div>
+                <h4>Plugins</h4>
+                <p>Claude Code spec compliant. Multi-skill bundles with commands, agents, hooks, and settings. 52 domain plugins generated.</p>
+                <span class="mp-ptype-count">52 domains</span>
+            </div>
+            <div class="mp-ptype" style="--ptype-color: var(--accent-cyan)">
+                <div class="mp-ptype-icon">&#x26A1;</div>
+                <h4>Workflows</h4>
+                <p>Multi-step pipelines. Topological ordering, data flow inference, env var merging. AI-composed or hand-crafted.</p>
+                <span class="mp-ptype-count">6 featured</span>
+            </div>
+            <div class="mp-ptype" style="--ptype-color: var(--accent-orange)">
+                <div class="mp-ptype-icon">&#x1F6E1;</div>
+                <h4>Hook Bundles</h4>
+                <p>Pre/post hooks for 7 event types. Pre-command, post-edit, pre-task, session start/end. Behavioral guardrails.</p>
+                <span class="mp-ptype-count">7 event types</span>
+            </div>
+            <div class="mp-ptype" style="--ptype-color: var(--accent-green)">
+                <div class="mp-ptype-icon">&#x1F916;</div>
+                <h4>Agent Definitions</h4>
+                <p>Autonomous agent personas with system prompts, tool access, and capability boundaries. Markdown-based, composable.</p>
+                <span class="mp-ptype-count">Pro tier</span>
+            </div>
+            <div class="mp-ptype" style="--ptype-color: var(--accent-pink)">
+                <div class="mp-ptype-icon">&#x1F465;</div>
+                <h4>Agent Teams</h4>
+                <p>Multi-agent orchestration. Coordinator + specialist agents with shared context, handoff protocols, and consensus.</p>
+                <span class="mp-ptype-count">Enterprise</span>
+            </div>
+            <div class="mp-ptype" style="--ptype-color: var(--text-secondary)">
+                <div class="mp-ptype-icon">&#x1F4BB;</div>
+                <h4>Harnesses</h4>
+                <p>CLI-Anything generated wrappers. GUI apps exposed as command-line tools with full schema introspection.</p>
+                <span class="mp-ptype-count">Unlimited</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         FEATURES — Premium Value
+         ═══════════════════════════════════════════════════════════════ -->
+    <section class="mp-section mp-section-dark" id="features">
+        <div class="mp-section-header">
+            <span class="mp-section-tag mp-tag-amber">PREMIUM FEATURES</span>
+            <h2 class="mp-section-title">Why <span class="mp-text-amber">Subscribe</span></h2>
+            <p class="mp-section-sub">Every feature is designed for agents-first development. Subscribe to unlock the full power of the platform.</p>
+        </div>
+
+        <div class="mp-features-mega">
+            <!-- Skill Forge -->
+            <div class="mp-mega-card">
+                <div class="mp-mega-icon">&#x1F525;</div>
+                <h3>Skill Forge</h3>
+                <p>3-layer pipeline: structural &rarr; AI-enhanced &rarr; quality-gated. Generate production-grade skills from any tool with deep schema probing, README extraction, and auto-description.</p>
+                <ul class="mp-mega-list">
+                    <li>Deep probe with configurable depth</li>
+                    <li>Trigger score optimization (avg 1.000)</li>
+                    <li>Quality score &ge; 6/10 guaranteed</li>
+                    <li>Content score &ge; 5/10 guaranteed</li>
+                    <li>Factory mode for 3-layer refinement</li>
+                    <li>Batch processing with CSV export</li>
+                </ul>
+                <span class="mp-mega-tier">Starter+</span>
+            </div>
+
+            <!-- Intelligence Layer -->
+            <div class="mp-mega-card mp-mega-featured">
+                <div class="mp-mega-ribbon">MOST POPULAR</div>
+                <div class="mp-mega-icon">&#x1F9E0;</div>
+                <h3>Intelligence Layer</h3>
+                <p>Semantic embeddings, skill graph, 4 discovery methods, and auto-repair. Find related skills, discover composable workflows, and automatically fix quality issues.</p>
+                <ul class="mp-mega-list">
+                    <li>Ollama batch embeddings</li>
+                    <li>sqlite-vec KNN search</li>
+                    <li>4-edge-type skill graph</li>
+                    <li>Semantic + domain + multi-hop + graph traversal discovery</li>
+                    <li>LLM-powered auto-repair (3 retries)</li>
+                    <li>I/O profile extraction</li>
+                </ul>
+                <span class="mp-mega-tier">Pro+</span>
+            </div>
+
+            <!-- Crawl System -->
+            <div class="mp-mega-card">
+                <div class="mp-mega-icon">&#x1F577;&#xFE0F;</div>
+                <h3>Crawl System</h3>
+                <p>Scale discovery across all registries. Adaptive concurrency, exponential backoff, install-analyze-prune cycle. Seed from PyPI, npm, crates, GitHub, and MCP registries.</p>
+                <ul class="mp-mega-list">
+                    <li>Adaptive concurrency (auto CPU detection)</li>
+                    <li>Token bucket rate limiting</li>
+                    <li>Exponential backoff (1min &rarr; 30min)</li>
+                    <li>Install-analyze-prune cycle</li>
+                    <li>Cross-registry seeding</li>
+                    <li>Libraries.io integration</li>
+                </ul>
+                <span class="mp-mega-tier">Pro+</span>
+            </div>
+
+            <!-- MCP Bridge -->
+            <div class="mp-mega-card">
+                <div class="mp-mega-icon">&#x1F310;</div>
+                <h3>MCP Bridge</h3>
+                <p>Expose every installed tool as an MCP-compatible server. Bidirectional: CLI &rarr; MCP and MCP &rarr; CLI. 534 tools available through the bridge.</p>
+                <ul class="mp-mega-list">
+                    <li>Automatic tool exposure</li>
+                    <li>Schema introspection</li>
+                    <li>MCP v1.0 compatible</li>
+                    <li>mcp2cli bidirectional bridge</li>
+                    <li>534+ tools available</li>
+                    <li>Claude Code native integration</li>
+                </ul>
+                <span class="mp-mega-tier">Starter+</span>
+            </div>
+
+            <!-- Hybrid Search -->
+            <div class="mp-mega-card">
+                <div class="mp-mega-icon">&#x1F50D;</div>
+                <h3>Hybrid Search</h3>
+                <p>FTS5 full-text search + sqlite-vec KNN embeddings. Search across skills, workflows, and tools with natural language queries. Domain-scoped filtering.</p>
+                <ul class="mp-mega-list">
+                    <li>FTS5 full-text indexing</li>
+                    <li>sqlite-vec embedding search</li>
+                    <li>Natural language queries</li>
+                    <li>Domain tree filtering</li>
+                    <li>Paginated results</li>
+                    <li>Cross-product-type search</li>
+                </ul>
+                <span class="mp-mega-tier">Starter+</span>
+            </div>
+
+            <!-- Creator Economy -->
+            <div class="mp-mega-card">
+                <div class="mp-mega-icon">&#x1F4B0;</div>
+                <h3>Creator Economy</h3>
+                <p>Publish skills and earn. 80% revenue share to creators. Per-call metering, monthly caps, and enterprise licensing. Your tools, your revenue.</p>
+                <ul class="mp-mega-list">
+                    <li>80/10/10 revenue split</li>
+                    <li>Per-call metering</li>
+                    <li>Monthly subscription caps</li>
+                    <li>Creator dashboard</li>
+                    <li>Earnings tracking</li>
+                    <li>Marketplace publishing</li>
+                </ul>
+                <span class="mp-mega-tier">Pro+</span>
+            </div>
+        </div>
+
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         INTERACTIVE DEMOS
+         ═══════════════════════════════════════════════════════════════ -->
+    <section class="mp-section" id="demos">
+        <div class="mp-section-header">
+            <span class="mp-section-tag mp-tag-cyan">INTERACTIVE</span>
+            <h2 class="mp-section-title">Try It <span class="mp-text-cyan">Live</span></h2>
+            <p class="mp-section-sub">Experience the full power of Agents-CLI right in your browser. Type commands, explore sources, and inspect workflows.</p>
+        </div>
+
+        <div class="mp-demos-grid">
+            <!-- CLI Simulator -->
+            <div class="mp-demo-full">
+                <h3 style="font-family: var(--mp-font-mono); font-size: 1rem; color: var(--mp-cyan, #00d4ff); margin-bottom: 1rem;">&#x1F4BB; Live CLI Simulator</h3>
+                <div class="mp-cli-sim">
+                    <div class="mp-terminal-bar">
+                        <span class="mp-term-dot red"></span>
+                        <span class="mp-term-dot yellow"></span>
+                        <span class="mp-term-dot green"></span>
+                        <span class="mp-term-title">agents-cli simulator</span>
+                    </div>
+                    <div class="mp-cli-sim-body" id="cliSimOutput">
+                        <div class="mp-term-line"><span class="mp-term-info">Welcome to agents-cli simulator. Type 'help' for commands.</span></div>
+                    </div>
+                    <div class="mp-cli-input-line">
+                        <span class="mp-term-prompt">$</span>
+                        <input type="text" id="cliSimInput" class="mp-cli-input" placeholder="Try: help, add pypi:ruff, search &quot;AI workflow&quot;, compose, stats..." autocomplete="off" spellcheck="false">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Source Adapter Picker -->
+            <div>
+                <h3 style="font-family: var(--mp-font-mono); font-size: 1rem; color: var(--mp-cyan, #00d4ff); margin-bottom: 1rem;">&#x1F504; Source Adapter Picker</h3>
+                <div class="mp-adapter-picker">
+                    <div class="mp-adapter-tabs">
+                        <button class="mp-adapter-tab active" data-adapter="github">GitHub</button>
+                        <button class="mp-adapter-tab" data-adapter="npm">npm</button>
+                        <button class="mp-adapter-tab" data-adapter="pypi">PyPI</button>
+                        <button class="mp-adapter-tab" data-adapter="crates">crates</button>
+                        <button class="mp-adapter-tab" data-adapter="cli-anything">CLI-Anything</button>
+                        <button class="mp-adapter-tab" data-adapter="mcp">MCP</button>
+                        <button class="mp-adapter-tab" data-adapter="local">Local</button>
+                    </div>
+                    <div class="mp-adapter-content">
+                        <div class="mp-adapter-pane active" data-adapter="github">
+                            <div class="mp-adapter-cmd">agents-cli add owner/repo</div>
+                            <p style="font-size: 0.85rem; color: #8b949e; margin-bottom: 1rem;">Clones any GitHub repository, detects language, builds from source, and analyzes all CLI entry points.</p>
+                            <div class="mp-adapter-pipeline">
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Clone</div><div class="mp-adapter-step-desc">git clone</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Build</div><div class="mp-adapter-step-desc">npm/cargo/pip</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Probe</div><div class="mp-adapter-step-desc">--help parse</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Generate</div><div class="mp-adapter-step-desc">SKILL.md</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Expose</div><div class="mp-adapter-step-desc">MCP ready</div></div>
+                            </div>
+                        </div>
+                        <div class="mp-adapter-pane" data-adapter="npm">
+                            <div class="mp-adapter-cmd">agents-cli add npm:eslint</div>
+                            <p style="font-size: 0.85rem; color: #8b949e; margin-bottom: 1rem;">Installs from npm registry with full dependency resolution. Detects global binaries and CLI entry points.</p>
+                            <div class="mp-adapter-pipeline">
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Resolve</div><div class="mp-adapter-step-desc">npm registry</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Install</div><div class="mp-adapter-step-desc">npm install</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Analyze</div><div class="mp-adapter-step-desc">bin detection</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Generate</div><div class="mp-adapter-step-desc">SKILL.md</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Expose</div><div class="mp-adapter-step-desc">MCP ready</div></div>
+                            </div>
+                        </div>
+                        <div class="mp-adapter-pane" data-adapter="pypi">
+                            <div class="mp-adapter-cmd">agents-cli add pypi:ruff</div>
+                            <p style="font-size: 0.85rem; color: #8b949e; margin-bottom: 1rem;">Creates isolated venv, installs via pip, detects entry points. Bare names auto-resolve to PyPI.</p>
+                            <div class="mp-adapter-pipeline">
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Resolve</div><div class="mp-adapter-step-desc">PyPI API</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Venv</div><div class="mp-adapter-step-desc">pip install</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Detect</div><div class="mp-adapter-step-desc">entry points</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Generate</div><div class="mp-adapter-step-desc">SKILL.md</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Expose</div><div class="mp-adapter-step-desc">MCP ready</div></div>
+                            </div>
+                        </div>
+                        <div class="mp-adapter-pane" data-adapter="crates">
+                            <div class="mp-adapter-cmd">agents-cli add crates:ripgrep</div>
+                            <p style="font-size: 0.85rem; color: #8b949e; margin-bottom: 1rem;">Compiles Rust crates natively. Parses Cargo.toml for multi-binary support. Zero-cost performance.</p>
+                            <div class="mp-adapter-pipeline">
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Resolve</div><div class="mp-adapter-step-desc">crates.io</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Build</div><div class="mp-adapter-step-desc">cargo build</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Parse</div><div class="mp-adapter-step-desc">Cargo.toml</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Generate</div><div class="mp-adapter-step-desc">SKILL.md</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Expose</div><div class="mp-adapter-step-desc">MCP ready</div></div>
+                            </div>
+                        </div>
+                        <div class="mp-adapter-pane" data-adapter="cli-anything">
+                            <div class="mp-adapter-cmd">agents-cli add cli-anything:blender</div>
+                            <p style="font-size: 0.85rem; color: #8b949e; margin-bottom: 1rem;">Wraps ANY desktop application with AI-generated CLI bindings. GUI → CLI transformation.</p>
+                            <div class="mp-adapter-pipeline">
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Profile</div><div class="mp-adapter-step-desc">app analysis</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Harness</div><div class="mp-adapter-step-desc">AI bindings</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Test</div><div class="mp-adapter-step-desc">smoke test</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Generate</div><div class="mp-adapter-step-desc">SKILL.md</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Expose</div><div class="mp-adapter-step-desc">MCP ready</div></div>
+                            </div>
+                        </div>
+                        <div class="mp-adapter-pane" data-adapter="mcp">
+                            <div class="mp-adapter-cmd">agents-cli add mcp:filesystem</div>
+                            <p style="font-size: 0.85rem; color: #8b949e; margin-bottom: 1rem;">Introspects MCP servers, extracts tool schemas, generates CLI wrappers. Bidirectional bridge.</p>
+                            <div class="mp-adapter-pipeline">
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Connect</div><div class="mp-adapter-step-desc">MCP server</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Introspect</div><div class="mp-adapter-step-desc">tool schemas</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Wrap</div><div class="mp-adapter-step-desc">CLI binding</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Generate</div><div class="mp-adapter-step-desc">SKILL.md</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Expose</div><div class="mp-adapter-step-desc">MCP ready</div></div>
+                            </div>
+                        </div>
+                        <div class="mp-adapter-pane" data-adapter="local">
+                            <div class="mp-adapter-cmd">agents-cli add ./my-internal-tool</div>
+                            <p style="font-size: 0.85rem; color: #8b949e; margin-bottom: 1rem;">Analyze any local directory. No upload needed. Perfect for private tools and enterprise repos.</p>
+                            <div class="mp-adapter-pipeline">
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Scan</div><div class="mp-adapter-step-desc">local dir</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Detect</div><div class="mp-adapter-step-desc">entry points</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Analyze</div><div class="mp-adapter-step-desc">--help parse</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Generate</div><div class="mp-adapter-step-desc">SKILL.md</div></div>
+                                <span class="mp-adapter-arrow">→</span>
+                                <div class="mp-adapter-step"><div class="mp-adapter-step-name">Expose</div><div class="mp-adapter-step-desc">MCP ready</div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Workflow Builder Preview -->
+            <div>
+                <h3 style="font-family: var(--mp-font-mono); font-size: 1rem; color: var(--mp-cyan, #00d4ff); margin-bottom: 1rem;">&#x26A1; Workflow Inspector</h3>
+                <div class="mp-wf-builder">
+                    <div class="mp-wf-builder-title">Content Creation Pipeline — Hover to inspect</div>
+                    <div class="mp-wf-builder-dag" id="workflowBuilderDag">
+                        <div class="mp-wf-builder-node" data-step="scout">
+                            <div class="mp-wf-builder-tooltip">
+                                <strong>Tool:</strong> web-scout<br>
+                                <strong>Command:</strong> scout --trending --limit 10<br>
+                                <strong>Env:</strong> SCOUT_API_KEY
+                            </div>
+                            <span class="mp-wf-builder-node-icon">&#x1F50D;</span>
+                            <span class="mp-wf-builder-node-name">Scout</span>
+                            <span class="mp-wf-builder-node-tool">web-scout</span>
+                        </div>
+                        <div class="mp-wf-builder-connector"></div>
+                        <div class="mp-wf-builder-node" data-step="write">
+                            <div class="mp-wf-builder-tooltip">
+                                <strong>Tool:</strong> ghostwriter<br>
+                                <strong>Command:</strong> write --tone professional<br>
+                                <strong>Env:</strong> OPENAI_API_KEY
+                            </div>
+                            <span class="mp-wf-builder-node-icon">&#x270D;&#xFE0F;</span>
+                            <span class="mp-wf-builder-node-name">Write</span>
+                            <span class="mp-wf-builder-node-tool">ghostwriter</span>
+                        </div>
+                        <div class="mp-wf-builder-connector"></div>
+                        <div class="mp-wf-builder-node" data-step="image">
+                            <div class="mp-wf-builder-tooltip">
+                                <strong>Tool:</strong> dalle-cli<br>
+                                <strong>Command:</strong> generate --style editorial<br>
+                                <strong>Env:</strong> OPENAI_API_KEY
+                            </div>
+                            <span class="mp-wf-builder-node-icon">&#x1F5BC;&#xFE0F;</span>
+                            <span class="mp-wf-builder-node-name">Image</span>
+                            <span class="mp-wf-builder-node-tool">dalle-cli</span>
+                        </div>
+                        <div class="mp-wf-builder-connector"></div>
+                        <div class="mp-wf-builder-node" data-step="publish">
+                            <div class="mp-wf-builder-tooltip">
+                                <strong>Tool:</strong> cms-push<br>
+                                <strong>Command:</strong> publish --platform wordpress<br>
+                                <strong>Env:</strong> WP_API_TOKEN
+                            </div>
+                            <span class="mp-wf-builder-node-icon">&#x1F4E4;</span>
+                            <span class="mp-wf-builder-node-name">Publish</span>
+                            <span class="mp-wf-builder-node-tool">cms-push</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         BROWSE — Live Marketplace Grid
+         ═══════════════════════════════════════════════════════════════ -->
+    <section class="mp-section" id="browse">
+        <div class="mp-section-header">
+            <span class="mp-section-tag">BROWSE</span>
+            <h2 class="mp-section-title">Explore the <span class="mp-text-gradient">Catalog</span></h2>
+        </div>
+
+        <div class="mp-browse-controls">
+            <div class="mp-browse-search">
+                <span class="mp-search-icon">&#x1F50D;</span>
+                <input type="text" id="mpSearchInput" class="mp-search-input" placeholder="Search tools, skills, workflows...">
+            </div>
+            <div class="mp-browse-tabs" id="mpTypeTabs">
+                <button class="mp-tab active" data-type="all">All</button>
+                <button class="mp-tab" data-type="workflow">&#x26A1; Workflows</button>
+                <button class="mp-tab" data-type="skill">Skills</button>
+                <button class="mp-tab" data-type="plugin">Plugins</button>
+                <button class="mp-tab" data-type="agent-def">Agents</button>
+                <button class="mp-tab" data-type="harness">Harnesses</button>
+            </div>
+            <div class="mp-browse-meta">
+                <span id="mpResultCount">Loading...</span>
+                <select id="mpSortSelect" class="mp-sort-select">
+                    <option value="quality">Quality</option>
+                    <option value="name">Name</option>
+                    <option value="downloads">Downloads</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="mp-browse-layout">
+            <!-- Domain Sidebar -->
+            <aside class="mp-domain-sidebar" id="mpDomainSidebar">
+                <h4 class="mp-sidebar-title">Domains</h4>
+                <ul class="mp-domain-list" id="mpDomainList">
+                    <!-- Populated by JS -->
+                </ul>
+            </aside>
+
+            <!-- Product Grid -->
+            <div class="mp-browse-main">
+                <div class="mp-browse-grid" id="mpProductGrid">
+                    <!-- Populated by JS -->
+                </div>
+
+                <!-- Infinite Scroll Sentinel -->
+                <div id="mpScrollSentinel" class="mp-scroll-sentinel">
+                    <span class="mp-loading-spinner"></span>
+                    <span>Loading more...</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="mp-browse-cta">
+            <p>Want more? <a href="#pricing" class="mp-link-accent">Subscribe</a> to unlock unlimited installs, premium sources, and workflow execution.</p>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         PRICING — Subscription Tiers
+         ═══════════════════════════════════════════════════════════════ -->
+    <section class="mp-section mp-section-dark" id="pricing">
+        <div class="mp-section-header">
+            <span class="mp-section-tag mp-tag-green">50% OFF LAUNCH</span>
+            <h2 class="mp-section-title">Choose Your <span class="mp-text-gradient">Plan</span></h2>
+            <p class="mp-section-sub">Start free. Scale as you build. Every plan includes the core marketplace.</p>
+        </div>
+
+        <div class="mp-pricing-grid">
+            <!-- Free -->
+            <div class="mp-price-card">
+                <h3 class="mp-price-name">Free</h3>
+                <div class="mp-price-amount">
+                    <span class="mp-price-currency">$</span>
+                    <span class="mp-price-value">0</span>
+                    <span class="mp-price-period">/forever</span>
+                </div>
+                <ul class="mp-price-features">
+                    <li class="mp-price-included">3 installs/month</li>
+                    <li class="mp-price-included">GitHub, npm, PyPI, crates, local sources</li>
+                    <li class="mp-price-included">Basic skill generation</li>
+                    <li class="mp-price-included">MCP bridge (read-only)</li>
+                    <li class="mp-price-included">Community support</li>
+                    <li class="mp-price-excluded">CLI-Anything</li>
+                    <li class="mp-price-excluded">MCP-to-CLI</li>
+                    <li class="mp-price-excluded">Workflow execution</li>
+                    <li class="mp-price-excluded">Intelligence layer</li>
+                    <li class="mp-price-excluded">Creator economy</li>
+                </ul>
+                <a href="/" class="mp-btn mp-btn-outline mp-btn-block">Current Plan</a>
+            </div>
+
+            <!-- Starter -->
+            <div class="mp-price-card">
+                <h3 class="mp-price-name">Starter</h3>
+                <div class="mp-price-amount">
+                    <span class="mp-price-original">$29</span>
+                    <span class="mp-price-currency">$</span>
+                    <span class="mp-price-value mp-price-promo">14.99</span>
+                    <span class="mp-price-period">/mo</span>
+                </div>
+                <ul class="mp-price-features">
+                    <li class="mp-price-included">50 installs/month</li>
+                    <li class="mp-price-included">All 7 source registries</li>
+                    <li class="mp-price-included">CLI-Anything adapter</li>
+                    <li class="mp-price-included">MCP-to-CLI bridge</li>
+                    <li class="mp-price-included">5 workflow installs/month</li>
+                    <li class="mp-price-included">Skill Forge (structural)</li>
+                    <li class="mp-price-included">MCP bridge (full)</li>
+                    <li class="mp-price-included">Hybrid search</li>
+                    <li class="mp-price-excluded">Intelligence layer</li>
+                    <li class="mp-price-excluded">Publish to marketplace</li>
+                </ul>
+                <button class="mp-btn mp-btn-primary mp-btn-block" data-price-id="price_1TAumR2QpzdUwTFgUWWQsbTe">Subscribe</button>
+            </div>
+
+            <!-- Pro -->
+            <div class="mp-price-card mp-price-featured">
+                <div class="mp-price-ribbon">BEST VALUE</div>
+                <h3 class="mp-price-name">Pro</h3>
+                <div class="mp-price-amount">
+                    <span class="mp-price-original">$79</span>
+                    <span class="mp-price-currency">$</span>
+                    <span class="mp-price-value mp-price-promo">39.99</span>
+                    <span class="mp-price-period">/mo</span>
+                </div>
+                <ul class="mp-price-features">
+                    <li class="mp-price-included">500 installs/month</li>
+                    <li class="mp-price-included">Everything in Starter</li>
+                    <li class="mp-price-included">Unlimited workflow execution</li>
+                    <li class="mp-price-included">Publish skills &amp; workflows</li>
+                    <li class="mp-price-included">Intelligence layer (embeddings + graph)</li>
+                    <li class="mp-price-included">Crawl system</li>
+                    <li class="mp-price-included">Auto-repair (LLM-powered)</li>
+                    <li class="mp-price-included">Creator economy (80% rev share)</li>
+                    <li class="mp-price-included">Priority support</li>
+                    <li class="mp-price-included">Agent definitions access</li>
+                </ul>
+                <button class="mp-btn mp-btn-primary mp-btn-block mp-btn-glow" data-price-id="price_1TAumW2QpzdUwTFgMyJIn89A">Subscribe</button>
+            </div>
+
+            <!-- Enterprise -->
+            <div class="mp-price-card">
+                <h3 class="mp-price-name">Enterprise</h3>
+                <div class="mp-price-amount">
+                    <span class="mp-price-original">$199</span>
+                    <span class="mp-price-currency">$</span>
+                    <span class="mp-price-value mp-price-promo">99</span>
+                    <span class="mp-price-period">/mo</span>
+                </div>
+                <ul class="mp-price-features">
+                    <li class="mp-price-included">Unlimited everything</li>
+                    <li class="mp-price-included">Everything in Pro</li>
+                    <li class="mp-price-included">Agent Teams (multi-agent)</li>
+                    <li class="mp-price-included">Private registry</li>
+                    <li class="mp-price-included">Air-gapped deployment</li>
+                    <li class="mp-price-included">Custom domain plugins</li>
+                    <li class="mp-price-included">SLA + dedicated support</li>
+                    <li class="mp-price-included">SSO / SAML</li>
+                    <li class="mp-price-included">Audit logs</li>
+                    <li class="mp-price-included">Custom integrations</li>
+                </ul>
+                <button class="mp-btn mp-btn-outline mp-btn-block" data-price-id="price_1TAumX2QpzdUwTFgDDWYS4V8">Subscribe</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         COMPARISON TABLE
+         ═══════════════════════════════════════════════════════════════ -->
+    <section class="mp-section" id="comparison">
+        <div class="mp-section-header">
+            <h2 class="mp-section-title">Feature <span class="mp-text-gradient">Comparison</span></h2>
+        </div>
+        <div class="mp-comparison-wrapper">
+            <table class="mp-comparison-table">
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th>Free</th>
+                        <th>Starter</th>
+                        <th class="mp-comp-highlight">Pro</th>
+                        <th>Enterprise</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Monthly installs</td><td>3</td><td>50</td><td class="mp-comp-highlight">500</td><td>&infin;</td>
+                    </tr>
+                    <tr>
+                        <td>GitHub source</td><td>&#x2705;</td><td>&#x2705;</td><td class="mp-comp-highlight">&#x2705;</td><td>&#x2705;</td>
+                    </tr>
+                    <tr>
+                        <td>npm source</td><td>&#x2705;</td><td>&#x2705;</td><td class="mp-comp-highlight">&#x2705;</td><td>&#x2705;</td>
+                    </tr>
+                    <tr>
+                        <td>PyPI source</td><td>&#x2705;</td><td>&#x2705;</td><td class="mp-comp-highlight">&#x2705;</td><td>&#x2705;</td>
+                    </tr>
+                    <tr>
+                        <td>crates.io source</td><td>&#x2705;</td><td>&#x2705;</td><td class="mp-comp-highlight">&#x2705;</td><td>&#x2705;</td>
+                    </tr>
+                    <tr>
+                        <td>Local source</td><td>&#x2705;</td><td>&#x2705;</td><td class="mp-comp-highlight">&#x2705;</td><td>&#x2705;</td>
+                    </tr>
+                    <tr class="mp-comp-divider">
+                        <td>CLI-Anything</td><td>&#x274C;</td><td>&#x2705;</td><td class="mp-comp-highlight">&#x2705;</td><td>&#x2705;</td>
+                    </tr>
+                    <tr>
+                        <td>MCP-to-CLI bridge</td><td>&#x274C;</td><td>&#x2705;</td><td class="mp-comp-highlight">&#x2705;</td><td>&#x2705;</td>
+                    </tr>
+                    <tr class="mp-comp-divider">
+                        <td>Workflow view</td><td>View only</td><td>5/mo</td><td class="mp-comp-highlight">&infin;</td><td>&infin;</td>
+                    </tr>
+                    <tr>
+                        <td>Workflow compose</td><td>&#x274C;</td><td>&#x274C;</td><td class="mp-comp-highlight">&#x2705;</td><td>&#x2705;</td>
+                    </tr>
+                    <tr>
+                        <td>Workflow publish</td><td>&#x274C;</td><td>&#x274C;</td><td class="mp-comp-highlight">&#x2705;</td><td>&#x2705;</td>
+                    </tr>
+                    <tr class="mp-comp-divider">
+                        <td>Skill Forge</td><td>Basic</td><td>Structural</td><td class="mp-comp-highlight">3-layer + AI</td><td>3-layer + AI</td>
+                    </tr>
+                    <tr>
+                        <td>Intelligence layer</td><td>&#x274C;</td><td>&#x274C;</td><td class="mp-comp-highlight">&#x2705;</td><td>&#x2705;</td>
+                    </tr>
+                    <tr>
+                        <td>Crawl system</td><td>&#x274C;</td><td>&#x274C;</td><td class="mp-comp-highlight">&#x2705;</td><td>&#x2705;</td>
+                    </tr>
+                    <tr>
+                        <td>Hybrid search</td><td>FTS only</td><td>&#x2705;</td><td class="mp-comp-highlight">&#x2705;</td><td>&#x2705;</td>
+                    </tr>
+                    <tr class="mp-comp-divider">
+                        <td>MCP bridge</td><td>Read-only</td><td>Full</td><td class="mp-comp-highlight">Full</td><td>Full</td>
+                    </tr>
+                    <tr>
+                        <td>Publish to marketplace</td><td>&#x274C;</td><td>&#x274C;</td><td class="mp-comp-highlight">&#x2705;</td><td>&#x2705;</td>
+                    </tr>
+                    <tr>
+                        <td>Creator revenue (80%)</td><td>&#x274C;</td><td>&#x274C;</td><td class="mp-comp-highlight">&#x2705;</td><td>&#x2705;</td>
+                    </tr>
+                    <tr class="mp-comp-divider">
+                        <td>Agent definitions</td><td>&#x274C;</td><td>&#x274C;</td><td class="mp-comp-highlight">&#x2705;</td><td>&#x2705;</td>
+                    </tr>
+                    <tr>
+                        <td>Agent teams</td><td>&#x274C;</td><td>&#x274C;</td><td class="mp-comp-highlight">&#x274C;</td><td>&#x2705;</td>
+                    </tr>
+                    <tr>
+                        <td>Private registry</td><td>&#x274C;</td><td>&#x274C;</td><td class="mp-comp-highlight">&#x274C;</td><td>&#x2705;</td>
+                    </tr>
+                    <tr>
+                        <td>SSO / SAML</td><td>&#x274C;</td><td>&#x274C;</td><td class="mp-comp-highlight">&#x274C;</td><td>&#x2705;</td>
+                    </tr>
+                    <tr>
+                        <td>Support</td><td>Community</td><td>Email</td><td class="mp-comp-highlight">Priority</td><td>Dedicated + SLA</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         FINAL CTA
+         ═══════════════════════════════════════════════════════════════ -->
+    <section class="mp-final-cta">
+        <div class="mp-cta-inner">
+            <h2>Ready to build the future?</h2>
+            <p>Join thousands of developers using Agents-CLI to bridge the gap between tools and AI agents.</p>
+            <div class="mp-cta-actions">
+                <button class="mp-btn mp-btn-primary mp-btn-xl" data-price-id="price_1TAumW2QpzdUwTFgMyJIn89A">
+                    Start with Pro &mdash; $39.99/mo
+                </button>
+                <a href="/" class="mp-btn mp-btn-ghost mp-btn-xl">Explore Free Plan</a>
+            </div>
+            <div class="mp-cta-trust">
+                <span>&#x1F512; Secure checkout via Stripe</span>
+                <span>&#x1F4B3; Cancel anytime</span>
+                <span>&#x26A1; Instant access</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         FOOTER
+         ═══════════════════════════════════════════════════════════════ -->
+    <footer class="mp-footer">
+        <div class="mp-footer-inner">
+            <div class="mp-footer-brand">
+                <span class="mp-brand-text">Agents<span class="mp-brand-accent">-CLI</span></span>
+                <p>The universal package manager for AI agent tools.</p>
+            </div>
+            <div class="mp-footer-links">
+                <div>
+                    <h4>Product</h4>
+                    <a href="#sources">Sources</a>
+                    <a href="#workflows">Workflows</a>
+                    <a href="#features">Features</a>
+                    <a href="#pricing">Pricing</a>
+                </div>
+                <div>
+                    <h4>Resources</h4>
+                    <a href="/">Documentation</a>
+                    <a href="/">API Reference</a>
+                    <a href="/">Changelog</a>
+                    <a href="/">Status</a>
+                </div>
+                <div>
+                    <h4>Company</h4>
+                    <a href="/">About</a>
+                    <a href="/">Privacy</a>
+                    <a href="/">Terms</a>
+                    <a href="/">Contact</a>
+                </div>
+            </div>
+        </div>
+        <div class="mp-footer-bottom">
+            <span>&copy; 2026 Agents-CLI. All rights reserved.</span>
+        </div>
+    </footer>
+
+    <!-- Product Detail Overlay (reused) -->
+    <div class="modal-overlay" id="productDetailOverlay"></div>
+    <div class="glass-card product-detail-panel" id="productDetailPanel"></div>
+
+    <script type="module" src="js/marketplace-page.js"></script>
+</body>
+</html>

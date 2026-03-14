@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Agents-CLI SaaS Platform</title>
     <link rel="stylesheet" href="css/styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <!-- Clerk publishable key — set via Vercel env var CLERK_PUBLISHABLE_KEY
          or override inline: window.__CLERK_KEY = 'pk_live_...' -->
     <script>window.__CLERK_KEY = window.__CLERK_KEY || null;</script>
@@ -35,6 +35,7 @@
             <ul class="nav-links">
                 <li><a href="#features" class="nav-link">Features</a></li>
                 <li><a href="#marketplace" class="nav-link">Marketplace</a></li>
+                <li><a href="/marketplace" class="nav-link">Full Marketplace</a></li>
                 <li><a href="#pricing" class="nav-link">Pricing</a></li>
                 <li><a href="#docs" class="nav-link">Documentation</a></li>
                 <li><a href="/admin" id="adminNavLink" class="nav-link" style="display:none">Admin</a></li>
@@ -129,8 +130,8 @@
                     </div>
                     <div class="feature-card glass-card">
                         <div class="feature-icon">&#x1F4E6;</div>
-                        <h3>6 Product Types</h3>
-                        <p>Skills, Plugins, Hook Bundles, Agent Definitions, Agent Teams, and Harnesses. Publish to the marketplace with 80/20 revenue split.</p>
+                        <h3>7 Product Types</h3>
+                        <p>Skills, Plugins, Hook Bundles, Agent Definitions, Agent Teams, Harnesses, and Workflows. Publish to the marketplace with 80/20 revenue split.</p>
                     </div>
                     <div class="feature-card glass-card">
                         <div class="feature-icon">&#x1F4C8;</div>
@@ -217,6 +218,120 @@ Result: Success 200 OK</code></pre>
             </div>
         </section>
 
+        <!-- Workflow Showcase Section -->
+        <section id="workflowShowcase" class="workflow-showcase-section">
+            <div class="container text-center">
+                <span class="showcase-badge glass">NEW — Workflow Pipelines</span>
+                <h2 class="section-title" style="margin-top:16px">Ship 10x Faster with <span class="text-gradient">Pre-Built Pipelines</span></h2>
+                <p class="section-description">Chain tools into automated multi-step workflows. From RAG pipelines to security audits — orchestrate your entire agent stack in one click.</p>
+
+                <div class="showcase-pipeline glass-card">
+                    <div class="showcase-pipeline-inner">
+                        <div class="showcase-node">
+                            <span class="showcase-node-icon">&#128229;</span>
+                            <span class="showcase-node-label">Ingest</span>
+                        </div>
+                        <div class="showcase-connector">
+                            <div class="showcase-connector-line wf-pulse"></div>
+                            <span class="showcase-connector-label">raw docs</span>
+                        </div>
+                        <div class="showcase-node">
+                            <span class="showcase-node-icon">&#128202;</span>
+                            <span class="showcase-node-label">Embed</span>
+                        </div>
+                        <div class="showcase-connector">
+                            <div class="showcase-connector-line wf-pulse"></div>
+                            <span class="showcase-connector-label">vectors</span>
+                        </div>
+                        <div class="showcase-node">
+                            <span class="showcase-node-icon">&#128199;</span>
+                            <span class="showcase-node-label">Index</span>
+                        </div>
+                        <div class="showcase-connector">
+                            <div class="showcase-connector-line wf-pulse"></div>
+                            <span class="showcase-connector-label">search index</span>
+                        </div>
+                        <div class="showcase-node">
+                            <span class="showcase-node-icon">&#10067;</span>
+                            <span class="showcase-node-label">Query</span>
+                        </div>
+                    </div>
+                    <div class="showcase-pipeline-footer">
+                        <span class="showcase-tier-badge">Requires Starter Plan</span>
+                        <a href="#pricing" class="btn btn-primary btn-sm shine">Unlock Workflows</a>
+                    </div>
+                </div>
+
+                <div class="showcase-grid">
+                    <div class="showcase-workflow-card glass-card">
+                        <div class="showcase-card-header">
+                            <span class="showcase-card-icon">&#129302;</span>
+                            <div>
+                                <h4>RAG Pipeline</h4>
+                                <span class="showcase-card-meta">4 steps &middot; ~5min</span>
+                            </div>
+                        </div>
+                        <p class="showcase-card-desc">Ingest, embed, index, and query documents with retrieval-augmented generation.</p>
+                        <div class="wf-mini-pipeline">
+                            <span class="wf-step">ingest</span><span class="wf-arrow wf-pulse">&#8594;</span>
+                            <span class="wf-step">embed</span><span class="wf-arrow wf-pulse">&#8594;</span>
+                            <span class="wf-step">index</span><span class="wf-arrow wf-pulse">&#8594;</span>
+                            <span class="wf-step">query</span>
+                        </div>
+                        <div class="showcase-card-stats">
+                            <span>342 dl</span>
+                            <span>&#9733; 4.6</span>
+                            <a href="#marketplace" class="showcase-explore">Explore &#8594;</a>
+                        </div>
+                    </div>
+
+                    <div class="showcase-workflow-card glass-card">
+                        <div class="showcase-card-header">
+                            <span class="showcase-card-icon">&#128737;</span>
+                            <div>
+                                <h4>Security Audit</h4>
+                                <span class="showcase-card-meta">4 steps &middot; ~5min</span>
+                            </div>
+                        </div>
+                        <p class="showcase-card-desc">Scan dependencies, lint secrets, audit configs, and generate compliance reports.</p>
+                        <div class="wf-mini-pipeline">
+                            <span class="wf-step">scan</span><span class="wf-arrow wf-pulse">&#8594;</span>
+                            <span class="wf-step">lint</span><span class="wf-arrow wf-pulse">&#8594;</span>
+                            <span class="wf-step">audit</span><span class="wf-arrow wf-pulse">&#8594;</span>
+                            <span class="wf-step">report</span>
+                        </div>
+                        <div class="showcase-card-stats">
+                            <span>567 dl</span>
+                            <span>&#9733; 4.7</span>
+                            <a href="#marketplace" class="showcase-explore">Explore &#8594;</a>
+                        </div>
+                    </div>
+
+                    <div class="showcase-workflow-card glass-card">
+                        <div class="showcase-card-header">
+                            <span class="showcase-card-icon">&#9989;</span>
+                            <div>
+                                <h4>Code Quality Gate</h4>
+                                <span class="showcase-card-meta">4 steps &middot; ~3min</span>
+                            </div>
+                        </div>
+                        <p class="showcase-card-desc">Lint, format, test, and validate — block merges until every gate passes.</p>
+                        <div class="wf-mini-pipeline">
+                            <span class="wf-step">lint</span><span class="wf-arrow wf-pulse">&#8594;</span>
+                            <span class="wf-step">format</span><span class="wf-arrow wf-pulse">&#8594;</span>
+                            <span class="wf-step">test</span><span class="wf-arrow wf-pulse">&#8594;</span>
+                            <span class="wf-step">validate</span>
+                        </div>
+                        <div class="showcase-card-stats">
+                            <span>891 dl</span>
+                            <span>&#9733; 4.8</span>
+                            <a href="#marketplace" class="showcase-explore">Explore &#8594;</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- Marketplace Section -->
         <section id="marketplace" class="marketplace-section">
             <div class="container">
@@ -273,6 +388,7 @@ Result: Success 200 OK</code></pre>
                             <!-- Product Type Tabs -->
                             <div class="product-type-tabs">
                                 <button class="product-type-tab active" data-type="all">All</button>
+                                <button class="product-type-tab workflow-tab" data-type="workflow">&#x26A1; Workflows <span class="new-badge">NEW</span></button>
                                 <button class="product-type-tab" data-type="skill">Skills</button>
                                 <button class="product-type-tab" data-type="plugin">Plugins</button>
                                 <button class="product-type-tab" data-type="hook-bundle">Hook Bundles</button>
@@ -293,8 +409,21 @@ Result: Success 200 OK</code></pre>
                                 <span id="resultCount">Loading...</span>
                             </div>
 
-                            <div class="plugin-grid" id="productGrid">
-                                <!-- Dynamic product cards rendered by marketplace.js -->
+                            <div class="marketplace-content-wrapper">
+                                <aside class="faceted-sidebar">
+                                    <h4 class="sidebar-heading">Domains</h4>
+                                    <div class="domain-tree">
+                                        <!-- Dynamic domain tree rendered by marketplace.js -->
+                                    </div>
+                                </aside>
+                                <div class="marketplace-main">
+                                    <div class="plugin-grid" id="productGrid">
+                                        <!-- Dynamic product cards rendered by marketplace.js -->
+                                    </div>
+                                    <div class="infinite-scroll-trigger">
+                                        <div class="infinite-scroll-loader"></div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -539,9 +668,9 @@ Authorization: Bearer ***</code></pre></div>
                         <div class="value-example">10 tools = <strong>$49.90</strong></div>
                     </div>
                     <div class="value-card glass-card value-card-highlight">
-                        <div class="savings-badge">Save 40%+</div>
+                        <div class="savings-badge">&#x1F525; 50% OFF Launch</div>
                         <h4>Starter Plan</h4>
-                        <div class="value-price">$29 <span>/ month</span></div>
+                        <div class="value-price"><s style="color:var(--text-muted);font-size:0.7em">$29</s> $14.99 <span>/ month</span></div>
                         <ul class="value-list">
                             <li>15 tools included</li>
                             <li>Auto-updates &amp; support</li>
@@ -552,7 +681,7 @@ Authorization: Bearer ***</code></pre></div>
                     </div>
                     <div class="value-card glass-card">
                         <h4>Pro Plan</h4>
-                        <div class="value-price">$79 <span>/ month</span></div>
+                        <div class="value-price"><s style="color:var(--text-muted);font-size:0.7em">$79</s> $39.99 <span>/ month</span></div>
                         <ul class="value-list">
                             <li>Unlimited tools</li>
                             <li>Agent defs &amp; deep analysis</li>
@@ -577,6 +706,7 @@ Authorization: Bearer ***</code></pre></div>
                             <tr><td>Skills access</td><td>Free only</td><td>All skills</td><td>All + agents</td></tr>
                             <tr><td>SKILL.md generation</td><td>Manual</td><td>Auto</td><td>AI-enhanced</td></tr>
                             <tr><td>MCP Bridge tools</td><td>5</td><td>15</td><td>Unlimited</td></tr>
+                            <tr><td>Workflow pipelines</td><td>View only</td><td>5/month</td><td>Unlimited</td></tr>
                             <tr><td>Plugin publishing</td><td>&#x2717;</td><td>&#x2713;</td><td>&#x2713;</td></tr>
                             <tr><td>Agent definitions</td><td>&#x2717;</td><td>&#x2717;</td><td>&#x2713;</td></tr>
                         </tbody>
@@ -591,6 +721,12 @@ Authorization: Bearer ***</code></pre></div>
                 <div class="section-header text-center">
                     <h2 class="section-title">Unlock Agentic Scale</h2>
                     <p class="section-description">Choose the intelligence tier that fits your workflow. From pure exploration to full architectural rewriting.</p>
+
+                    <div class="launch-promo-banner glass">
+                        <span class="promo-flame">&#x1F525;</span>
+                        <span class="promo-text">Launch Special — <strong>50% OFF</strong> all plans</span>
+                        <span class="promo-timer">Limited time</span>
+                    </div>
 
                     <div class="billing-toggle glass">
                         <button class="toggle-btn active" data-billing="monthly">Monthly</button>
@@ -622,19 +758,24 @@ Authorization: Bearer ***</code></pre></div>
                     <div class="pricing-card glass-card pop">
                         <div class="tier-header">
                             <div class="tier-badge">Most Popular</div>
+                            <span class="promo-ribbon">50% OFF</span>
                             <h3 class="tier-name">Starter</h3>
                             <p class="tier-desc">Fast daily automation</p>
-                            <div class="tier-price">
-                                <span class="currency">$</span><span class="amount" data-monthly="29" data-yearly="24">29</span><span class="period">/mo</span>
+                            <div class="tier-price-promo">
+                                <span class="price-original"><span class="currency">$</span>29<span class="period">/mo</span></span>
+                                <div class="tier-price">
+                                    <span class="currency">$</span><span class="amount promo-amount" data-monthly="14.99" data-yearly="11.99">14.99</span><span class="period">/mo</span>
+                                </div>
                             </div>
                         </div>
                         <div class="tier-body">
-                            <button class="btn btn-primary btn-block shine" id="starterPricingBtn" data-price-id="price_1TAsLJ2QpzdUwTFgn4OhkLig">Subscribe Now</button>
+                            <button class="btn btn-primary btn-block shine" id="starterPricingBtn" data-price-id="price_1TAumR2QpzdUwTFgUWWQsbTe">Subscribe Now</button>
                             <ul class="feature-list">
                                 <li><i class="icon-check">&#x2713;</i> 15 tools, 20 daily generations</li>
                                 <li><i class="icon-check">&#x2713;</i> Natural language tool discovery</li>
                                 <li><i class="icon-check">&#x2713;</i> Auto-generated SKILL.md files</li>
                                 <li><i class="icon-check">&#x2713;</i> Plugin publishing</li>
+                                <li><i class="icon-check">&#x2713;</i> 5 workflow runs / month</li>
                                 <li><i class="icon-check">&#x2713;</i> MCP Bridge (up to 15 tools)</li>
                             </ul>
                         </div>
@@ -642,19 +783,24 @@ Authorization: Bearer ***</code></pre></div>
 
                     <div class="pricing-card glass-card premium">
                         <div class="tier-header">
+                            <span class="promo-ribbon">50% OFF</span>
                             <h3 class="tier-name">Pro</h3>
                             <p class="tier-desc">Complex multi-tool workflows</p>
-                            <div class="tier-price">
-                                <span class="currency">$</span><span class="amount" data-monthly="79" data-yearly="63">79</span><span class="period">/mo</span>
+                            <div class="tier-price-promo">
+                                <span class="price-original"><span class="currency">$</span>79<span class="period">/mo</span></span>
+                                <div class="tier-price">
+                                    <span class="currency">$</span><span class="amount promo-amount" data-monthly="39.99" data-yearly="31.99">39.99</span><span class="period">/mo</span>
+                                </div>
                             </div>
                         </div>
                         <div class="tier-body">
-                            <button class="btn btn-primary btn-block" data-price-id="price_1TAsLK2QpzdUwTFgqe4HP5Jh" id="proPricingBtn">Start Pro Trial</button>
+                            <button class="btn btn-primary btn-block" data-price-id="price_1TAumW2QpzdUwTFgMyJIn89A" id="proPricingBtn">Start Pro Trial</button>
                             <ul class="feature-list">
                                 <li><i class="icon-check">&#x2713;</i> 50 tools, 100 daily generations</li>
                                 <li><i class="icon-check">&#x2713;</i> Deep analysis &amp; AI generation</li>
                                 <li><i class="icon-check">&#x2713;</i> Multi-Agent Team Orchestration</li>
                                 <li><i class="icon-check">&#x2713;</i> Bundle publishing</li>
+                                <li><i class="icon-check">&#x2713;</i> Unlimited workflows + publish</li>
                                 <li><i class="icon-check">&#x2713;</i> Automated quality auditing</li>
                             </ul>
                         </div>
@@ -662,16 +808,21 @@ Authorization: Bearer ***</code></pre></div>
 
                     <div class="pricing-card glass-card enterprise border-gradient">
                         <div class="tier-header">
+                            <span class="promo-ribbon promo-ribbon-enterprise">50% OFF</span>
                             <h3 class="tier-name text-gradient">Enterprise</h3>
                             <p class="tier-desc">Scale your agentic workforce</p>
-                            <div class="tier-price">
-                                <span class="currency">$</span><span class="amount" data-monthly="199" data-yearly="159">199</span><span class="period">/mo</span>
+                            <div class="tier-price-promo">
+                                <span class="price-original"><span class="currency">$</span>199<span class="period">/mo</span></span>
+                                <div class="tier-price">
+                                    <span class="currency">$</span><span class="amount promo-amount" data-monthly="99" data-yearly="79">99</span><span class="period">/mo</span>
+                                </div>
                             </div>
                         </div>
                         <div class="tier-body">
-                            <button class="btn btn-block btn-gradient shine" data-price-id="price_1TAsLK2QpzdUwTFgZQQ56NrE" id="enterprisePricingBtn">Get Enterprise</button>
+                            <button class="btn btn-block btn-gradient shine" data-price-id="price_1TAumX2QpzdUwTFgDDWYS4V8" id="enterprisePricingBtn">Get Enterprise</button>
                             <ul class="feature-list">
                                 <li><i class="icon-check">&#x2713;</i> 200 tools, unlimited generations</li>
+                                <li><i class="icon-check">&#x2713;</i> Custom workflow builder</li>
                                 <li><i class="icon-check">&#x2713;</i> Unlimited MCP Bridge scale</li>
                                 <li><i class="icon-check">&#x2713;</i> Advanced enterprise security</li>
                                 <li><i class="icon-check">&#x2713;</i> Private registry integration</li>
@@ -773,6 +924,7 @@ agents-cli mcp start</code></pre>
                     <ul>
                         <li><a href="#features">Features</a></li>
                         <li><a href="#marketplace">Marketplace</a></li>
+                        <li><a href="/marketplace">Full Marketplace</a></li>
                         <li><a href="#pricing">Pricing</a></li>
                         <li><a href="#" id="footerSkillForge">Skill Forge</a></li>
                     </ul>

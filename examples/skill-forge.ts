@@ -158,6 +158,12 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (args.workflowGen) {
+    const { workflowGenMode } = await import("./forge/mode-workflow-gen.js");
+    await workflowGenMode(args, startTime);
+    return;
+  }
+
   if (args.workflow) {
     const { workflowMode } = await import("./forge/mode-workflow.js");
     await workflowMode(args, startTime);

@@ -36,6 +36,7 @@ export function initRegistries(api, store) {
         ...(data.agent_defs || []).map(t => ({ ...t, productType: 'agent-def' })),
         ...(data.harnesses || []).map(t => ({ ...t, productType: 'harness' })),
         ...(data.generated_skills || []).map(t => ({ ...t, productType: t.productType || 'skill' })),
+        ...(data.workflows || []).map(t => ({ ...t, productType: 'workflow' })),
       ];
       // Merge into api.catalog without duplicates
       const existingIds = new Set(api.catalog.map(p => p.id));

@@ -6,7 +6,7 @@ Any GitHub repo, npm package, PyPI package, or crates.io crate with a CLI become
 
 Built on the ["Rewrite Your CLI for AI Agents"](https://justin.poehnelt.com/posts/rewrite-your-cli-for-ai-agents/) philosophy — structured JSON output, schema introspection, context window discipline, input hardening, dry-run safety, and rich skill generation.
 
-> For contributor guidelines and strict implementation rules, see **[CLAUDE.md](./CLAUDE.md)**.
+> **Cross-references:** [CLAUDE.md](./CLAUDE.md) (contributor rules, project structure, pitfalls, canonical imports), [`.claude/skills/agents-cli-dev/SKILL.md`](./.claude/skills/agents-cli-dev/SKILL.md) (dev skill for Claude Code), [`.claude/agents/forge-expert.md`](./.claude/agents/forge-expert.md) (forge expert agent), [`deploy-local.sh`](./deploy-local.sh) (local dev launcher).
 
 ## What it does
 
@@ -153,6 +153,30 @@ agents-cli scan ./dir [--deep]         # discover tools in a local directory
 agents-cli info <name>                 # show registry info for a package
 ```
 
+### Crawl — scale discovery to 100K+ tools
+
+```bash
+agents-cli crawl seed --registry pypi --limit 1000        # seed crawl queue from PyPI
+agents-cli crawl seed --all                                # seed from all registries
+agents-cli crawl start --concurrency 8 --limit 100        # process crawl queue
+agents-cli crawl status --json                             # queue stats
+```
+
+### Compose — agentic workflow generation
+
+```bash
+agents-cli compose "Python CI with linting, testing, coverage"    # NL prompt → workflow
+agents-cli compose --from-skills src-ruff,src-pytest --creative   # compose from existing skills
+agents-cli compose "deploy pipeline" --iterations 5 --sandbox     # with Docker validation
+```
+
+### Stats — system monitoring
+
+```bash
+agents-cli stats                       # system overview (tools, skills, workflows, edges, embeddings)
+agents-cli stats --json                # machine-readable metrics
+```
+
 ## Skill Forge — generate skills from any CLI tool
 
 The skill forge resolves, installs, analyzes, and generates rich SKILL.md files from any package registry.
@@ -181,6 +205,11 @@ npx tsx examples/skill-forge.ts --curated --category ai-ml/llm-inference
 npx tsx examples/skill-forge.ts --curated --category security --limit 10
 npx tsx examples/skill-forge.ts --curated --force --limit 600
 
+# Workflow generation — analyze agent scripts → workflow SKILL.md
+npx tsx examples/skill-forge.ts --workflow-gen ./my-agents
+npx tsx examples/skill-forge.ts --workflow-gen ./agents --domain ai-ml --out ./output
+npx tsx examples/skill-forge.ts --workflow-gen ./scripts --dry-run --json
+
 # System PATH discovery
 npx tsx examples/skill-forge.ts --system --dry-run     # preview local executables
 npx tsx examples/skill-forge.ts --system --limit 20    # forge top 20
@@ -206,6 +235,47 @@ npx tsx examples/skill-forge.ts --system --limit 20    # forge top 20
 --ai             # include AI-enhanced generation
 --strict         # strict quality gate (trigger ≥ 0.90)
 ```
+
+## Workflow generation — turn agent scripts into managed workflows
+
+Point `--workflow-gen` at a directory of agent scripts (.py/.ts/.js/.sh) and the forge will analyze them, infer execution order, data flow, and environment requirements, then generate a complete workflow package with quality gates.
+
+```bash
+# Basic — analyze scripts and generate workflow
+npx tsx examples/skill-forge.ts --workflow-gen ./my-agents
+
+# With domain and custom output
+npx tsx examples/skill-forge.ts --workflow-gen ./agents --domain ai-ml --out ./workflows
+
+# Preview without writing
+npx tsx examples/skill-forge.ts --workflow-gen ./scripts --dry-run --json
+```
+
+### What it does
+
+1. **Analyze** — regex/heuristic parser extracts imports, env vars, file I/O, SDK calls (50+ known SDKs), entry points, and cross-script dependencies from each script
+2. **Infer** — topological sort from cross-script imports + file I/O chains determines step ordering; data flow edges, env var requirements, and duration estimates are computed
+3. **Generate** — produces SKILL.md (with frontmatter + workflow description), run.sh (orchestrator), setup.sh (env var + tool validation), workflow.md (pipeline diagram + step table), and copies agent scripts
+4. **Quality gate** — 4-axis scoring (each must be >= 0.5): step completeness, data flow validity, env var documentation, setup runnability
+
+### Output structure
+
+```
+examples/generated-workflows/<name>/
+  SKILL.md              — frontmatter + workflow description
+  scripts/run.sh        — orchestrator script
+  scripts/setup.sh      — env var + tool validation
+  references/workflow.md — pipeline diagram + step table
+  agents/*.py           — copied agent scripts
+```
+
+### SaaS UI workflow features
+
+- **Workflows tab** in marketplace (2nd position after All, with NEW badge)
+- **Mini pipeline preview** on workflow cards showing step flow (scout -> ghostwriter -> image-gen -> ...)
+- **Step count + duration estimate** on cards
+- **Pipeline tab** in detail modal with DAG visualization, step table, and env vars table
+- **Tier gating** — workflows require at least Starter tier (free = view-only, starter = 5/month, pro/enterprise = unlimited + publish)
 
 ## Plugin system — Claude Code spec-compliant
 
@@ -330,36 +400,73 @@ agents-cli schema ruff --json --depth 3
 
 ## SaaS UI & Companion Server
 
-The SaaS marketplace UI lives at `examples/saas-ui/`. Serve it with the companion server:
+The SaaS marketplace UI lives at `examples/saas-ui/`, deployed to [ui.spectredve.com](https://ui.spectredve.com) via Vercel. See [CLAUDE.md — SaaS UI](./CLAUDE.md#saas-ui-examplessaas-ui) for full architecture, pricing, auth, and deployment details.
+
+### Local dev
 
 ```bash
-# Start companion server (UI at http://localhost:3100)
-agents-cli mcp start
+# Start both servers (UI :8080 + companion :3100)
+./deploy-local.sh
+./deploy-local.sh --no-build   # skip npm build
+
+# Or manual companion start
+npx tsx examples/skill-forge.ts --companion --serve --port 3100
+
+# Stripe webhook testing
+stripe listen --forward-to localhost:3100/api/billing/webhook
 ```
 
-The UI includes:
+Env vars in `.env` (gitignored): `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (must be `whsec_...`).
 
-- **Marketplace** — product grid with Agent-Native filter, bulk select, `▶ Try` button (pre-fills Forge)
-- **Skill Forge** — cost estimator, quality preview bar, AI persona selector, generation history, batch CSV upload
-- **Dashboard** — usage meter, revenue tracker with split bar, agent wallet with 24h heatmap
-- **Agent Economy** — creator earnings, per-skill revenue with SVG sparklines, agent leaderboard
-- **API Keys** — create/revoke scoped keys (one-time secret reveal)
-- **Product Detail** — 3-tab view (Overview / Pricing / Changelog), live SSE invocation feed, MCP deploy button
+### Production deploy
 
-### Companion API
+```bash
+cd examples/saas-ui && vercel --prod    # deploy from this dir, NOT repo root
+git tag v1.2.0 && git push --tags      # GH Actions prod deploy
+```
 
-All endpoints require `Authorization: Bearer <token>`.
+### Landing page (`index.html`)
+
+- **Workflow Showcase** — animated pipeline demo, 3 featured workflow cards
+- **Skill Forge** — cost estimator, quality preview bar, AI persona selector, batch CSV
+- **Pricing** — 50% OFF launch promo (Starter $14.99/mo, Pro $39.99/mo, Enterprise $99/mo) via Stripe Checkout
+- Links to dedicated `/marketplace` page
+
+### Marketplace (`marketplace.html` at `/marketplace`)
+
+**Dedicated standalone page** with its own CSS (`css/marketplace-page.css`) and JS (`js/marketplace-page.js`):
+- **How It Works** — walkthrough section
+- **Sources** — registry sources overview
+- **Workflows** — workflow showcase + browse
+- **Demos** — interactive demos
+- **Browse** — full product grid with Agent-Native filter, Workflows tab (2nd, NEW badge), bulk select, `▶ Try` button, tier-gated installs
+- **Product Detail** — 4-tab view (Overview / Pricing / Changelog / Pipeline for workflows), live SSE feed, DAG visualization
+- **Pricing** — subscription plans with Stripe Checkout
+
+### Admin panel (`admin.html` at `/admin`)
+
+Auth-gated standalone SPA with hash routing:
+- **Dashboard** — revenue tracker, agent wallet, 24h heatmap
+- **Economy** — creator earnings, per-skill revenue with SVG sparklines, leaderboard
+- **API Keys** — create/revoke scoped keys
+- **Settings** — profile/preferences
+
+### Auth
+
+Dual-mode: Clerk JWT (production) with mock OAuth fallback (offline dev). `AuthManager` in `js/auth.js`. `AppStore` in `js/store.js` (pub/sub + localStorage).
+
+### Companion API (`lib/companion/web-service.ts` @ :3100)
+
+Auth: API-key SHA256 first, Clerk JWT fallback. All `/api/*` require `Authorization: Bearer <token>` (except `/api/health`, `/api/config`).
 
 ```
-GET  /api/earnings?period=month        — creator revenue summary
-GET  /api/agents/:id/metrics           — call/cost/latency stats
-GET  /api/agents/:id/heatmap           — 24h invocation heatmap
-POST /api/agent-keys                   — create scoped API key
-DELETE /api/agent-keys/:id             — revoke key
+GET  /api/health|config|auth/me|catalog|usage|earnings|catalog/domains|graph/:skillId
+GET  /api/catalog?page=1&limit=50&domain=X&type=Y&sort=quality&q=Z
+POST /api/generate | billing/checkout | billing/webhook | agent-keys
+GET  /api/billing/portal | status/:jobId | download/:jobId
+GET  /api/agents/:id/metrics | agents/:id/heatmap
 GET  /api/invocations/stream?skill=X   — SSE live invocation feed
-GET  /api/catalog / /api/usage / /api/health
-POST /api/generate | GET /api/status/:id | GET /api/download/:id
-POST /api/billing/checkout | GET /api/billing/portal
+DELETE /api/agent-keys/:id
 ```
 
 ## Full pipeline example
@@ -371,20 +478,23 @@ npm run build
 # 2. Forge skills from curated tools
 npx tsx examples/skill-forge.ts --curated --category code-search --limit 5
 
-# 3. Build full-featured plugins
+# 3. Generate workflows from agent scripts
+npx tsx examples/skill-forge.ts --workflow-gen ./my-agents --domain ai-ml
+
+# 4. Build full-featured plugins
 npx tsx examples/skill-forge.ts --plugin --full
 
-# 4. Build marketplace
+# 5. Build marketplace
 npx tsx examples/skill-forge.ts --marketplace
 
-# 5. Validate everything
+# 6. Validate everything
 npx tsx examples/skill-forge.ts --benchmark --json
 bash battle-test-ecosystem.sh --quick
 
-# 6. Test a plugin in Claude Code
+# 7. Test a plugin in Claude Code
 claude --plugin-dir ./examples/plugins/python
 
-# 7. Serve the SaaS UI
+# 8. Serve the SaaS UI
 agents-cli mcp start   # → open http://localhost:3100
 ```
 
@@ -392,14 +502,23 @@ agents-cli mcp start   # → open http://localhost:3100
 
 ```
 bin/
-  agents-cli.ts         — 67-line dispatcher (thin shell)
-  commands/             — 22 registerXCommand files
+  agents-cli.ts         — dispatcher (25 commands registered)
+  commands/             — 25 registerXCommand files (incl. crawl, compose, stats)
 lib/
   skills/               — 5 focused modules (frontmatter / lockfile / description / lifecycle / generators)
-  guards.ts             — security guards + shellQuote (canonical location)
+  guards.ts             — security guards + shellQuote + cosine + validateOllamaUrl
   companion/            — SaaS HTTP server, billing, OAuth, metering
+  db/                   — unified-store.ts (SQLite), vec-store.ts (sqlite-vec), migrate.ts
+  intelligence/         — embeddings, IO extraction, skill graph, 4 discovery methods, auto-repair
+  composer/             — tiered LLM client, workflow proposer, validator, iteration loop
+  crawler/              — crawl queue worker, registry seeders
+  adapters/             — source adapter interface, registry adapter, unified pipeline
+  concurrency.ts        — AdaptiveSemaphore, TokenBucketRateLimiter
+  classifier/           — npm, github, crates, pypi, libraries-io, github-graphql
+  marketplace/          — export.ts (SQLite → registry-data.json)
+  monitoring/           — stats.ts (system metrics aggregator)
 examples/
-  forge/                — 15 mode modules
+  forge/                — 16 mode modules (incl. mode-workflow-gen.ts)
   saas-ui/              — SaaS marketplace UI
   data/ai-ml-tools.json — 502 curated AI/ML tool definitions
 ```
@@ -409,12 +528,30 @@ examples/
 1. **Resolve** — detect source format, fetch metadata from appropriate registry
 2. **Install** — download, extract, install deps, auto-build (monorepo-aware, branch fallback)
 3. **Analyze** — probe `--help` recursively (depth 3, up to 500 commands)
-4. **Store** — persist metadata in `~/.agents-cli/` (JSON + CONTEXT.md)
+4. **Store** — persist metadata in SQLite (unified store with FTS5 + vector search)
 5. **Generate** — produce SKILL.md with trigger-aware descriptions and domain content
 6. **Quality** — gate on trigger score ≥ 0.80, quality ≥ 6/10, content ≥ 5
-7. **Plugin** — build Claude Code plugins (hooks, agents, commands, settings)
-8. **Marketplace** — generate marketplace.json + plugin distribution
-9. **Expose** — MCP bridge + SaaS API
+7. **Embed** — batch-embed skills via Ollama for semantic search
+8. **Graph** — pre-compute skill graph edges (IO chain, same domain, embedding similarity, LLM-inferred)
+9. **Plugin** — build Claude Code plugins (hooks, agents, commands, settings)
+10. **Marketplace** — generate marketplace.json + plugin distribution
+11. **Expose** — MCP bridge + SaaS API
+12. **Workflow Gen** — analyze agent scripts → infer manifest → generate workflow SKILL.md + scripts
+13. **Compose** — agentic LLM loop: propose → validate → refine → re-validate (3-5 iterations)
+
+### Scaling infrastructure
+
+The system is designed to scale from hundreds to millions of skills:
+
+- **SQLite unified store** — replaces flat-file `tools.json` with O(1) lookups, FTS5 full-text search, transactional writes
+- **sqlite-vec** — HNSW-like KNN vector search for semantic skill discovery
+- **Crawl queue** — persistent queue with exponential backoff, adaptive concurrency, install-analyze-prune cycle
+- **Libraries.io connector** — unified access to npm, PyPI, crates.io (55 req/min rate limited)
+- **GitHub GraphQL** — cursor-based pagination beyond REST API's 1000-result limit (4500pt budget)
+- **Skill graph** — 4 edge types pre-computed via inverted index: IO chain, same domain, embedding similarity, LLM-inferred
+- **4 discovery methods** — semantic KNN, domain-filtered KNN, multi-hop LLM decomposition, graph traversal (BFS)
+- **Tiered LLM** — Ollama for batch/draft (free), Claude API for validation/refinement (quality)
+- **Agentic composer** — fully generative workflow creation with Docker sandbox validation
 
 ## Development
 
@@ -427,10 +564,16 @@ npm run lint         # tsc --noEmit type check
 ```
 
 See **[CLAUDE.md](./CLAUDE.md)** for the complete contributor reference:
-- Hard rules (ESM, security, output format, dry-run, no process.exit, etc.)
-- Full project structure with all file paths and module responsibilities
-- Key function signatures and their module locations
-- Common pitfalls and the Do-NOT list
+- [Hard rules](./CLAUDE.md#hard-rules) (ESM, security, output format, dry-run, no process.exit, etc.)
+- [Project structure](./CLAUDE.md#project-structure) with all file paths and module responsibilities
+- [Key function signatures](./CLAUDE.md#key-function-signatures) and their module locations
+- [Common pitfalls](./CLAUDE.md#common-pitfalls) and the [Do-NOT list](./CLAUDE.md#do-not)
+- [Canonical imports](./CLAUDE.md#canonical-imports) — which module to import from
+- [SaaS UI](./CLAUDE.md#saas-ui-examplessaas-ui) — deployment, auth, pricing, admin panel
+
+For Claude Code integration:
+- [`.claude/skills/agents-cli-dev/SKILL.md`](./.claude/skills/agents-cli-dev/SKILL.md) — dev skill with quick commands
+- [`.claude/agents/forge-expert.md`](./.claude/agents/forge-expert.md) — forge expert agent
 
 ## License
 

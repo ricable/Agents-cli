@@ -27,7 +27,11 @@
       "destination": "/admin.html"
     },
     {
-      "source": "/((?!api/)(?!admin)(?!.*\\.).*)",
+      "source": "/marketplace",
+      "destination": "/marketplace.html"
+    },
+    {
+      "source": "/((?!api/)(?!admin)(?!marketplace)(?!.*\\.).*)",
       "destination": "/index.html"
     }
   ]

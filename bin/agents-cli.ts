@@ -34,6 +34,9 @@ import { registerPublishCommand } from "./commands/publish.js";
 import { registerPipelineCommand } from "./commands/pipeline.js";
 import { registerIndexCommand } from "./commands/index-cmd.js";
 import { registerGenerateCommand } from "./commands/generate.js";
+import { registerCrawlCommand } from "./commands/crawl.js";
+import { registerComposeCommand } from "./commands/compose.js";
+import { registerStatsCommand } from "./commands/stats.js";
 
 const VERSION = readPkgVersion(new URL("../", import.meta.url).pathname) ?? "0.1.0";
 
@@ -63,5 +66,8 @@ registerPublishCommand(program);
 registerPipelineCommand(program);
 registerIndexCommand(program);
 registerGenerateCommand(program);
+registerCrawlCommand(program);
+registerComposeCommand(program);
+registerStatsCommand(program);
 
 program.parse();

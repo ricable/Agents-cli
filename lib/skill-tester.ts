@@ -13,6 +13,7 @@
  */
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
+import { parseFrontmatter } from "./skills/frontmatter.js";
 import { join, basename, dirname } from "node:path";
 
 // ============================================================================
@@ -84,6 +85,101 @@ export function parseSkillFrontmatter(content: string): FrontmatterFields {
     compatibility: getField("compatibility"),
     license: getField("license"),
   };
+}
+
+// ============================================================================
+// Workflow Quality Scoring
+// ============================================================================
+
+export interface WorkflowQualityResult {
+  stepCompleteness: number;    // 0-1: every step has command + description
+  dataFlowValidity: number;    // 0-1: no dangling edges, inputs match prior outputs
+  envVarDocumentation: number; // 0-1: all env vars have descriptions
+  setupRunnability: number;    // 0-1: setup.sh has shebang, set -e, tool checks
+}
+
+/**
+ * Score workflow-specific quality axes.
+ * Only applied when domain contains "workflow" or content has workflow steps.
+ */
+export function scoreWorkflowQuality(
+  skillMd: string,
+  files: Record<string, string>,
+): WorkflowQualityResult {
+  // ── Step completeness ──
+  let stepCompleteness = 0;
+  const stepMatches = skillMd.match(/^\d+\.\s+\*\*.+?\*\*/gm) ?? [];
+  if (stepMatches.length > 0) {
+    const stepsWithCommands = skillMd.match(/^\d+\.\s+\*\*.+?\*\*\s*—\s*`[^`]+`/gm) ?? [];
+    stepCompleteness = stepsWithCommands.length / stepMatches.length;
+  } else {
+    // Check for step table format
+    const tableRows = skillMd.match(/^\|[^|]+\|[^|]+\|[^|]+\|/gm) ?? [];
+    const dataRows = tableRows.filter(r => !r.includes("---") && !r.includes("Step"));
+    stepCompleteness = dataRows.length > 0 ? 1 : 0;
+  }
+
+  // ── Data flow validity ──
+  let dataFlowValidity = 0.5; // default: no data flow info = neutral
+  const runSh = files["scripts/run.sh"] ?? "";
+  const workflowMd = files["references/workflow.md"] ?? "";
+  if (workflowMd.includes("Pipeline Diagram") || workflowMd.includes("Data Flow")) {
+    dataFlowValidity = 0.8;
+    if (/\[.+?\]\s*→\s*\[.+?\]/.test(workflowMd) || /→/.test(workflowMd)) {
+      dataFlowValidity = 1;
+    }
+  }
+
+  // ── Env var documentation ──
+  let envVarDocumentation = 1; // perfect if none needed
+  const envVarSection = skillMd.match(/## (?:Environment Variables|Env Vars|Setup)[\s\S]*?(?=\n## |$)/i);
+  if (envVarSection) {
+    const envVarLines = envVarSection[0].match(/[A-Z][A-Z0-9_]{2,}/g) ?? [];
+    const documented = envVarLines.filter(v => {
+      const pattern = new RegExp(`${v}[^\\n]*(?:—|:|-)\\s*\\S`);
+      return pattern.test(envVarSection[0]);
+    });
+    envVarDocumentation = envVarLines.length > 0 ? documented.length / envVarLines.length : 1;
+  } else {
+    // Check setup.sh for env var references
+    const setupSh = files["scripts/setup.sh"] ?? "";
+    const envRefs = setupSh.match(/\$\{?[A-Z][A-Z0-9_]+\}?/g) ?? [];
+    if (envRefs.length > 0) {
+      envVarDocumentation = 0.3; // env vars exist but no docs section
+    }
+  }
+
+  // ── Setup runnability ──
+  let setupRunnability = 0;
+  const setupSh = files["scripts/setup.sh"] ?? "";
+  if (setupSh) {
+    if (/^#!.*(?:bash|sh)/m.test(setupSh)) setupRunnability += 0.3;
+    if (/set -e/.test(setupSh)) setupRunnability += 0.3;
+    if (/command -v|which\s/.test(setupSh)) setupRunnability += 0.4;
+  } else if (runSh) {
+    // No setup.sh but run.sh exists
+    if (/^#!.*(?:bash|sh)/m.test(runSh)) setupRunnability += 0.3;
+    if (/set -e/.test(runSh)) setupRunnability += 0.2;
+    setupRunnability = Math.min(0.5, setupRunnability); // cap without setup.sh
+  }
+
+  return {
+    stepCompleteness: Math.round(stepCompleteness * 100) / 100,
+    dataFlowValidity: Math.round(dataFlowValidity * 100) / 100,
+    envVarDocumentation: Math.round(envVarDocumentation * 100) / 100,
+    setupRunnability: Math.round(setupRunnability * 100) / 100,
+  };
+}
+
+/**
+ * Check if a skill is a workflow based on domain or content.
+ */
+function isWorkflowSkill(content: string): boolean {
+  const fm = parseFrontmatter(content);
+  if (fm?.domain && /workflow/i.test(fm.domain)) return true;
+  if (fm?.tags?.some((t) => /workflow/i.test(t))) return true;
+  // Fallback: structural heuristic
+  return /^ingredients:/m.test(content) && /## Steps/m.test(content);
 }
 
 // ============================================================================
@@ -332,7 +428,29 @@ export function testSkillSync(skillPath: string, preloadedContent?: string): Ski
   const triggerScore = Math.round(scoreTrigger(fm.description) * 100) / 100;
   const qualityScore = scoreSkillDescription(fm.description);
   const { score: contentScore, issues: contentIssues } = scoreContentQuality(content);
-  const passed = triggerScore >= 0.8 && qualityScore >= 6 && contentScore >= 5;
+
+  // Workflow-specific quality gate
+  let workflowPassed = true;
+  if (isWorkflowSkill(content)) {
+    // Load workflow files for quality scoring
+    const workflowFiles: Record<string, string> = {};
+    if (skillPath !== "inline" && !preloadedContent) {
+      const skillDir = dirname(skillPath);
+      for (const rel of ["scripts/run.sh", "scripts/setup.sh", "references/workflow.md"]) {
+        const fp = join(skillDir, rel);
+        try {
+          workflowFiles[rel] = readFileSync(fp, "utf-8");
+        } catch { /* skip missing */ }
+      }
+    }
+    const wq = scoreWorkflowQuality(content, workflowFiles);
+    if (wq.stepCompleteness < 0.5) { workflowPassed = false; issues.push(`Workflow: low step completeness ${wq.stepCompleteness.toFixed(2)} (need >= 0.50)`); }
+    if (wq.dataFlowValidity < 0.5) { workflowPassed = false; issues.push(`Workflow: low data flow validity ${wq.dataFlowValidity.toFixed(2)} (need >= 0.50)`); }
+    if (wq.envVarDocumentation < 0.5) { workflowPassed = false; issues.push(`Workflow: low env var docs ${wq.envVarDocumentation.toFixed(2)} (need >= 0.50)`); }
+    if (wq.setupRunnability < 0.5) { workflowPassed = false; issues.push(`Workflow: low setup runnability ${wq.setupRunnability.toFixed(2)} (need >= 0.50)`); }
+  }
+
+  const passed = triggerScore >= 0.8 && qualityScore >= 6 && contentScore >= 5 && workflowPassed;
 
   if (triggerScore < 0.8) issues.push(`Low trigger score: ${triggerScore.toFixed(2)} (need >= 0.80)`);
   if (qualityScore < 6) issues.push(`Low quality score: ${qualityScore}/10 (need >= 6)`);
