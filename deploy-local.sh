@@ -44,8 +44,8 @@ fi
 
 # ── Stop old processes ───────────────────────────────────────────────
 echo "▶  Stopping any process on port $PORT and 3100..."
-lsof -ti :"$PORT" | xargs -r kill -9 2>/dev/null || true
-lsof -ti :3100 | xargs -r kill -9 2>/dev/null || true
+lsof -ti :"$PORT" | xargs kill -9 2>/dev/null || true
+lsof -ti :3100 | xargs kill -9 2>/dev/null || true
 sleep 0.5
 
 # ── Build ────────────────────────────────────────────────────────────

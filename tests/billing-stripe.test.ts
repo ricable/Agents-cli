@@ -2,7 +2,7 @@
  * Tests for companion/billing.ts — Stripe SDK integration.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // ── Mock stripe ──────────────────────────────────────────────────────
 
@@ -37,6 +37,16 @@ import { StripeProvider } from "../lib/companion/billing.js";
 // ── StripeProvider ────────────────────────────────────────────────────
 
 describe("StripeProvider — mock mode (no API key)", () => {
+  let savedKey: string | undefined;
+  beforeEach(() => {
+    savedKey = process.env["STRIPE_SECRET_KEY"];
+    delete process.env["STRIPE_SECRET_KEY"];
+  });
+  afterEach(() => {
+    if (savedKey !== undefined) process.env["STRIPE_SECRET_KEY"] = savedKey;
+    else delete process.env["STRIPE_SECRET_KEY"];
+  });
+
   it("createCustomer returns mock customerId", async () => {
     const provider = new StripeProvider({ apiKey: undefined });
     const result = await provider.createCustomer("test@example.com", "pro");
@@ -102,6 +112,8 @@ describe("StripeProvider — SDK mode", () => {
       mode: "subscription",
       success_url: "http://localhost/?checkout=success",
       cancel_url: "http://localhost/?checkout=success",
+      metadata: { priceId: "price_pro_monthly" },
+      subscription_data: { metadata: { priceId: "price_pro_monthly" } },
     });
     expect(result.url).toBe("https://checkout.stripe.com/pay/cs_test_abc");
   });

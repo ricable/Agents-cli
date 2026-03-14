@@ -82,7 +82,7 @@ export default async function handler(req, res) {
   try {
     // Embed priceId in metadata so the webhook can reliably derive the tier
     // (line_items is NOT included in checkout.session.completed webhook payloads by default)
-    const meta = { priceId };
+    const meta = { priceId, tier: PRICE_TO_TIER[priceId] };
     const session = await stripe.checkout.sessions.create({
       line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',

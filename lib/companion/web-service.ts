@@ -759,7 +759,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     if (method === "GET" && agentMetricsMatch) {
       const authed = await requireAuth(req);
       if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
-      res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+      res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({
         success: true,
         data: {
@@ -778,7 +778,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     if (method === "GET" && agentHeatmapMatch) {
       const authed = await requireAuth(req);
       if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
-      res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+      res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({
         success: true,
         data: {
@@ -833,7 +833,6 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         "Connection": "keep-alive",
-        "Access-Control-Allow-Origin": "*",
       });
 
       const agents = ["claude-sonnet-4-6", "gpt-4o", "gemini-1.5-pro", "local-agent"];
