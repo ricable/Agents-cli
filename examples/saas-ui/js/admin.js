@@ -7,7 +7,17 @@ import { AppStore } from './store.js';
 import { AuthManager } from './auth.js';
 import { initDashboard } from './dashboard.js';
 import { initEconomy } from './economy.js';
-import { showToast } from './utils.js';
+import { escapeHtml, showToast } from './utils.js';
+
+/** Escape a string for safe use inside HTML attribute values. */
+function escapeAttr(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
   const api = new AgentsApi();
@@ -128,12 +138,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     keysList.innerHTML = agentKeys.map(k => `
       <div class="key-card">
         <div>
-          <div class="key-id">${k.id}</div>
-          <div class="key-scopes">${(k.scopes || ['read', 'execute']).join(', ')}</div>
+          <div class="key-id">${escapeHtml(k.id)}</div>
+          <div class="key-scopes">${escapeHtml((k.scopes || ['read', 'execute']).join(', '))}</div>
         </div>
         <div style="display:flex;align-items:center;gap:12px">
           <span class="key-date">${new Date(k.createdAt).toLocaleDateString()}</span>
-          <button class="admin-btn danger revoke-key-btn" data-key-id="${k.id}">Revoke</button>
+          <button class="admin-btn danger revoke-key-btn" data-key-id="${escapeAttr(k.id)}">Revoke</button>
         </div>
       </div>
     `).join('');

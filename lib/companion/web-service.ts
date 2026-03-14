@@ -25,6 +25,19 @@ import type { CompanionToolPlan } from "./mapper.js";
 import type { PipelineReport } from "../types.js";
 import type { CliOutput } from "../types.js";
 
+// ── Stripe price → tier mapping ────────────────────────────────────────
+
+const PRICE_TO_TIER: Record<string, ApiTier> = {
+  "price_1TAsLJ2QpzdUwTFgn4OhkLig": "starter",   // $29/mo
+  "price_1TAsLK2QpzdUwTFgqe4HP5Jh": "pro",        // $79/mo
+  "price_1TAsLK2QpzdUwTFgZQQ56NrE": "enterprise",  // $199/mo
+};
+
+function tierFromPriceId(priceId: string | undefined): ApiTier | undefined {
+  if (!priceId) return undefined;
+  return PRICE_TO_TIER[priceId];
+}
+
 // ── Types ──────────────────────────────────────────────────────────────
 
 export type ApiTier = "free" | "starter" | "pro" | "enterprise";
@@ -577,11 +590,21 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
           if (clerkUserId) {
             let tier: ApiTier;
             switch (event.type) {
-              case "checkout.session.completed":
-              case "customer.subscription.updated":
-                // Read tier from subscription/price metadata, default to "starter"
-                tier = (meta?.["tier"] as ApiTier | undefined) ?? "starter";
+              case "checkout.session.completed": {
+                // Derive tier from the price ID in the line items or subscription
+                const lineItems = event.data["line_items"] as { data?: Array<{ price?: { id?: string } }> } | undefined;
+                const priceId = lineItems?.data?.[0]?.price?.id
+                  ?? (event.data["subscription"] as { items?: { data?: Array<{ price?: { id?: string } }> } } | undefined)?.items?.data?.[0]?.price?.id;
+                tier = tierFromPriceId(priceId) ?? "starter";
                 break;
+              }
+              case "customer.subscription.updated": {
+                // Extract price ID from subscription items
+                const items = event.data["items"] as { data?: Array<{ price?: { id?: string } }> } | undefined;
+                const subPriceId = items?.data?.[0]?.price?.id;
+                tier = tierFromPriceId(subPriceId) ?? "starter";
+                break;
+              }
               case "customer.subscription.deleted":
                 tier = "free";
                 break;
