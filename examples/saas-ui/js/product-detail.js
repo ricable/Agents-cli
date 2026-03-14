@@ -70,14 +70,14 @@ export function initProductDetail(api, store, auth) {
       </div>
 
       <div class="detail-tabs" style="display:flex;gap:4px;padding:0 20px;border-bottom:1px solid var(--surface-border)">
-        <button class="detail-tab active" data-tab="overview">Overview</button>
-        ${p.productType === 'workflow' ? '<button class="detail-tab" data-tab="pipeline">Pipeline</button>' : ''}
+        <button class="detail-tab${p.productType === 'workflow' ? '' : ' active'}" data-tab="overview">Overview</button>
+        ${p.productType === 'workflow' ? '<button class="detail-tab active" data-tab="pipeline">Pipeline</button>' : ''}
         <button class="detail-tab" data-tab="pricing">Pricing</button>
         <button class="detail-tab" data-tab="changelog">Changelog</button>
       </div>
 
       <div class="detail-body">
-        <div class="detail-tab-content" id="detailTabOverview">
+        <div class="detail-tab-content" id="detailTabOverview" style="${p.productType === 'workflow' ? 'display:none' : ''}">
           <div class="detail-stats-row">
             <div class="detail-stat">
               <span class="detail-stat-value">${rating > 0 ? rating.toFixed(1) : '--'}</span>
@@ -214,7 +214,7 @@ export function initProductDetail(api, store, auth) {
         </div>
 
         ${p.productType === 'workflow' ? `
-        <div class="detail-tab-content" id="detailTabPipeline" style="display:none">
+        <div class="detail-tab-content" id="detailTabPipeline"
           <div style="padding:20px">
             <div class="detail-section">
               <h3>Pipeline Visualization</h3>
@@ -222,11 +222,14 @@ export function initProductDetail(api, store, auth) {
             </div>
             <div class="detail-section">
               <h3>Step Details</h3>
-              ${renderStepTable(p.workflowSteps)}
+              ${renderStepTable(p.workflowSteps, { enhanced: true })}
             </div>
             <div class="detail-section">
               <h3>Environment Variables</h3>
               ${renderEnvVarsTable(p.envVars)}
+            </div>
+            <div class="wf-pipeline-cta" style="margin-top:24px;padding:16px;border-radius:12px;background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.15);text-align:center">
+              <p style="color:var(--text-secondary);margin-bottom:8px">Unlock workflow execution — <a href="#pricing" style="color:var(--accent-cyan,#00d4ff);font-weight:600" onclick="document.getElementById('productDetailPanel').classList.remove('active');document.getElementById('productDetailOverlay')?.classList.remove('active');document.body.style.overflow=''">Upgrade to Starter</a></p>
             </div>
             ${p.dependencies?.length ? `
             <div class="detail-section">

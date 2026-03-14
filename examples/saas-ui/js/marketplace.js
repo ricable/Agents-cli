@@ -174,7 +174,7 @@ function renderWorkflowMiniPipeline(product) {
   const overflow = steps.length > maxVisible ? `<span class="wf-more">+${steps.length - maxVisible}</span>` : '';
   return `<div class="wf-mini-pipeline">
     ${visible.map((s, i) =>
-      `<span class="wf-step">${escapeHtml(s.name)}</span>${i < visible.length - 1 ? '<span class="wf-arrow">\u2192</span>' : ''}`
+      `<span class="wf-step">${escapeHtml(s.name)}</span>${i < visible.length - 1 ? '<span class="wf-arrow wf-pulse">\u2192</span>' : ''}`
     ).join('')}${overflow}
   </div>`;
 }
@@ -209,7 +209,7 @@ function renderCard(product, opts = {}) {
       </div>` : '';
 
   return `
-    <div class="plugin-card glass-card${!hasAccess ? ' tier-locked' : ''}" data-product-id="${escapeAttr(product.id)}">
+    <div class="plugin-card glass-card${!hasAccess ? ' tier-locked' : ''}${product.productType === 'workflow' ? ' workflow-card' : ''}" data-product-id="${escapeAttr(product.id)}">
       <div class="plugin-header">
         <div class="plugin-icon" style="border-color:${typeColor}30;background:${typeColor}10">
           ${icon}

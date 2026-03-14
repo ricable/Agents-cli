@@ -42,7 +42,7 @@ export function renderWorkflowDag(steps, dataFlow) {
     const artifact = findArtifact(step.name, i, visible, dataFlow);
 
     const nodeHtml = `
-      <div class="wf-dag-node" title="${escapeHtml(step.command || '')}">
+      <div class="wf-dag-node wf-dag-node-glow" title="${escapeHtml(step.command || '')}">
         <span class="wf-dag-node-icon">${icon}</span>
         <span class="wf-dag-node-label">${escapeHtml(step.name)}</span>
         <span class="wf-dag-node-tool">${escapeHtml(step.skill || step.tool || '')}</span>
@@ -52,7 +52,7 @@ export function renderWorkflowDag(steps, dataFlow) {
     if (i < visible.length - 1) {
       return nodeHtml + `
         <div class="wf-dag-connector">
-          <div class="wf-dag-arrow">
+          <div class="wf-dag-arrow wf-dag-arrow-animated">
             ${artifact ? `<span class="wf-dag-artifact">${escapeHtml(artifact)}</span>` : ''}
           </div>
         </div>`;
@@ -70,8 +70,9 @@ export function renderWorkflowDag(steps, dataFlow) {
 /**
  * Render a step detail table.
  */
-export function renderStepTable(steps) {
+export function renderStepTable(steps, opts = {}) {
   if (!steps?.length) return '';
+  const tableClass = opts.enhanced ? 'wf-step-table wf-step-table-enhanced' : 'wf-step-table';
 
   const rows = steps.map(s => `
     <tr>
@@ -83,7 +84,7 @@ export function renderStepTable(steps) {
     </tr>`).join('');
 
   return `
-    <table class="wf-step-table">
+    <table class="${tableClass}">
       <thead>
         <tr>
           <th>Step</th>

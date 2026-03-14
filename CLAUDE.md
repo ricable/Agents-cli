@@ -182,14 +182,14 @@ examples/
     ai-ml-tools.json  — 502 AI/ML tool entries (was at project root, now here)
   saas-ui/            — SaaS marketplace UI, deployed to https://ui.spectredve.com
     package.json      — dependencies for Vercel serverless functions (stripe ^17.0.0)
-    index.html        — main app (marketplace, forge). Dashboard/economy/keys moved to admin.html
+    index.html        — main app (marketplace, forge). Dashboard/economy/keys moved to admin.html. Includes JetBrains Mono font, workflow showcase section (`#workflowShowcase` between Chrome Extension and Marketplace), 50% OFF launch promo pricing
     admin.html        — standalone admin SPA, auth-gated, hash routing (#dashboard, #economy, #keys, #settings)
     api/              — Vercel serverless functions (Node.js, ESM)
       health.js       — GET /api/health — returns {ok, ts}, no auth
       config.js       — GET /api/config — returns {clerkPublishableKey}, no auth
       billing/
         checkout.js   — POST /api/billing/checkout — creates Stripe Checkout session, returns {url}
-    css/styles.css    — design system + economy / heatmap / bulk-select / tier badges / value comparison / workflow (mini pipeline, DAG, step table, NEW badge) styles
+    css/styles.css    — design system + economy / heatmap / bulk-select / tier badges / value comparison / workflow (mini pipeline, DAG, step table, NEW badge) / workflow showcase / launch promo styles. CSS vars: `--accent-cyan: #00d4ff`, `--font-tech` (JetBrains Mono)
     css/admin.css     — admin panel styles: fixed 220px sidebar, cyan border glow, scan-line top bar, command bridge aesthetic
     vercel.json       — Vercel deploy config (SPA rewrites incl. /admin→admin.html, /api/* → serverless, no-cache HTML, long-cache assets)
     registry-data.json — static data for marketplace: github/npm/pypi/crates/agent_defs/harnesses/cli_anything/generated_skills/workflows
@@ -202,7 +202,7 @@ examples/
       marketplace.js  — product grid, agent-native filter, bulk select, Try button, tier access gating, catalog-updated event. Re-exports utils.js symbols
       registries.js   — registry panes (GitHub/npm/PyPI/crates/cli-anything); injects agent_defs+generated_skills into catalog
       dashboard.js    — revenue tracker, agent wallet, heatmap. Imports from utils.js. Key links → /admin#keys
-      product-detail.js — 4-tab detail (overview/pricing/changelog/pipeline for workflows), SSE feed, DAG viz. Re-exports showToast from utils.js
+      product-detail.js — 4-tab detail (overview/pricing/changelog/pipeline for workflows), SSE feed, DAG viz. Re-exports showToast from utils.js. Workflow detail defaults to Pipeline tab (not Overview). `renderStepTable(steps, opts)` accepts optional `{ enhanced: true }` for zebra striping
       workflow-dag.js — pure CSS/HTML DAG renderer for workflow detail modal pipeline tab
       forge-ui.js     — cost estimator, quality preview, persona selector, batch CSV
       economy.js      — agent economy: earnings, leaderboard, sparklines. Imports escapeHtml from utils.js
@@ -296,7 +296,11 @@ examples/generated-workflows/<name>/
 - `examples/saas-ui/js/marketplace.js` — workflow tier gating, mini pipeline renderer
 - `examples/saas-ui/js/product-detail.js` — Pipeline tab with DAG, step table, env vars
 - `examples/saas-ui/js/registries.js` — injects workflows from registry-data.json
-- `examples/saas-ui/css/styles.css` — workflow CSS (mini pipeline, DAG, step table, NEW badge)
+- `examples/saas-ui/css/styles.css` — workflow CSS (mini pipeline, DAG, step table, NEW badge), `--accent-cyan`, `--font-tech`, workflow showcase section, launch promo styles (ribbon, strikethrough, gradient-pulse animation)
+- `examples/saas-ui/index.html` — JetBrains Mono font, `#workflowShowcase` section (animated pipeline demo, 3 featured cards), 50% OFF promo pricing with yearly toggle, "7 Product Types", workflow row in value comparison
+- `examples/saas-ui/js/marketplace.js` — `.workflow-card` cyan left border, `.wf-pulse` gradient-pulse on mini-pipeline arrows
+- `examples/saas-ui/js/product-detail.js` — Pipeline tab default for workflows, CTA upsell note for free users, enhanced step table with `{ enhanced: true }` option
+- `examples/saas-ui/js/workflow-dag.js` — `.wf-dag-arrow-animated` gradient-pulse, `.wf-dag-node-glow` hover, artifact float animation
 - `examples/saas-ui/registry-data.json` — 6 showcase workflows
 
 ## SaaS UI Deployment
@@ -337,6 +341,7 @@ Standalone admin SPA at `/admin`, separate from the main marketplace UI. Auth-ga
 **Pricing checkout flow:**
 - All tiers (Starter/Pro/Enterprise) use `POST /api/billing/checkout` → Vercel serverless function → Stripe Checkout session → redirect
 - Real Stripe test price IDs: Starter ($29/mo) `price_1TAsLJ2QpzdUwTFgn4OhkLig`, Pro ($79/mo) `price_1TAsLK2QpzdUwTFgqe4HP5Jh`, Enterprise ($199/mo) `price_1TAsLK2QpzdUwTFgZQQ56NrE`
+- **50% OFF launch promo** — display-only promo prices: Starter $14.99/mo ($11.99/yr), Pro $39.99/mo ($31.99/yr), Enterprise $99/mo ($79/yr). Pricing cards use `.tier-price-promo` wrapper with `.price-original` (strikethrough) and `.promo-amount` (green glow). `.promo-ribbon` uses `clip-path: polygon()`. Stripe price IDs and actual billing amounts are unchanged — promo is UI-only
 - `handleCheckout(priceId)` in `app.js` sends `{priceId, successUrl, cancelUrl}` → serverless fn creates `stripe.checkout.sessions.create()` in subscription mode
 - On success redirect, `?checkout=success` query param triggers a toast + URL cleanup
 - Generic button handler in `app.js` skips pricing buttons with `data-price-id` attributes
@@ -562,6 +567,11 @@ updateUserMetadata(userId, metadata, config: ClerkConfig): Promise<void>
 - Workflow DAG renderer (`workflow-dag.js`) is pure CSS/HTML — no external dependencies (no D3, no Mermaid)
 - `"workflow"` is a valid ProductType — must be included in any ProductType union exhaustiveness checks
 - Workflow tier gating requires at least Starter — free users get view-only access (0 installs)
+- Promo prices are display-only — Stripe price IDs and actual billing amounts are unchanged. Do not create new Stripe prices for promo
+- `renderStepTable(steps, opts)` now accepts optional `{ enhanced: true }` second argument for zebra striping
+- `.promo-ribbon` uses `clip-path: polygon()` — test in target browsers before modifying
+- Workflow detail modal defaults to Pipeline tab (not Overview) for workflow products — do not reset this behavior
+- `#workflowShowcase` section is positioned between Chrome Extension and Marketplace sections in `index.html`
 
 ## Do NOT
 
@@ -585,3 +595,6 @@ updateUserMetadata(userId, metadata, config: ClerkConfig): Promise<void>
 - Add external DAG rendering libs (D3, Mermaid) to workflow visualization — `workflow-dag.js` is intentionally pure CSS/HTML
 - Bypass workflow quality gates (all 4 axes must be ≥ 0.5) — `scoreWorkflowQuality()` is integrated into `testSkillSync()`
 - Put workflow tier entitlements anywhere except `lib/companion/tiers.ts` — that is the canonical location
+- Change promo display prices without updating all 3 views (monthly cards, yearly cards, value comparison table)
+- Remove or reorder `#workflowShowcase` section — it is intentionally between Chrome Extension and Marketplace for conversion flow
+- Override workflow detail modal's default Pipeline tab — workflows should always open to Pipeline, not Overview
