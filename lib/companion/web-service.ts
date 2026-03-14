@@ -144,22 +144,62 @@ function hashKey(key: string): string {
   return createHash("sha256").update(key).digest("hex");
 }
 
-// ── Response Helpers ───────────────────────────────────────────────────
+// ── CORS ───────────────────────────────────────────────────────────────
 
-function sendJson<T>(res: ServerResponse, status: number, data: CliOutput<T>): void {
-  const body = JSON.stringify(data, null, 2);
-  res.writeHead(status, {
-    "Content-Type": "application/json",
-    "X-Content-Type-Options": "nosniff",
-    "Access-Control-Allow-Origin": "*",
+const ALLOWED_ORIGINS = new Set([
+  "https://ui.spectredve.com",
+]);
+
+function isAllowedOrigin(origin: string | undefined): string | null {
+  if (!origin) return null;
+  if (ALLOWED_ORIGINS.has(origin)) return origin;
+  // Allow localhost on any port for local development
+  try {
+    const url = new URL(origin);
+    if (url.hostname === "localhost" || url.hostname === "127.0.0.1") return origin;
+  } catch {
+    // Invalid URL — not allowed
+  }
+  return null;
+}
+
+function corsHeaders(req: IncomingMessage): Record<string, string> {
+  const origin = req.headers.origin;
+  const allowed = isAllowedOrigin(origin);
+  const headers: Record<string, string> = {
     "Access-Control-Allow-Headers": "Authorization, Content-Type",
     "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-  });
+  };
+  if (allowed) {
+    headers["Access-Control-Allow-Origin"] = allowed;
+    headers["Vary"] = "Origin";
+  }
+  return headers;
+}
+
+// ── Stripe Price-to-Tier Mapping ───────────────────────────────────────
+
+const PRICE_TO_TIER: Record<string, ApiTier> = {
+  "price_1TAsLJ2QpzdUwTFgn4OhkLig": "starter",
+  "price_1TAsLK2QpzdUwTFgqe4HP5Jh": "pro",
+  "price_1TAsLK2QpzdUwTFgZQQ56NrE": "enterprise",
+};
+
+// ── Response Helpers ───────────────────────────────────────────────────
+
+function sendJson<T>(res: ServerResponse, status: number, data: CliOutput<T>, req?: IncomingMessage): void {
+  const body = JSON.stringify(data, null, 2);
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "X-Content-Type-Options": "nosniff",
+    ...(req ? corsHeaders(req) : {}),
+  };
+  res.writeHead(status, headers);
   res.end(body);
 }
 
-function sendError(res: ServerResponse, status: number, code: string, message: string): void {
-  sendJson(res, status, failure("web-service", code, message, Date.now()));
+function sendError(res: ServerResponse, status: number, code: string, message: string, req?: IncomingMessage): void {
+  sendJson(res, status, failure("web-service", code, message, Date.now()), req);
 }
 
 // ── Shared request helpers ─────────────────────────────────────────────
@@ -182,16 +222,16 @@ async function authenticateAndParse(
   const keyRecord = authenticate(req);
   if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token", req); return null; }
   if (!keyLimiter.consume(hashKey(req.headers.authorization!.slice(7)))) {
-    sendError(res, 429, "RATE_LIMITED", "Rate limit exceeded for API key"); return null;
+    sendError(res, 429, "RATE_LIMITED", "Rate limit exceeded for API key", req); return null;
   }
   if (!ipLimiter.consume(ip)) {
-    sendError(res, 429, "RATE_LIMITED", "Rate limit exceeded for IP"); return null;
+    sendError(res, 429, "RATE_LIMITED", "Rate limit exceeded for IP", req); return null;
   }
 
   const body = await parseBody(req, config.maxBodySize);
   const parsed = JSON.parse(body) as { description?: string };
   if (!parsed.description || typeof parsed.description !== "string") {
-    sendError(res, 400, "INVALID_INPUT", "Missing 'description' field"); return null;
+    sendError(res, 400, "INVALID_INPUT", "Missing 'description' field", req); return null;
   }
   const description = sanitizeControlChars(parsed.description).slice(0, 2000);
   return { keyRecord, description };
@@ -263,8 +303,8 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
       const session = await verifyClerkToken(req, config.clerkConfig);
       if (session) {
         // Read tier from Clerk publicMetadata (updated by Stripe webhook on subscription events)
-        const tier = (session.publicMetadata["tier"] as ApiTier | undefined) ?? "free";
-        const syntheticKey: ApiKeyRecord = { tier, label: `clerk:${session.userId}` };
+        const userTier = (session.publicMetadata?.["tier"] as ApiTier) || "free";
+        const syntheticKey: ApiKeyRecord = { tier: userTier, label: `clerk:${session.userId}` };
         return {
           keyRecord: syntheticKey,
           clerkUserId: session.userId,
@@ -370,11 +410,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
 
     // CORS preflight
     if (method === "OPTIONS") {
-      res.writeHead(204, {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Authorization, Content-Type",
-        "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-      });
+      res.writeHead(204, corsHeaders(req));
       res.end();
       return;
     }
@@ -386,7 +422,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     if (method === "GET" && path === "/api/config") {
       sendJson(res, 200, success("config", {
         clerkPublishableKey: config.clerkConfig?.publishableKey ?? null,
-      }, Date.now()));
+      }, Date.now()), req);
       return;
     }
 
@@ -398,7 +434,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
         activeJobs: runningJobs,
         queuedJobs: jobQueue.length,
         totalJobs: jobs.size,
-      }, Date.now()));
+      }, Date.now()), req);
       return;
     }
 
@@ -408,9 +444,9 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
       if (!authed) return;
       try {
         const profile = analyzeProject(authed.description);
-        sendJson(res, 200, success("analyze", profile, Date.now()));
+        sendJson(res, 200, success("analyze", profile, Date.now()), req);
       } catch (err) {
-        sendError(res, 400, "ANALYSIS_ERROR", toErrorMessage(err));
+        sendError(res, 400, "ANALYSIS_ERROR", toErrorMessage(err), req);
       }
       return;
     }
@@ -422,9 +458,9 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
       try {
         const profile = analyzeProject(authed.description);
         const plan = mapToTools(profile, config.projectRoot);
-        sendJson(res, 200, success("plan", plan, Date.now()));
+        sendJson(res, 200, success("plan", plan, Date.now()), req);
       } catch (err) {
-        sendError(res, 400, "PLAN_ERROR", toErrorMessage(err));
+        sendError(res, 400, "PLAN_ERROR", toErrorMessage(err), req);
       }
       return;
     }
@@ -434,15 +470,15 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
       const authed = await authenticateAndParse(req, res, ip, config, keyLimiter, ipLimiter, authenticate);
       if (!authed) return;
       if (authed.keyRecord.tier === "free") {
-        sendError(res, 403, "TIER_REQUIRED", "Generation requires starter tier or above"); return;
+        sendError(res, 403, "TIER_REQUIRED", "Generation requires starter tier or above", req); return;
       }
       const keyHash = hashKey(req.headers.authorization!.slice(7));
       const tierLimits = getTierLimits(authed.keyRecord.tier);
       if (!usageMeter.recordUsage(keyHash, tierLimits.dailyGens)) {
-        sendError(res, 429, "DAILY_LIMIT", `Daily generation limit (${tierLimits.dailyGens}) exceeded`); return;
+        sendError(res, 429, "DAILY_LIMIT", `Daily generation limit (${tierLimits.dailyGens}) exceeded`, req); return;
       }
       if (jobQueue.length >= maxQueueDepth) {
-        sendError(res, 503, "QUEUE_FULL", "Job queue is full — try again later"); return;
+        sendError(res, 503, "QUEUE_FULL", "Job queue is full — try again later", req); return;
       }
 
       const job: Job = {
@@ -459,7 +495,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
       jobQueue.push(job.id);
       drainQueue();
 
-      sendJson(res, 202, success("generate", { jobId: job.id, status: "queued" }, Date.now()));
+      sendJson(res, 202, success("generate", { jobId: job.id, status: "queued" }, Date.now()), req);
       return;
     }
 
@@ -470,7 +506,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
       if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token", req); return; }
 
       const job = jobs.get(statusMatch[1]!);
-      if (!job) { sendError(res, 404, "NOT_FOUND", "Job not found"); return; }
+      if (!job) { sendError(res, 404, "NOT_FOUND", "Job not found", req); return; }
 
       sendJson(res, 200, success("status", {
         id: job.id,
@@ -485,7 +521,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
         } : undefined,
         recommendations: job.plan ? job.plan.summary : undefined,
         report: job.report,
-      }, Date.now()));
+      }, Date.now()), req);
       return;
     }
 
@@ -496,12 +532,12 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
       if (!keyRecord) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token", req); return; }
 
       const job = jobs.get(dlMatch[1]!);
-      if (!job) { sendError(res, 404, "NOT_FOUND", "Job not found"); return; }
+      if (!job) { sendError(res, 404, "NOT_FOUND", "Job not found", req); return; }
       if (job.status !== "completed") {
-        sendError(res, 409, "NOT_READY", `Job status: ${job.status}`); return;
+        sendError(res, 409, "NOT_READY", `Job status: ${job.status}`, req); return;
       }
       if (!job.bundlePath) {
-        sendError(res, 404, "NO_BUNDLE", "Bundle not yet available — use /api/status to check progress"); return;
+        sendError(res, 404, "NO_BUNDLE", "Bundle not yet available — use /api/status to check progress", req); return;
       }
 
       // Direct stat — handle ENOENT instead of TOCTOU existsSync + statSync
@@ -515,7 +551,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
         });
         createReadStream(job.bundlePath).pipe(res);
       } catch {
-        sendError(res, 404, "NO_BUNDLE", "Bundle file not found");
+        sendError(res, 404, "NO_BUNDLE", "Bundle file not found", req);
       }
       return;
     }
@@ -535,7 +571,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
         used: usage.count,
         remaining: tierLimits.dailyGens < 0 ? -1 : tierLimits.dailyGens - usage.count,
         resetsAt: new Date(usage.resetAt).toISOString(),
-      }, Date.now()));
+      }, Date.now()), req);
       return;
     }
 
@@ -549,7 +585,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
         email: authed.clerkEmail ?? "user@example.com",
         userId: authed.clerkUserId ?? null,
         tier: authed.keyRecord.tier,
-      }, Date.now()));
+      }, Date.now()), req);
       return;
     }
 
@@ -562,43 +598,70 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
         const payload = await parseBody(req, config.maxBodySize);
         const signature = req.headers["stripe-signature"];
         if (!signature || Array.isArray(signature)) {
-          sendError(res, 400, "INVALID_SIGNATURE", "Missing stripe-signature header"); return;
+          sendError(res, 400, "INVALID_SIGNATURE", "Missing stripe-signature header", req); return;
         }
         const billing = createBillingProvider("stripe");
         const event = await billing.verifyWebhook(payload, signature, config.stripeWebhookSecret);
 
-        // Sync subscription tier → Clerk user publicMetadata
-        if (config.clerkConfig) {
-          // clerkUserId is stored in session metadata (checkout.session.completed)
-          // and in subscription metadata (customer.subscription.*)
-          const meta = event.data["metadata"] as Record<string, string> | undefined;
+        // Handle subscription events — resolve tier from Stripe price ID
+        if (event.type === "checkout.session.completed" || event.type === "customer.subscription.updated") {
+          const eventData = event.data as Record<string, unknown>;
+
+          // Extract price ID: from subscription items (subscription.updated) or line_items (checkout.completed)
+          let priceId: string | undefined;
+          const items = (eventData["items"] as { data?: Array<{ price?: { id?: string } }> })?.data;
+          if (items?.[0]?.price?.id) {
+            priceId = items[0].price.id;
+          }
+          // For checkout.session.completed, the price may be nested in line_items
+          if (!priceId) {
+            const lineItems = (eventData["line_items"] as { data?: Array<{ price?: { id?: string } }> })?.data;
+            if (lineItems?.[0]?.price?.id) {
+              priceId = lineItems[0].price.id;
+            }
+          }
+
+          const tier = priceId ? PRICE_TO_TIER[priceId] ?? "free" : "free";
+
+          // Extract Clerk user ID from metadata for reverse-lookup
+          const meta = eventData["metadata"] as Record<string, string> | undefined;
           const clerkUserId = meta?.["clerkUserId"];
 
-          if (clerkUserId) {
-            let tier: ApiTier;
-            switch (event.type) {
-              case "checkout.session.completed":
-              case "customer.subscription.updated":
-                // Read tier from subscription/price metadata, default to "starter"
-                tier = (meta?.["tier"] as ApiTier | undefined) ?? "starter";
-                break;
-              case "customer.subscription.deleted":
-                tier = "free";
-                break;
-              default:
-                tier = "starter";
+          if (clerkUserId && config.clerkConfig) {
+            try {
+              await updateUserMetadata(
+                clerkUserId,
+                { tier, stripeCustomerId: event.customerId },
+                config.clerkConfig,
+              );
+            } catch {
+              // Non-fatal — log in production
             }
-            await updateUserMetadata(
-              clerkUserId,
-              { tier, stripeCustomerId: event.customerId },
-              config.clerkConfig,
-            ).catch(() => { /* non-fatal */ });
           }
         }
 
-        sendJson(res, 200, success("billing-webhook", { received: true, type: event.type }, Date.now()));
+        // Handle subscription deletion — downgrade to free
+        if (event.type === "customer.subscription.deleted") {
+          const eventData = event.data as Record<string, unknown>;
+          const meta = eventData["metadata"] as Record<string, string> | undefined;
+          const clerkUserId = meta?.["clerkUserId"];
+
+          if (clerkUserId && config.clerkConfig) {
+            try {
+              await updateUserMetadata(
+                clerkUserId,
+                { tier: "free" },
+                config.clerkConfig,
+              );
+            } catch {
+              // Non-fatal
+            }
+          }
+        }
+
+        sendJson(res, 200, success("billing-webhook", { received: true, type: event.type }, Date.now()), req);
       } catch (err) {
-        sendError(res, 400, "WEBHOOK_ERROR", toErrorMessage(err));
+        sendError(res, 400, "WEBHOOK_ERROR", toErrorMessage(err), req);
       }
       return;
     }
@@ -656,9 +719,9 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
         }
         const billing = createBillingProvider("stripe");
         const result = await billing.getPortalUrl(customerId);
-        sendJson(res, 200, success("billing-portal", result, Date.now()));
+        sendJson(res, 200, success("billing-portal", result, Date.now()), req);
       } catch (err) {
-        sendError(res, 400, "BILLING_ERROR", toErrorMessage(err));
+        sendError(res, 400, "BILLING_ERROR", toErrorMessage(err), req);
       }
       return;
     }
@@ -680,9 +743,9 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
         }
         const billing = createBillingProvider("stripe");
         const result = await billing.listInvoices(customerId);
-        sendJson(res, 200, success("billing-invoices", result, Date.now()));
+        sendJson(res, 200, success("billing-invoices", result, Date.now()), req);
       } catch (err) {
-        sendError(res, 400, "BILLING_ERROR", toErrorMessage(err));
+        sendError(res, 400, "BILLING_ERROR", toErrorMessage(err), req);
       }
       return;
     }
@@ -703,7 +766,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
         nextPayoutDate: nextPayout.toISOString().slice(0, 10),
         period,
         skills: [],
-      }, Date.now()));
+      }, Date.now()), req);
       return;
     }
 
@@ -712,7 +775,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     if (method === "GET" && agentMetricsMatch) {
       const authed = await requireAuth(req);
       if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token", req); return; }
-      res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+      res.writeHead(200, { "Content-Type": "application/json", ...corsHeaders(req) });
       res.end(JSON.stringify({
         success: true,
         data: {
@@ -731,7 +794,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     if (method === "GET" && agentHeatmapMatch) {
       const authed = await requireAuth(req);
       if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token", req); return; }
-      res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+      res.writeHead(200, { "Content-Type": "application/json", ...corsHeaders(req) });
       res.end(JSON.stringify({
         success: true,
         data: {
@@ -758,9 +821,9 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
           secret,
           scopes,
           createdAt: new Date().toISOString(),
-        }, Date.now()));
+        }, Date.now()), req);
       } catch (err) {
-        sendError(res, 400, "INVALID_INPUT", toErrorMessage(err));
+        sendError(res, 400, "INVALID_INPUT", toErrorMessage(err), req);
       }
       return;
     }
@@ -773,7 +836,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
       sendJson(res, 200, success("agent-keys-revoke", {
         revoked: true,
         id: agentKeyDeleteMatch[1],
-      }, Date.now()));
+      }, Date.now()), req);
       return;
     }
 
@@ -786,7 +849,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         "Connection": "keep-alive",
-        "Access-Control-Allow-Origin": "*",
+        ...corsHeaders(req),
       });
 
       const agents = ["claude-sonnet-4-6", "gpt-4o", "gemini-1.5-pro", "local-agent"];
@@ -811,12 +874,12 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
         const marketplacePath = join(config.projectRoot, "marketplace.json");
         if (existsSync(marketplacePath)) {
           const data = JSON.parse(readFileSync(marketplacePath, "utf-8"));
-          sendJson(res, 200, success("catalog", data, Date.now()));
+          sendJson(res, 200, success("catalog", data, Date.now()), req);
         } else {
-          sendJson(res, 200, success("catalog", { products: [] }, Date.now()));
+          sendJson(res, 200, success("catalog", { products: [] }, Date.now()), req);
         }
       } catch (err) {
-        sendError(res, 500, "CATALOG_ERROR", toErrorMessage(err));
+        sendError(res, 500, "CATALOG_ERROR", toErrorMessage(err), req);
       }
       return;
     }
@@ -830,14 +893,14 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
 
       // Path traversal check — must be within saas-ui/
       if (!resolved.startsWith(saasUiDir + "/") && resolved !== saasUiDir) {
-        sendError(res, 403, "FORBIDDEN", "Path traversal denied");
+        sendError(res, 403, "FORBIDDEN", "Path traversal denied", req);
         return;
       }
 
       try {
         const stat = statSync(resolved);
-        if (!stat.isFile()) { sendError(res, 404, "NOT_FOUND", "Not a file"); return; }
-        if (stat.size > 10_000_000) { sendError(res, 413, "TOO_LARGE", "File too large"); return; }
+        if (!stat.isFile()) { sendError(res, 404, "NOT_FOUND", "Not a file", req); return; }
+        if (stat.size > 10_000_000) { sendError(res, 413, "TOO_LARGE", "File too large", req); return; }
 
         const ext = extname(resolved).toLowerCase();
         const mimeTypes: Record<string, string> = {
@@ -872,14 +935,14 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
           });
           createReadStream(indexPath).pipe(res);
         } catch {
-          sendError(res, 404, "NOT_FOUND", "File not found");
+          sendError(res, 404, "NOT_FOUND", "File not found", req);
         }
       }
       return;
     }
 
     // ── 404 ─────────────────────────────────────────────────────
-    sendError(res, 404, "NOT_FOUND", `Unknown endpoint: ${method} ${path}`);
+    sendError(res, 404, "NOT_FOUND", `Unknown endpoint: ${method} ${path}`, req);
   }
 
   // ── Server setup ──────────────────────────────────────────────────
