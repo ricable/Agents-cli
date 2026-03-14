@@ -90,7 +90,7 @@ export class AuthManager {
             userId: user.id,
           };
           this.store.set('user', authUser);
-          this.store.set('tier', 'pro');
+          this.store.set('tier', user.publicMetadata?.tier || 'free');
           // Pipe Clerk session token to API client
           session.getToken().then(token => {
             if (token) this.api.setToken(token);
@@ -134,7 +134,7 @@ export class AuthManager {
               avatar: (u.fullName ?? u.firstName ?? 'U')[0].toUpperCase(),
               userId: u.id,
             });
-            this.store.set('tier', 'pro');
+            this.store.set('tier', u.publicMetadata?.tier || 'free');
           }
           // handleRedirectCallback navigates to after_sign_in_url on success.
           // If still here (no navigation happened), go home.

@@ -639,8 +639,8 @@
       <select id="tier">
         <option value="free">Free</option>
         <option value="starter" selected>Starter ($29/mo)</option>
-        <option value="pro">Pro ($99/mo)</option>
-        <option value="enterprise">Enterprise (custom)</option>
+        <option value="pro">Pro ($79/mo)</option>
+        <option value="enterprise">Enterprise ($199/mo)</option>
       </select>
     </div>
 
@@ -1010,7 +1010,7 @@ function renderPreview() {
     enterprise: { analyze: 'unlimited', plan: 'unlimited', generate: 'unlimited', download: true, deep: true, cache: '7d' },
   };
 
-  const tierPrices = { free: '$0', starter: '$29', pro: '$99', enterprise: 'Custom' };
+  const tierPrices = { free: '$0', starter: '$29', pro: '$79', enterprise: '$199' };
 
   let html = `
     <div class="preview-header">
