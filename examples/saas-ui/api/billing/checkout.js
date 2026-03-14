@@ -12,11 +12,11 @@ import Stripe from 'stripe';
 
 // ── Allowlists ────────────────────────────────────────────────────────
 
-const ALLOWED_PRICE_IDS = new Set([
-  'price_1TAsLJ2QpzdUwTFgn4OhkLig', // Starter $29/mo
-  'price_1TAsLK2QpzdUwTFgqe4HP5Jh', // Pro $79/mo
-  'price_1TAsLK2QpzdUwTFgZQQ56NrE', // Enterprise $199/mo
-]);
+const PRICE_TO_TIER = {
+  'price_1TAsLJ2QpzdUwTFgn4OhkLig': 'starter',    // $29/mo
+  'price_1TAsLK2QpzdUwTFgqe4HP5Jh': 'pro',         // $79/mo
+  'price_1TAsLK2QpzdUwTFgZQQ56NrE': 'enterprise',  // $199/mo
+};
 
 const ALLOWED_ORIGINS = [
   'https://ui.spectredve.com',
@@ -74,7 +74,7 @@ export default async function handler(req, res) {
   const { priceId, successUrl, cancelUrl } = req.body || {};
 
   // Validate priceId
-  if (!priceId || !ALLOWED_PRICE_IDS.has(priceId)) {
+  if (!priceId || !PRICE_TO_TIER[priceId]) {
     return res.status(400).json({ error: 'Invalid or missing priceId' });
   }
 
@@ -95,11 +95,15 @@ export default async function handler(req, res) {
 
   try {
     const stripe = new Stripe(secretKey);
+    // Embed priceId + tier so webhooks can reliably resolve the subscription tier
+    const meta = { priceId, tier: PRICE_TO_TIER[priceId] };
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: successUrl || `${requestOrigin}/?checkout=success`,
       cancel_url: cancelUrl || `${requestOrigin}/?checkout=cancel`,
+      metadata: meta,
+      subscription_data: { metadata: meta },
     });
 
     return res.status(200).json({ url: session.url });
