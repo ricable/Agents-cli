@@ -10526,5 +10526,166 @@
         "downloads": 62
       }
     }
+  ],
+  "workflows": [
+    {
+      "id": "wf-rag-pipeline",
+      "name": "RAG Pipeline",
+      "description": "Use when building retrieval-augmented generation pipelines, ingesting documents, embedding and indexing text, querying with LLM context. Do NOT use for single-model inference without retrieval.",
+      "author": "agents-cli",
+      "version": "1.0.0",
+      "category": "ai-ml/rag",
+      "quality": 8.5,
+      "pricing": { "model": "freemium", "price": 9.99 },
+      "estimatedDuration": "5min",
+      "workflowSteps": [
+        { "name": "ingest", "skill": "document-loader", "command": "python3 ingest.py", "onFailure": "stop" },
+        { "name": "embed", "skill": "embedder", "command": "python3 embed.py", "onFailure": "stop" },
+        { "name": "index", "skill": "vector-store", "command": "python3 index.py", "onFailure": "stop" },
+        { "name": "query", "skill": "rag-query", "command": "python3 query.py", "onFailure": "stop" }
+      ],
+      "dataFlow": [
+        { "from": "ingest", "to": "embed", "artifact": "json" },
+        { "from": "embed", "to": "index", "artifact": "vectors" },
+        { "from": "index", "to": "query", "artifact": "index" }
+      ],
+      "envVars": [
+        { "name": "OPENAI_API_KEY", "description": "OpenAI API key for embeddings and LLM", "required": true, "example": "sk-..." },
+        { "name": "PINECONE_API_KEY", "description": "Pinecone vector database API key", "required": true, "example": "pc-..." }
+      ],
+      "dependencies": ["document-loader", "embedder", "vector-store", "rag-query"],
+      "stats": { "downloads": 342, "rating": 4.6, "reviews": 18 }
+    },
+    {
+      "id": "wf-code-quality-gate",
+      "name": "Code Quality Gate",
+      "description": "Use when enforcing code quality standards, running automated linting, formatting, testing, and coverage checks before merge. Do NOT use for single-tool linting or ad-hoc formatting.",
+      "author": "agents-cli",
+      "version": "1.0.0",
+      "category": "devops/ci",
+      "quality": 9.0,
+      "pricing": { "model": "free" },
+      "estimatedDuration": "3min",
+      "workflowSteps": [
+        { "name": "lint", "skill": "ruff", "command": "ruff check .", "onFailure": "stop" },
+        { "name": "format", "skill": "black", "command": "black --check .", "onFailure": "stop" },
+        { "name": "test", "skill": "pytest", "command": "pytest --tb=short", "onFailure": "stop" },
+        { "name": "coverage", "skill": "coverage", "command": "coverage report --fail-under=80", "onFailure": "continue" }
+      ],
+      "dependencies": ["ruff", "black", "pytest", "coverage"],
+      "stats": { "downloads": 891, "rating": 4.8, "reviews": 45 }
+    },
+    {
+      "id": "wf-ml-training",
+      "name": "ML Training Pipeline",
+      "description": "Use when orchestrating machine learning training workflows, preprocessing datasets, training models, evaluating performance, deploying to production. Do NOT use for simple inference or single predictions.",
+      "author": "agents-cli",
+      "version": "1.0.0",
+      "category": "ai-ml/training",
+      "quality": 8.2,
+      "pricing": { "model": "paid", "price": 19.99 },
+      "estimatedDuration": "15min",
+      "workflowSteps": [
+        { "name": "preprocess", "skill": "data-prep", "command": "python3 preprocess.py", "onFailure": "stop" },
+        { "name": "train", "skill": "trainer", "command": "python3 train.py", "onFailure": "stop" },
+        { "name": "evaluate", "skill": "evaluator", "command": "python3 evaluate.py", "onFailure": "continue" },
+        { "name": "deploy", "skill": "deployer", "command": "python3 deploy.py", "onFailure": "stop" }
+      ],
+      "dataFlow": [
+        { "from": "preprocess", "to": "train", "artifact": "csv" },
+        { "from": "train", "to": "evaluate", "artifact": "model" },
+        { "from": "evaluate", "to": "deploy", "artifact": "metrics" }
+      ],
+      "envVars": [
+        { "name": "WANDB_API_KEY", "description": "Weights & Biases API key for experiment tracking", "required": false },
+        { "name": "AWS_ACCESS_KEY_ID", "description": "AWS access key for S3 model storage", "required": true }
+      ],
+      "dependencies": ["data-prep", "trainer", "evaluator", "deployer"],
+      "stats": { "downloads": 215, "rating": 4.3, "reviews": 12 }
+    },
+    {
+      "id": "wf-security-audit",
+      "name": "Security Audit",
+      "description": "Use when scanning for vulnerabilities, auditing dependencies, checking for leaked secrets, generating compliance reports. Do NOT use for runtime security monitoring or WAF configuration.",
+      "author": "agents-cli",
+      "version": "1.0.0",
+      "category": "security/audit",
+      "quality": 8.8,
+      "pricing": { "model": "freemium", "price": 4.99 },
+      "estimatedDuration": "5min",
+      "workflowSteps": [
+        { "name": "scan-deps", "skill": "trivy", "command": "trivy fs --scanners vuln .", "onFailure": "continue" },
+        { "name": "audit-code", "skill": "semgrep", "command": "semgrep --config auto .", "onFailure": "continue" },
+        { "name": "check-secrets", "skill": "gitleaks", "command": "gitleaks detect --source .", "onFailure": "stop" },
+        { "name": "report", "skill": "reporter", "command": "python3 report.py", "onFailure": "continue" }
+      ],
+      "dataFlow": [
+        { "from": "scan-deps", "to": "report", "artifact": "json" },
+        { "from": "audit-code", "to": "report", "artifact": "json" },
+        { "from": "check-secrets", "to": "report", "artifact": "json" }
+      ],
+      "dependencies": ["trivy", "semgrep", "gitleaks", "reporter"],
+      "stats": { "downloads": 567, "rating": 4.7, "reviews": 31 }
+    },
+    {
+      "id": "wf-content-publishing",
+      "name": "Content Publishing",
+      "description": "Use when automating content creation workflows, generating articles, reviewing drafts, formatting for publication, publishing to CMS platforms. Do NOT use for single content generation or manual editing.",
+      "author": "agents-cli",
+      "version": "1.0.0",
+      "category": "content/publishing",
+      "quality": 7.8,
+      "pricing": { "model": "paid", "price": 14.99 },
+      "estimatedDuration": "8min",
+      "workflowSteps": [
+        { "name": "generate", "skill": "writer", "command": "python3 generate.py", "onFailure": "stop" },
+        { "name": "review", "skill": "reviewer", "command": "python3 review.py", "onFailure": "continue" },
+        { "name": "format", "skill": "formatter", "command": "python3 format.py", "onFailure": "stop" },
+        { "name": "publish", "skill": "publisher", "command": "python3 publish.py", "onFailure": "stop" }
+      ],
+      "dataFlow": [
+        { "from": "generate", "to": "review", "artifact": "markdown" },
+        { "from": "review", "to": "format", "artifact": "markdown" },
+        { "from": "format", "to": "publish", "artifact": "html" }
+      ],
+      "envVars": [
+        { "name": "OPENAI_API_KEY", "description": "OpenAI API key for content generation", "required": true },
+        { "name": "CMS_API_KEY", "description": "CMS platform API key", "required": true }
+      ],
+      "dependencies": ["writer", "reviewer", "formatter", "publisher"],
+      "stats": { "downloads": 183, "rating": 4.2, "reviews": 9 }
+    },
+    {
+      "id": "wf-video-production",
+      "name": "AI Video Production",
+      "description": "Use when orchestrating AI-powered video production pipelines, scripting content, generating images, composing music, creating voiceovers, directing final output. Do NOT use for simple image generation or text-to-speech.",
+      "author": "agents-cli",
+      "version": "1.0.0",
+      "category": "content-production/video",
+      "quality": 9.2,
+      "pricing": { "model": "paid", "price": 29.99 },
+      "estimatedDuration": "20min",
+      "workflowSteps": [
+        { "name": "scout", "skill": "news-scout", "command": "python3 scout.py", "onFailure": "stop" },
+        { "name": "ghostwriter", "skill": "scriptwriter", "command": "python3 ghostwriter.py", "onFailure": "stop" },
+        { "name": "image-gen", "skill": "image-generator", "command": "python3 image_gen.py", "onFailure": "stop" },
+        { "name": "music", "skill": "music-gen", "command": "python3 music.py", "onFailure": "continue" },
+        { "name": "voiceover", "skill": "tts-engine", "command": "python3 voiceover.py", "onFailure": "stop" },
+        { "name": "director", "skill": "video-director", "command": "python3 director.py", "onFailure": "stop" }
+      ],
+      "dataFlow": [
+        { "from": "scout", "to": "ghostwriter", "artifact": "json" },
+        { "from": "ghostwriter", "to": "image-gen", "artifact": "json" },
+        { "from": "image-gen", "to": "director", "artifact": "images" },
+        { "from": "music", "to": "director", "artifact": "audio" },
+        { "from": "voiceover", "to": "director", "artifact": "audio" }
+      ],
+      "envVars": [
+        { "name": "GEMINI_API_KEY", "description": "Google Gemini API key for content generation", "required": true },
+        { "name": "SUNO_COOKIE", "description": "Suno.ai authentication cookie for music generation", "required": false }
+      ],
+      "dependencies": ["news-scout", "scriptwriter", "image-generator", "music-gen", "tts-engine", "video-director"],
+      "stats": { "downloads": 127, "rating": 4.9, "reviews": 7 }
+    }
   ]
 }

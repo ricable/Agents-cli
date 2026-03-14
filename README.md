@@ -181,6 +181,11 @@ npx tsx examples/skill-forge.ts --curated --category ai-ml/llm-inference
 npx tsx examples/skill-forge.ts --curated --category security --limit 10
 npx tsx examples/skill-forge.ts --curated --force --limit 600
 
+# Workflow generation — analyze agent scripts → workflow SKILL.md
+npx tsx examples/skill-forge.ts --workflow-gen ./my-agents
+npx tsx examples/skill-forge.ts --workflow-gen ./agents --domain ai-ml --out ./output
+npx tsx examples/skill-forge.ts --workflow-gen ./scripts --dry-run --json
+
 # System PATH discovery
 npx tsx examples/skill-forge.ts --system --dry-run     # preview local executables
 npx tsx examples/skill-forge.ts --system --limit 20    # forge top 20
@@ -206,6 +211,47 @@ npx tsx examples/skill-forge.ts --system --limit 20    # forge top 20
 --ai             # include AI-enhanced generation
 --strict         # strict quality gate (trigger ≥ 0.90)
 ```
+
+## Workflow generation — turn agent scripts into managed workflows
+
+Point `--workflow-gen` at a directory of agent scripts (.py/.ts/.js/.sh) and the forge will analyze them, infer execution order, data flow, and environment requirements, then generate a complete workflow package with quality gates.
+
+```bash
+# Basic — analyze scripts and generate workflow
+npx tsx examples/skill-forge.ts --workflow-gen ./my-agents
+
+# With domain and custom output
+npx tsx examples/skill-forge.ts --workflow-gen ./agents --domain ai-ml --out ./workflows
+
+# Preview without writing
+npx tsx examples/skill-forge.ts --workflow-gen ./scripts --dry-run --json
+```
+
+### What it does
+
+1. **Analyze** — regex/heuristic parser extracts imports, env vars, file I/O, SDK calls (50+ known SDKs), entry points, and cross-script dependencies from each script
+2. **Infer** — topological sort from cross-script imports + file I/O chains determines step ordering; data flow edges, env var requirements, and duration estimates are computed
+3. **Generate** — produces SKILL.md (with frontmatter + workflow description), run.sh (orchestrator), setup.sh (env var + tool validation), workflow.md (pipeline diagram + step table), and copies agent scripts
+4. **Quality gate** — 4-axis scoring (each must be >= 0.5): step completeness, data flow validity, env var documentation, setup runnability
+
+### Output structure
+
+```
+examples/generated-workflows/<name>/
+  SKILL.md              — frontmatter + workflow description
+  scripts/run.sh        — orchestrator script
+  scripts/setup.sh      — env var + tool validation
+  references/workflow.md — pipeline diagram + step table
+  agents/*.py           — copied agent scripts
+```
+
+### SaaS UI workflow features
+
+- **Workflows tab** in marketplace (2nd position after All, with NEW badge)
+- **Mini pipeline preview** on workflow cards showing step flow (scout -> ghostwriter -> image-gen -> ...)
+- **Step count + duration estimate** on cards
+- **Pipeline tab** in detail modal with DAG visualization, step table, and env vars table
+- **Tier gating** — workflows require at least Starter tier (free = view-only, starter = 5/month, pro/enterprise = unlimited + publish)
 
 ## Plugin system — Claude Code spec-compliant
 
@@ -339,7 +385,7 @@ agents-cli mcp start
 
 The UI includes:
 
-- **Marketplace** — product grid with Agent-Native filter, bulk select, `▶ Try` button (pre-fills Forge)
+- **Marketplace** — product grid with Agent-Native filter, Workflows tab (NEW badge), bulk select, `▶ Try` button (pre-fills Forge)
 - **Skill Forge** — cost estimator, quality preview bar, AI persona selector, generation history, batch CSV upload
 - **Dashboard** — usage meter, revenue tracker with split bar, agent wallet with 24h heatmap
 - **Agent Economy** — creator earnings, per-skill revenue with SVG sparklines, agent leaderboard
@@ -371,20 +417,23 @@ npm run build
 # 2. Forge skills from curated tools
 npx tsx examples/skill-forge.ts --curated --category code-search --limit 5
 
-# 3. Build full-featured plugins
+# 3. Generate workflows from agent scripts
+npx tsx examples/skill-forge.ts --workflow-gen ./my-agents --domain ai-ml
+
+# 4. Build full-featured plugins
 npx tsx examples/skill-forge.ts --plugin --full
 
-# 4. Build marketplace
+# 5. Build marketplace
 npx tsx examples/skill-forge.ts --marketplace
 
-# 5. Validate everything
+# 6. Validate everything
 npx tsx examples/skill-forge.ts --benchmark --json
 bash battle-test-ecosystem.sh --quick
 
-# 6. Test a plugin in Claude Code
+# 7. Test a plugin in Claude Code
 claude --plugin-dir ./examples/plugins/python
 
-# 7. Serve the SaaS UI
+# 8. Serve the SaaS UI
 agents-cli mcp start   # → open http://localhost:3100
 ```
 
@@ -399,7 +448,7 @@ lib/
   guards.ts             — security guards + shellQuote (canonical location)
   companion/            — SaaS HTTP server, billing, OAuth, metering
 examples/
-  forge/                — 15 mode modules
+  forge/                — 16 mode modules (incl. mode-workflow-gen.ts)
   saas-ui/              — SaaS marketplace UI
   data/ai-ml-tools.json — 502 curated AI/ML tool definitions
 ```
@@ -415,6 +464,7 @@ examples/
 7. **Plugin** — build Claude Code plugins (hooks, agents, commands, settings)
 8. **Marketplace** — generate marketplace.json + plugin distribution
 9. **Expose** — MCP bridge + SaaS API
+10. **Workflow Gen** — analyze agent scripts → infer manifest (topo sort + data flow) → generate workflow SKILL.md + scripts
 
 ## Development
 

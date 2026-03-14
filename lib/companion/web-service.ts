@@ -180,9 +180,12 @@ function corsHeaders(req: IncomingMessage): Record<string, string> {
 // ── Stripe Price-to-Tier Mapping ───────────────────────────────────────
 
 const PRICE_TO_TIER: Record<string, ApiTier> = {
-  "price_1TAsLJ2QpzdUwTFgn4OhkLig": "starter",
-  "price_1TAsLK2QpzdUwTFgqe4HP5Jh": "pro",
-  "price_1TAsLK2QpzdUwTFgZQQ56NrE": "enterprise",
+  "price_1TAsLJ2QpzdUwTFgn4OhkLig": "starter",   // $29/mo (original)
+  "price_1TAsLK2QpzdUwTFgqe4HP5Jh": "pro",       // $79/mo (original)
+  "price_1TAsLK2QpzdUwTFgZQQ56NrE": "enterprise", // $199/mo (original)
+  "price_1TAumR2QpzdUwTFgUWWQsbTe": "starter",   // $14.99/mo (50% OFF launch promo)
+  "price_1TAumW2QpzdUwTFgMyJIn89A": "pro",       // $39.99/mo (50% OFF launch promo)
+  "price_1TAumX2QpzdUwTFgDDWYS4V8": "enterprise", // $99/mo (50% OFF launch promo)
 };
 
 // ── Response Helpers ───────────────────────────────────────────────────

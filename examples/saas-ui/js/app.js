@@ -264,9 +264,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   };
 
-  document.getElementById('starterPricingBtn')?.addEventListener('click', () => handleCheckout('price_1TAsLJ2QpzdUwTFgn4OhkLig'));
-  document.getElementById('proPricingBtn')?.addEventListener('click', () => handleCheckout('price_1TAsLK2QpzdUwTFgqe4HP5Jh'));
-  document.getElementById('enterprisePricingBtn')?.addEventListener('click', () => handleCheckout('price_1TAsLK2QpzdUwTFgZQQ56NrE'));
+  document.getElementById('starterPricingBtn')?.addEventListener('click', () => handleCheckout('price_1TAumR2QpzdUwTFgUWWQsbTe'));
+  document.getElementById('proPricingBtn')?.addEventListener('click', () => handleCheckout('price_1TAumW2QpzdUwTFgMyJIn89A'));
+  document.getElementById('enterprisePricingBtn')?.addEventListener('click', () => handleCheckout('price_1TAumX2QpzdUwTFgDDWYS4V8'));
 
   // Auth state changes close modals and update nav
   auth.onAuthChange((user) => {

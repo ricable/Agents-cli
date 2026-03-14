@@ -24,7 +24,9 @@
     
     --font-heading: 'Inter', sans-serif;
     --font-body: 'Inter', sans-serif;
+    --accent-cyan: #00d4ff;
     --font-mono: 'Fira Code', monospace;
+    --font-tech: 'JetBrains Mono', 'Fira Code', monospace;
     
     --radius-sm: 8px;
     --radius-md: 12px;
@@ -630,6 +632,98 @@ h1, h2, h3, h4 {
 .currency { font-size: 20px; color: var(--text-secondary); font-weight: 600; }
 .amount { font-size: 48px; font-weight: 700; margin: 0 4px; letter-spacing: -2px; transition: opacity var(--transition-fast), transform var(--transition-fast); }
 .period { font-size: 16px; color: var(--text-secondary); }
+
+/* ── Launch Promo 50% OFF ──────────────────────────────────────────── */
+
+.launch-promo-banner {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 24px;
+    border-radius: var(--radius-pill);
+    border: 1px solid rgba(255, 123, 114, 0.35);
+    background: linear-gradient(135deg, rgba(255,123,114,0.08), rgba(210,153,34,0.08));
+    margin-bottom: 20px;
+    animation: promoPulse 3s ease-in-out infinite;
+}
+@keyframes promoPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,123,114,0); }
+    50% { box-shadow: 0 0 24px 2px rgba(255,123,114,0.15); }
+}
+.promo-flame {
+    font-size: 18px;
+    animation: flameWiggle 1.5s ease-in-out infinite;
+}
+@keyframes flameWiggle {
+    0%, 100% { transform: rotate(0deg) scale(1); }
+    25% { transform: rotate(-6deg) scale(1.1); }
+    75% { transform: rotate(6deg) scale(1.05); }
+}
+.promo-text {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    letter-spacing: 0.02em;
+}
+.promo-text strong {
+    color: var(--accent-pink);
+    font-weight: 800;
+}
+.promo-timer {
+    font-size: 0.7rem;
+    color: var(--accent-orange);
+    padding: 3px 10px;
+    border: 1px solid rgba(210,153,34,0.3);
+    border-radius: var(--radius-pill);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+/* Promo Ribbon on cards */
+.promo-ribbon {
+    position: absolute;
+    top: 16px;
+    right: -8px;
+    background: linear-gradient(135deg, #ff4d4d, #ff7b72);
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 4px 14px 4px 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    z-index: 2;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 6px 50%);
+    box-shadow: 0 2px 8px rgba(255,77,77,0.3);
+}
+.promo-ribbon-enterprise {
+    background: linear-gradient(135deg, var(--accent-orange), var(--accent-pink));
+}
+
+/* Promo Price Layout */
+.tier-price-promo {
+    margin-bottom: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: baseline;
+    gap: 4px;
+}
+.price-original {
+    font-size: 16px;
+    color: var(--text-muted);
+    text-decoration: line-through;
+    text-decoration-color: var(--accent-pink);
+    text-decoration-thickness: 2px;
+    opacity: 0.7;
+}
+.price-original .currency,
+.price-original .period {
+    font-size: inherit;
+    color: inherit;
+}
+.promo-amount {
+    color: var(--accent-green);
+    text-shadow: 0 0 20px rgba(63,185,80,0.3);
+}
 
 .tier-body { flex: 1; display: flex; flex-direction: column; }
 
@@ -2478,5 +2572,422 @@ textarea.form-control {
     .upsell-content {
         flex-direction: column;
         text-align: center;
+    }
+}
+
+/* ==========================================================================
+   WORKFLOW — Mini Pipeline + DAG + NEW Badge
+   ========================================================================== */
+
+.wf-mini-pipeline {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 0;
+    overflow-x: auto;
+    font-size: 0.7rem;
+}
+.wf-step {
+    background: rgba(0,212,255,0.08);
+    border: 1px solid rgba(0,212,255,0.2);
+    padding: 3px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    font-weight: 500;
+    color: var(--accent-cyan);
+}
+.wf-arrow {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+.wf-more {
+    color: var(--text-muted);
+    font-size: 0.65rem;
+    margin-left: 4px;
+}
+.new-badge {
+    background: var(--accent-green);
+    color: #000;
+    font-size: 0.55rem;
+    padding: 1px 5px;
+    border-radius: 8px;
+    margin-left: 4px;
+    font-weight: 700;
+    vertical-align: super;
+}
+.workflow-tab {
+    position: relative;
+}
+
+/* DAG Visualization */
+.wf-dag-linear {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 24px 16px;
+    overflow-x: auto;
+}
+.wf-dag-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 100px;
+    padding: 12px 16px;
+    background: var(--surface-color);
+    border: 1px solid rgba(0,212,255,0.25);
+    border-radius: 12px;
+    text-align: center;
+    transition: border-color 0.2s;
+}
+.wf-dag-node:hover {
+    border-color: var(--accent-cyan);
+}
+.wf-dag-node-icon {
+    font-size: 20px;
+    margin-bottom: 4px;
+}
+.wf-dag-node-label {
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+.wf-dag-node-tool {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-family: monospace;
+}
+.wf-dag-node-fail {
+    font-size: 0.6rem;
+    color: var(--accent-orange);
+    margin-top: 4px;
+}
+.wf-dag-overflow {
+    opacity: 0.6;
+    border-style: dashed;
+}
+.wf-dag-connector {
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+}
+.wf-dag-arrow {
+    width: 40px;
+    height: 2px;
+    background: var(--accent-cyan);
+    position: relative;
+}
+.wf-dag-arrow::after {
+    content: '';
+    position: absolute;
+    right: -6px;
+    top: -4px;
+    border: 5px solid transparent;
+    border-left-color: var(--accent-cyan);
+}
+.wf-dag-artifact {
+    position: absolute;
+    top: -18px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+/* Step Table */
+.wf-step-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px;
+}
+.wf-step-table th {
+    text-align: left;
+    padding: 8px;
+    border-bottom: 1px solid var(--surface-border);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+}
+.wf-step-table td {
+    padding: 8px;
+    border-bottom: 1px solid var(--surface-border);
+    font-size: 0.85rem;
+}
+.wf-step-table td code {
+    font-size: 0.75rem;
+    background: rgba(255,255,255,0.05);
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+/* ── Workflow Card Enhancements ─────────────────────────────────────── */
+
+.plugin-card.workflow-card {
+    border-left: 2px solid var(--accent-cyan);
+}
+.plugin-card.workflow-card:hover {
+    background: rgba(0,212,255,0.03);
+}
+
+/* Gradient Pulse Animation for mini-pipeline arrows and connectors */
+@keyframes gradientPulse {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+.wf-pulse {
+    background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: gradientPulse 2s ease-in-out infinite;
+}
+
+/* DAG Arrow Animated */
+.wf-dag-arrow-animated {
+    background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent) !important;
+    background-size: 200% 100% !important;
+    animation: gradientPulse 2s ease-in-out infinite;
+}
+
+/* DAG Node Glow on Hover */
+.wf-dag-node-glow:hover {
+    box-shadow: 0 0 16px rgba(0,212,255,0.35), 0 0 4px rgba(0,212,255,0.2);
+    border-color: var(--accent-cyan) !important;
+}
+
+/* DAG Artifact Float */
+@keyframes artifactFloat {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(-3px); }
+}
+.wf-dag-artifact {
+    animation: artifactFloat 3s ease-in-out infinite;
+}
+
+/* Pipeline CTA */
+.wf-pipeline-cta {
+    margin-top: 24px;
+    padding: 16px;
+    border-radius: 12px;
+    background: rgba(0,212,255,0.05);
+    border: 1px solid rgba(0,212,255,0.15);
+    text-align: center;
+}
+.wf-pipeline-cta p {
+    color: var(--text-secondary);
+    margin-bottom: 0;
+}
+.wf-cta-link {
+    color: var(--accent-cyan);
+    font-weight: 600;
+    text-decoration: none;
+}
+.wf-cta-link:hover {
+    color: #fff;
+}
+
+/* Enhanced Step Table */
+.wf-step-table-enhanced tr:nth-child(even) td {
+    background: rgba(255,255,255,0.02);
+}
+.wf-step-table-enhanced tr:hover td {
+    background: rgba(0,212,255,0.06);
+}
+
+/* ==========================================================================
+   WORKFLOW SHOWCASE SECTION — Mission Control
+   ========================================================================== */
+
+.workflow-showcase-section {
+    padding: 80px 0;
+    background:
+        linear-gradient(180deg, rgba(0,212,255,0.02) 0%, transparent 40%, rgba(0,212,255,0.02) 100%),
+        repeating-linear-gradient(0deg, transparent, transparent 60px, rgba(255,255,255,0.015) 60px, rgba(255,255,255,0.015) 61px),
+        repeating-linear-gradient(90deg, transparent, transparent 60px, rgba(255,255,255,0.015) 60px, rgba(255,255,255,0.015) 61px);
+    position: relative;
+}
+
+.showcase-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 16px;
+    border-radius: var(--radius-pill);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--accent-cyan);
+    border: 1px solid rgba(0,212,255,0.25);
+    background: rgba(0,212,255,0.08);
+}
+
+/* Showcase Animated Pipeline */
+.showcase-pipeline {
+    max-width: 720px;
+    margin: 32px auto;
+    padding: 32px 24px 20px;
+    border: 1px solid rgba(0,212,255,0.2);
+}
+.showcase-pipeline-inner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    flex-wrap: wrap;
+}
+.showcase-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 90px;
+    padding: 14px 18px;
+    background: rgba(0,212,255,0.06);
+    border: 1px solid rgba(0,212,255,0.25);
+    border-radius: 12px;
+    font-family: var(--font-tech);
+    transition: all var(--transition-fast);
+}
+.showcase-node:hover {
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 20px rgba(0,212,255,0.25);
+}
+.showcase-node-icon {
+    font-size: 22px;
+    margin-bottom: 6px;
+}
+.showcase-node-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--accent-cyan);
+    font-family: var(--font-tech);
+}
+
+/* Showcase Connectors */
+.showcase-connector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 6px;
+    position: relative;
+}
+.showcase-connector-line {
+    width: 48px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+    background-size: 200% 100%;
+    animation: gradientPulse 2s ease-in-out infinite;
+    position: relative;
+}
+.showcase-connector-line::after {
+    content: '';
+    position: absolute;
+    right: -5px;
+    top: -4px;
+    border: 5px solid transparent;
+    border-left-color: var(--accent-cyan);
+}
+.showcase-connector-label {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+    font-family: var(--font-tech);
+    white-space: nowrap;
+}
+
+.showcase-pipeline-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--surface-border);
+}
+.showcase-tier-badge {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    padding: 4px 12px;
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-pill);
+}
+
+/* Showcase Featured Workflow Grid */
+.showcase-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    max-width: 960px;
+    margin: 40px auto 0;
+}
+.showcase-workflow-card {
+    text-align: left;
+    padding: 24px;
+    border-top: 2px solid var(--accent-cyan);
+    transition: all var(--transition-fast);
+    cursor: pointer;
+}
+.showcase-workflow-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 32px rgba(0,212,255,0.15);
+}
+.showcase-card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.showcase-card-icon {
+    font-size: 28px;
+}
+.showcase-card-header h4 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0;
+}
+.showcase-card-meta {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-family: var(--font-tech);
+}
+.showcase-card-desc {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin-bottom: 12px;
+}
+.showcase-card-stats {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--surface-border);
+}
+.showcase-explore {
+    margin-left: auto;
+    color: var(--accent-cyan);
+    font-weight: 600;
+    font-size: 0.75rem;
+}
+.showcase-explore:hover {
+    color: #fff;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .showcase-grid {
+        grid-template-columns: 1fr;
+    }
+    .showcase-pipeline-inner {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .showcase-connector {
+        display: none;
+    }
+    .workflow-showcase-section {
+        padding: 48px 0;
     }
 }

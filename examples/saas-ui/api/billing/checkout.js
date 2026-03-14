@@ -8,9 +8,12 @@
 import Stripe from 'stripe';
 
 const ALLOWED_PRICE_IDS = new Set([
-  'price_1TAsLJ2QpzdUwTFgn4OhkLig', // Starter $29/mo
-  'price_1TAsLK2QpzdUwTFgqe4HP5Jh', // Pro $79/mo
-  'price_1TAsLK2QpzdUwTFgZQQ56NrE', // Enterprise $199/mo
+  'price_1TAsLJ2QpzdUwTFgn4OhkLig', // Starter $29/mo (original)
+  'price_1TAsLK2QpzdUwTFgqe4HP5Jh', // Pro $79/mo (original)
+  'price_1TAsLK2QpzdUwTFgZQQ56NrE', // Enterprise $199/mo (original)
+  'price_1TAumR2QpzdUwTFgUWWQsbTe', // Starter $14.99/mo (50% OFF launch promo)
+  'price_1TAumW2QpzdUwTFgMyJIn89A', // Pro $39.99/mo (50% OFF launch promo)
+  'price_1TAumX2QpzdUwTFgDDWYS4V8', // Enterprise $99/mo (50% OFF launch promo)
 ]);
 
 const ALLOWED_ORIGINS = new Set([

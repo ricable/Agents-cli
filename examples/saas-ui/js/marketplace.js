@@ -16,6 +16,7 @@ function getRequiredTier(product) {
   const t = product.productType;
   if (t === 'agent-team') return 'enterprise';
   if (t === 'agent-def' || q >= 9) return 'pro';
+  if (t === 'workflow') return 'starter';
   if (t === 'plugin' || t === 'hook-bundle' || q >= 7) return 'starter';
   return 'free';
 }
@@ -163,6 +164,21 @@ export function initMarketplace(api, store, showProductDetail, auth) {
   return { renderProducts, loadAndRender };
 }
 
+// ── Workflow mini pipeline ──────────────────────────────────────────
+
+function renderWorkflowMiniPipeline(product) {
+  if (product.productType !== 'workflow' || !product.workflowSteps?.length) return '';
+  const maxVisible = 4;
+  const steps = product.workflowSteps;
+  const visible = steps.slice(0, maxVisible);
+  const overflow = steps.length > maxVisible ? `<span class="wf-more">+${steps.length - maxVisible}</span>` : '';
+  return `<div class="wf-mini-pipeline">
+    ${visible.map((s, i) =>
+      `<span class="wf-step">${escapeHtml(s.name)}</span>${i < visible.length - 1 ? '<span class="wf-arrow wf-pulse">\u2192</span>' : ''}`
+    ).join('')}${overflow}
+  </div>`;
+}
+
 // ── Card renderer ───────────────────────────────────────────────────
 
 function renderCard(product, opts = {}) {
@@ -193,7 +209,7 @@ function renderCard(product, opts = {}) {
       </div>` : '';
 
   return `
-    <div class="plugin-card glass-card${!hasAccess ? ' tier-locked' : ''}" data-product-id="${escapeAttr(product.id)}">
+    <div class="plugin-card glass-card${!hasAccess ? ' tier-locked' : ''}${product.productType === 'workflow' ? ' workflow-card' : ''}" data-product-id="${escapeAttr(product.id)}">
       <div class="plugin-header">
         <div class="plugin-icon" style="border-color:${typeColor}30;background:${typeColor}10">
           ${icon}
@@ -205,6 +221,7 @@ function renderCard(product, opts = {}) {
         <span class="tier-badge ${tierBadgeClass}">${tierLabel}</span>
       </div>
       <p class="plugin-desc">${escapeHtml(truncate(product.description || 'No description', 120))}</p>
+      ${renderWorkflowMiniPipeline(product)}
       <div class="plugin-footer">
         <div class="plugin-meta">
           <span class="badge" style="background:${typeColor}20;color:${typeColor}">${formatType(product.productType)}</span>
@@ -212,6 +229,8 @@ function renderCard(product, opts = {}) {
           ${commands > 0 ? `<span class="meta-item" title="Commands">${commands} cmds</span>` : ''}
           ${rating > 0 ? `<span class="meta-item">${renderStars(rating)}</span>` : ''}
           ${downloads > 0 ? `<span class="meta-item">${formatNum(downloads)} dl</span>` : ''}
+          ${product.workflowSteps ? `<span class="meta-item">${product.workflowSteps.length} steps</span>` : ''}
+          ${product.estimatedDuration ? `<span class="meta-item">~${escapeHtml(product.estimatedDuration)}</span>` : ''}
           ${isAgentNative(product) ? '<span class="badge-agent">\u{1F916} Agent</span>' : ''}
           ${product.pricing?.perCall ? `<span class="cost-badge">$${product.pricing.perCall}/call</span>` : ''}
         </div>

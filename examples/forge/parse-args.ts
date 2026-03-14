@@ -49,6 +49,8 @@ export function parseArgs(): CliArgs {
     marketplaceV2: false,
     // Full pipeline mode
     fullPipeline: false,
+    // Workflow generation mode
+    workflowGen: "",
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -175,6 +177,8 @@ export function parseArgs(): CliArgs {
     else if (a === "--marketplace-v2")        { opts.marketplaceV2 = true; }
     // Full pipeline mode
     else if (a === "--full-pipeline")         { opts.fullPipeline = true; }
+    // Workflow generation mode
+    else if (a === "--workflow-gen" && argv[i+1]) { opts.workflowGen = argv[++i]!; }
     // Positional → prompt
     else if (!a.startsWith("--"))             { opts.prompt += (opts.prompt ? " " : "") + a; }
   }

@@ -5,6 +5,7 @@
 
 import { PRODUCT_TYPE_ICONS, PRODUCT_TYPE_COLORS, formatType, escapeHtml, showToast } from './utils.js';
 import { formatPrice } from './marketplace.js';
+import { renderWorkflowDag, renderStepTable, renderEnvVarsTable } from './workflow-dag.js';
 
 
 export function initProductDetail(api, store, auth) {
@@ -69,13 +70,14 @@ export function initProductDetail(api, store, auth) {
       </div>
 
       <div class="detail-tabs" style="display:flex;gap:4px;padding:0 20px;border-bottom:1px solid var(--surface-border)">
-        <button class="detail-tab active" data-tab="overview">Overview</button>
+        <button class="detail-tab${p.productType === 'workflow' ? '' : ' active'}" data-tab="overview">Overview</button>
+        ${p.productType === 'workflow' ? '<button class="detail-tab active" data-tab="pipeline">Pipeline</button>' : ''}
         <button class="detail-tab" data-tab="pricing">Pricing</button>
         <button class="detail-tab" data-tab="changelog">Changelog</button>
       </div>
 
       <div class="detail-body">
-        <div class="detail-tab-content" id="detailTabOverview">
+        <div class="detail-tab-content" id="detailTabOverview" style="${p.productType === 'workflow' ? 'display:none' : ''}">
           <div class="detail-stats-row">
             <div class="detail-stat">
               <span class="detail-stat-value">${rating > 0 ? rating.toFixed(1) : '--'}</span>
@@ -210,9 +212,42 @@ export function initProductDetail(api, store, auth) {
             </div>
           </div>
         </div>
+
+        ${p.productType === 'workflow' ? `
+        <div class="detail-tab-content" id="detailTabPipeline">
+          <div style="padding:20px">
+            <div class="detail-section">
+              <h3>Pipeline Visualization</h3>
+              ${renderWorkflowDag(p.workflowSteps, p.dataFlow)}
+            </div>
+            <div class="detail-section">
+              <h3>Step Details</h3>
+              ${renderStepTable(p.workflowSteps, { enhanced: true })}
+            </div>
+            <div class="detail-section">
+              <h3>Environment Variables</h3>
+              ${renderEnvVarsTable(p.envVars)}
+            </div>
+            <div class="wf-pipeline-cta">
+              <p>Unlock workflow execution — <a href="#pricing" class="wf-cta-link">Upgrade to Starter</a></p>
+            </div>
+            ${p.dependencies?.length ? `
+            <div class="detail-section">
+              <h3>Dependencies</h3>
+              <div style="display:flex;flex-wrap:wrap;gap:6px">
+                ${p.dependencies.map(d => `<span class="badge" style="background:rgba(0,212,255,0.1);color:var(--accent-cyan)">${escapeHtml(d)}</span>`).join('')}
+              </div>
+            </div>` : ''}
+          </div>
+        </div>` : ''}
       </div>`;
 
     // Event listeners
+    panel.querySelector('.wf-cta-link')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      hide();
+      document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
+    });
     panel.querySelector('#detailCloseBtn')?.addEventListener('click', hide);
     panel.querySelector('#detailInstallBtn')?.addEventListener('click', (e) => {
       const id = e.target.dataset.id;
