@@ -2480,3 +2480,147 @@ textarea.form-control {
         text-align: center;
     }
 }
+
+/* ==========================================================================
+   WORKFLOW — Mini Pipeline + DAG + NEW Badge
+   ========================================================================== */
+
+.wf-mini-pipeline {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 0;
+    overflow-x: auto;
+    font-size: 0.7rem;
+}
+.wf-step {
+    background: rgba(0,212,255,0.08);
+    border: 1px solid rgba(0,212,255,0.2);
+    padding: 3px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    font-weight: 500;
+    color: var(--accent-cyan);
+}
+.wf-arrow {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+.wf-more {
+    color: var(--text-muted);
+    font-size: 0.65rem;
+    margin-left: 4px;
+}
+.new-badge {
+    background: var(--accent-green);
+    color: #000;
+    font-size: 0.55rem;
+    padding: 1px 5px;
+    border-radius: 8px;
+    margin-left: 4px;
+    font-weight: 700;
+    vertical-align: super;
+}
+.workflow-tab {
+    position: relative;
+}
+
+/* DAG Visualization */
+.wf-dag-linear {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 24px 16px;
+    overflow-x: auto;
+}
+.wf-dag-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 100px;
+    padding: 12px 16px;
+    background: var(--surface-color);
+    border: 1px solid rgba(0,212,255,0.25);
+    border-radius: 12px;
+    text-align: center;
+    transition: border-color 0.2s;
+}
+.wf-dag-node:hover {
+    border-color: var(--accent-cyan);
+}
+.wf-dag-node-icon {
+    font-size: 20px;
+    margin-bottom: 4px;
+}
+.wf-dag-node-label {
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+.wf-dag-node-tool {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-family: monospace;
+}
+.wf-dag-node-fail {
+    font-size: 0.6rem;
+    color: var(--accent-orange);
+    margin-top: 4px;
+}
+.wf-dag-overflow {
+    opacity: 0.6;
+    border-style: dashed;
+}
+.wf-dag-connector {
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+}
+.wf-dag-arrow {
+    width: 40px;
+    height: 2px;
+    background: var(--accent-cyan);
+    position: relative;
+}
+.wf-dag-arrow::after {
+    content: '';
+    position: absolute;
+    right: -6px;
+    top: -4px;
+    border: 5px solid transparent;
+    border-left-color: var(--accent-cyan);
+}
+.wf-dag-artifact {
+    position: absolute;
+    top: -18px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+/* Step Table */
+.wf-step-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px;
+}
+.wf-step-table th {
+    text-align: left;
+    padding: 8px;
+    border-bottom: 1px solid var(--surface-border);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+}
+.wf-step-table td {
+    padding: 8px;
+    border-bottom: 1px solid var(--surface-border);
+    font-size: 0.85rem;
+}
+.wf-step-table td code {
+    font-size: 0.75rem;
+    background: rgba(255,255,255,0.05);
+    padding: 2px 6px;
+    border-radius: 3px;
+}

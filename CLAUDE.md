@@ -110,6 +110,7 @@ agents-cli plugin init | publish <name> | test [dir] | group | factory | pipelin
 --index [--domain agent]
 --plugin [--full --multi-runtime --domain git --ai --output-dir ~/plugins]
 --agent-defs [--domain agent --ai]
+--workflow-gen <dir> [--domain <domain> --out <dir> --dry-run --json]
 --marketplace [--dry-run]
 --freeze | --verify
 --system [--limit 20 --deep]
@@ -164,14 +165,17 @@ lib/
   curated-tools.ts    — 91 general tools; loadAllTools() reads examples/data/ai-ml-tools.json
   search.ts / indexer.ts / indexes.ts / domains.ts / cache.ts / chunker.ts
   classifier/         — npm.ts, github.ts, crates.ts, pypi.ts
-  pipeline/           — intent.ts, entity-extractor.ts, prompt-parser.ts, capability-map.ts
+  pipeline/           — intent.ts, entity-extractor.ts, prompt-parser.ts, capability-map.ts,
+                        agent-analyzer.ts (script parser: imports, env vars, SDK calls, cross-deps),
+                        workflow-manifest-inference.ts (topo sort, data flow, env merge, duration est),
+                        workflow-composer.ts (WorkflowEnvVar, DataFlowEdge, SkillWorkflow extensions)
   hooks/              — types.ts, generator.ts, validator.ts, templates/
   plugin/             — builder.ts, publisher.ts, marketplace.ts, audit-report.ts, versioning.ts, ...
   db/                 — domain-db.ts, aggregated-db.ts, sqlite.ts
   companion/          — web-service.ts, billing.ts, oauth.ts, metering.ts, tiers.ts, clerk-auth.ts, ...
 examples/
   skill-forge.ts      — thin dispatcher → forge/ modules
-  forge/              — types, helpers, parse-args, stages, 15 mode-* modules
+  forge/              — types, helpers, parse-args, stages, 16 mode-* modules (incl. mode-workflow-gen.ts)
   regenerate-skills.ts — batch regeneration
   generated-skills/   — auto-generated skills (trigger ≥ 0.80)
   data/
@@ -185,10 +189,10 @@ examples/
       config.js       — GET /api/config — returns {clerkPublishableKey}, no auth
       billing/
         checkout.js   — POST /api/billing/checkout — creates Stripe Checkout session, returns {url}
-    css/styles.css    — design system + economy / heatmap / bulk-select / tier badges (.tier-badge, .tier-lock-overlay, .tier-upsell-banner) / value comparison (.value-comparison-section, .value-card, .tier-compare-table, .savings-badge) styles
+    css/styles.css    — design system + economy / heatmap / bulk-select / tier badges / value comparison / workflow (mini pipeline, DAG, step table, NEW badge) styles
     css/admin.css     — admin panel styles: fixed 220px sidebar, cyan border glow, scan-line top bar, command bridge aesthetic
     vercel.json       — Vercel deploy config (SPA rewrites incl. /admin→admin.html, /api/* → serverless, no-cache HTML, long-cache assets)
-    registry-data.json — static data for marketplace: github/npm/pypi/crates/agent_defs/harnesses/cli_anything/generated_skills
+    registry-data.json — static data for marketplace: github/npm/pypi/crates/agent_defs/harnesses/cli_anything/generated_skills/workflows
     js/
       app.js          — bootstrap, router, auth wiring, nav state, modal logic, pricing checkout wiring, tier-based upsell visibility
       store.js        — AppStore pub/sub + localStorage (searchFilters excluded — session-only). Monthly install tracking
@@ -198,7 +202,8 @@ examples/
       marketplace.js  — product grid, agent-native filter, bulk select, Try button, tier access gating, catalog-updated event. Re-exports utils.js symbols
       registries.js   — registry panes (GitHub/npm/PyPI/crates/cli-anything); injects agent_defs+generated_skills into catalog
       dashboard.js    — revenue tracker, agent wallet, heatmap. Imports from utils.js. Key links → /admin#keys
-      product-detail.js — 3-tab detail (overview/pricing/changelog), SSE feed. Re-exports showToast from utils.js
+      product-detail.js — 4-tab detail (overview/pricing/changelog/pipeline for workflows), SSE feed, DAG viz. Re-exports showToast from utils.js
+      workflow-dag.js — pure CSS/HTML DAG renderer for workflow detail modal pipeline tab
       forge-ui.js     — cost estimator, quality preview, persona selector, batch CSV
       economy.js      — agent economy: earnings, leaderboard, sparklines. Imports escapeHtml from utils.js
       admin.js        — admin bootstrap: imports api/store/auth/dashboard/economy, auth gate, inline API key CRUD + settings
@@ -218,10 +223,19 @@ tests/                — 19 test files, 369 tests
 7. **Index** — `groupByDomain()` + `generateMasterIndex()`
 8. **Factory** — `runSkillFactory()` optional 3-layer
 9. **MCP** — `McpBridge` exposes tools
+10. **Workflow Gen** — `--workflow-gen <dir>` analyzes agent scripts → infers manifest (topo sort + data flow) → generates SKILL.md + run.sh + setup.sh + workflow.md + copies scripts
 
 ## Skill Quality
 
 `scoreTrigger()` (max 1.0, clamped): +0.3 "Use when", +0.4 action verbs (3×0.15 from 60+ verbs), +0.2 "Do NOT use for", +0.1 comma triggers (≥2 clauses), +0.1 TechNames (≥2 capitalized words). `buildDescription()` in `lib/skills/description.ts` auto-generates via `CATEGORY_ACTION_MAP` + `DOMAIN_NEGATIVE_TRIGGERS` + `detectToolLanguage()`. Note: `buildShortDescription()` in `lib/skill-content.ts` is a separate function for `ManifestEntry` structural content.
+
+**Workflow quality gates** — `scoreWorkflowQuality()` in `lib/skill-tester.ts` scores 4 axes (each must be ≥ 0.5):
+- `stepCompleteness` — every step has command + description
+- `dataFlowValidity` — no dangling edges, inputs match prior outputs
+- `envVarDocumentation` — all env vars have descriptions
+- `setupRunnability` — setup.sh has shebang, `set -e`, tool checks
+
+Integrated into `testSkillSync()` — workflows are scored on all 4 axes plus the standard trigger/quality/content gates.
 
 ## Plugin System (Claude Code spec)
 
@@ -232,6 +246,58 @@ tests/                — 19 test files, 369 tests
 **Rules** — no non-standard plugin.json fields, skills self-contained, domains flattened (`ai-ml/x`→`ai-ml-x`), no external path refs, `$ARGUMENTS` for user input in commands.
 
 **Key functions**: `buildPlugins(opts)`, `generateHooksJson(domain, entries)`, `generatePluginCommands(domain, entries)`, `auditPlugin(dir)`, `generateMarketplace(opts)`, `publishPlugin(domain, dryRun)`, `computePluginHash(dir)`, `bumpVersion(current, type)`
+
+## Workflow Generation (`--workflow-gen`)
+
+Analyzes a directory of agent scripts (.py/.ts/.js/.sh), infers a workflow manifest (step ordering via topological sort, data flow, env vars), generates SKILL.md + scripts + references, and runs quality gates.
+
+```bash
+npx tsx examples/skill-forge.ts --workflow-gen ./my-agents [--domain ai-ml --out ./output --dry-run --json]
+```
+
+**Output structure:**
+```
+examples/generated-workflows/<name>/
+  SKILL.md              # frontmatter + workflow description
+  scripts/run.sh        # orchestrator
+  scripts/setup.sh      # env var + tool validation
+  references/workflow.md # pipeline diagram + step table
+  agents/*.py           # copied agent scripts
+```
+
+**Agent analyzer** (`lib/pipeline/agent-analyzer.ts`) — pure TS regex/heuristic parser. Extracts imports, env vars, file I/O, SDK calls (50+ known SDKs), entry points, cross-script dependencies.
+
+**Manifest inference** (`lib/pipeline/workflow-manifest-inference.ts`) — topological sort from cross-script imports + file I/O chains, data flow inference, env var merging, duration estimation.
+
+**Tier entitlements for workflows** (in `lib/companion/tiers.ts`):
+- Free: view-only (0 installs)
+- Starter: 5/month
+- Pro: unlimited + publish
+- Enterprise: unlimited + publish
+
+**SaaS UI workflow features:**
+- Workflows tab (2nd position after All, with NEW badge) in marketplace
+- Mini pipeline preview on workflow cards (scout → ghostwriter → image-gen → ...)
+- Step count + duration estimate on workflow cards
+- Pipeline tab in detail modal with DAG visualization (`workflow-dag.js`), step table, env vars table
+- Tier gating: workflows require at least Starter tier to install
+
+**Modified files for workflow support:**
+- `lib/marketplace/types.ts` — `"workflow"` added to ProductType union
+- `lib/companion/tiers.ts` — workflow entitlements per tier
+- `lib/pipeline/workflow-composer.ts` — `WorkflowEnvVar`, `DataFlowEdge`, `envVars`, `dataFlow`, `estimatedDuration`, `pricing` on SkillWorkflow
+- `lib/skill-tester.ts` — `scoreWorkflowQuality()` integrated into `testSkillSync()`
+- `lib/skills/description.ts` — `"workflow"` in CATEGORY_ACTION_MAP and DOMAIN_NEGATIVE_TRIGGERS
+- `examples/forge/types.ts` — `workflowGen` field on CliArgs
+- `examples/forge/parse-args.ts` — `--workflow-gen` flag parsing
+- `examples/skill-forge.ts` — dispatch for workflowGen mode
+- `examples/saas-ui/index.html` — Workflows tab with NEW badge
+- `examples/saas-ui/js/utils.js` — workflow in PRODUCT_TYPE_ICONS/COLORS
+- `examples/saas-ui/js/marketplace.js` — workflow tier gating, mini pipeline renderer
+- `examples/saas-ui/js/product-detail.js` — Pipeline tab with DAG, step table, env vars
+- `examples/saas-ui/js/registries.js` — injects workflows from registry-data.json
+- `examples/saas-ui/css/styles.css` — workflow CSS (mini pipeline, DAG, step table, NEW badge)
+- `examples/saas-ui/registry-data.json` — 6 showcase workflows
 
 ## SaaS UI Deployment
 
@@ -443,6 +509,11 @@ GENERAL_TOOLS: CliTool[]
 groupByDomain(entries): Map<string, ManifestEntry[]>
 generateMasterIndex(manifest, triggers): string
 
+// Workflow generation (lib/pipeline/)
+analyzeAgentScript(path): AgentScriptAnalysis           // agent-analyzer.ts — extracts imports, env vars, SDK calls, file I/O, entry points
+inferWorkflowManifest(analyses): WorkflowManifest       // workflow-manifest-inference.ts — topo sort, data flow, env merge, duration est
+scoreWorkflowQuality(skillMd): WorkflowQualityResult    // skill-tester.ts — 4-axis quality (stepCompleteness, dataFlowValidity, envVarDocumentation, setupRunnability)
+
 // Clerk Auth (lib/companion/clerk-auth.ts) — canonical @clerk/backend import location
 verifyClerkToken(req: IncomingMessage, config: ClerkConfig): Promise<ClerkSession | null>
 updateUserMetadata(userId, metadata, config: ClerkConfig): Promise<void>
@@ -486,6 +557,11 @@ updateUserMetadata(userId, metadata, config: ClerkConfig): Promise<void>
 - `TIER_LIMITS` in `marketplace.js`: `{ free: 3, starter: 50, pro: 500, enterprise: Infinity }` — monthly install caps per tier
 - `getRequiredTier(product)` and `userHasAccess(userTier, requiredTier)` are in `marketplace.js` — do not duplicate logic elsewhere
 - Tier upsell banner (`#tierUpsellBanner`) and value comparison (`#valueComparisonSection`) are hidden when user tier is not `free`
+- `scoreWorkflowQuality()` returns 4 axes — all must be ≥ 0.5 for workflow to pass quality gate
+- `analyzeAgentScript()` is a pure regex/heuristic parser (no AST) — it recognizes 50+ SDK patterns but may miss custom frameworks
+- Workflow DAG renderer (`workflow-dag.js`) is pure CSS/HTML — no external dependencies (no D3, no Mermaid)
+- `"workflow"` is a valid ProductType — must be included in any ProductType union exhaustiveness checks
+- Workflow tier gating requires at least Starter — free users get view-only access (0 installs)
 
 ## Do NOT
 
@@ -506,3 +582,6 @@ updateUserMetadata(userId, metadata, config: ClerkConfig): Promise<void>
 - Use direct Stripe payment links (`buy.stripe.com`) for pricing checkout — all tiers now go through `POST /api/billing/checkout` serverless function
 - Hardcode Stripe price IDs outside `app.js` — the canonical price ID mapping is in the `handleCheckout` wiring in `app.js`
 - Duplicate tier access logic — use `getRequiredTier()` and `userHasAccess()` from `marketplace.js`
+- Add external DAG rendering libs (D3, Mermaid) to workflow visualization — `workflow-dag.js` is intentionally pure CSS/HTML
+- Bypass workflow quality gates (all 4 axes must be ≥ 0.5) — `scoreWorkflowQuality()` is integrated into `testSkillSync()`
+- Put workflow tier entitlements anywhere except `lib/companion/tiers.ts` — that is the canonical location

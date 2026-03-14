@@ -10,6 +10,7 @@ export const PRODUCT_TYPE_ICONS = {
   'agent-def': '\u{1F916}',
   'agent-team': '\u{1F465}',
   harness: '\u{1F4BB}',
+  workflow: '\u26A1',
 };
 
 export const PRODUCT_TYPE_COLORS = {
@@ -19,6 +20,7 @@ export const PRODUCT_TYPE_COLORS = {
   'agent-def': 'var(--accent-green)',
   'agent-team': 'var(--accent-pink)',
   harness: 'var(--text-secondary)',
+  workflow: 'var(--accent-cyan)',
 };
 
 export function formatType(type) {

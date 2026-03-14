@@ -8,12 +8,29 @@
 
 // ── Types ──────────────────────────────────────────────────────────────
 
+export interface WorkflowEnvVar {
+  name: string;
+  description: string;
+  required: boolean;
+  example?: string;
+}
+
+export interface DataFlowEdge {
+  from: string;
+  to: string;
+  artifact: string;   // e.g. "json", "csv", "images"
+}
+
 export interface SkillWorkflow {
   name: string;
   description: string;
   steps: WorkflowStep[];
   triggers: WorkflowTrigger[];
   dependencies: string[];   // skill names
+  envVars?: WorkflowEnvVar[];
+  dataFlow?: DataFlowEdge[];
+  estimatedDuration?: string;
+  pricing?: { model: "free" | "paid" | "freemium"; price?: number; currency?: string };
 }
 
 export type WorkflowTrigger = "manual" | "on-commit" | "on-push" | "schedule";

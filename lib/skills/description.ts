@@ -45,6 +45,7 @@ export function normalizeDesc(tool: Tool): string {
 const CATEGORY_ACTION_MAP: Record<string, string[]> = {
   "ai-ml/llm-inference": ["running LLM inference with %", "deploying % for language model serving", "generating text using %"],
   "ai-ml/ai-agents": ["building AI agents with %", "orchestrating agent workflows via %", "managing autonomous tasks using %"],
+  "workflow": ["orchestrating multi-step % pipelines", "automating sequential agent tasks with %", "chaining CLI tools via % workflows"],
   "ai-ml/ai-coding": ["generating code with %", "building AI-powered dev tools using %", "debugging with % assistance"],
   "ai-ml/rag-and-embeddings": ["building retrieval pipelines with %", "embedding documents using %", "indexing knowledge bases via %"],
   "ai-ml/vector-search": ["storing vector embeddings with %", "searching similarity indexes via %", "querying % vector databases"],
@@ -198,6 +199,7 @@ const DOMAIN_NEGATIVE_TRIGGERS: Record<string, string> = {
   "ai-ml/data-processing": "real-time streaming or interactive UIs",
   "ai-ml/mlops-pipelines": "local development without ML infrastructure",
   "ai-ml/ai-apis": "offline or local-only computation",
+  "workflow": "single-tool execution, one-off commands, interactive REPL sessions",
   "general": "tasks better served by a domain-specific tool",
 };
 

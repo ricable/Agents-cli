@@ -6,7 +6,7 @@
 
 // ── Product Types ──────────────────────────────────────────────────────
 
-export type ProductType = "harness" | "skill" | "plugin" | "hook-bundle" | "agent-def" | "agent-team";
+export type ProductType = "harness" | "skill" | "plugin" | "hook-bundle" | "agent-def" | "agent-team" | "workflow";
 
 export interface ProductPricing {
   model: "free" | "paid" | "freemium";

@@ -5,6 +5,7 @@
 
 import { PRODUCT_TYPE_ICONS, PRODUCT_TYPE_COLORS, formatType, escapeHtml, showToast } from './utils.js';
 import { formatPrice } from './marketplace.js';
+import { renderWorkflowDag, renderStepTable, renderEnvVarsTable } from './workflow-dag.js';
 
 
 export function initProductDetail(api, store, auth) {
@@ -70,6 +71,7 @@ export function initProductDetail(api, store, auth) {
 
       <div class="detail-tabs" style="display:flex;gap:4px;padding:0 20px;border-bottom:1px solid var(--surface-border)">
         <button class="detail-tab active" data-tab="overview">Overview</button>
+        ${p.productType === 'workflow' ? '<button class="detail-tab" data-tab="pipeline">Pipeline</button>' : ''}
         <button class="detail-tab" data-tab="pricing">Pricing</button>
         <button class="detail-tab" data-tab="changelog">Changelog</button>
       </div>
@@ -210,6 +212,31 @@ export function initProductDetail(api, store, auth) {
             </div>
           </div>
         </div>
+
+        ${p.productType === 'workflow' ? `
+        <div class="detail-tab-content" id="detailTabPipeline" style="display:none">
+          <div style="padding:20px">
+            <div class="detail-section">
+              <h3>Pipeline Visualization</h3>
+              ${renderWorkflowDag(p.workflowSteps, p.dataFlow)}
+            </div>
+            <div class="detail-section">
+              <h3>Step Details</h3>
+              ${renderStepTable(p.workflowSteps)}
+            </div>
+            <div class="detail-section">
+              <h3>Environment Variables</h3>
+              ${renderEnvVarsTable(p.envVars)}
+            </div>
+            ${p.dependencies?.length ? `
+            <div class="detail-section">
+              <h3>Dependencies</h3>
+              <div style="display:flex;flex-wrap:wrap;gap:6px">
+                ${p.dependencies.map(d => `<span class="badge" style="background:rgba(0,212,255,0.1);color:var(--accent-cyan)">${escapeHtml(d)}</span>`).join('')}
+              </div>
+            </div>` : ''}
+          </div>
+        </div>` : ''}
       </div>`;
 
     // Event listeners
