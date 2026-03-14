@@ -378,7 +378,7 @@ updateUserMetadata(userId, metadata, config): Promise<void>
 
 | Symbol | From | Not From |
 |---|---|---|
-| `shellQuote`, `cosine`, `validateOllamaUrl` | `lib/guards.ts` | `lib/skills.ts` or elsewhere |
+| `shellQuote`, `cosine`, `validateOllamaUrl`, `DEFAULT_OLLAMA_URL` | `lib/guards.ts` | `lib/skills.ts` or elsewhere, hardcoded URLs |
 | `@clerk/backend` | `lib/companion/clerk-auth.ts` | direct import |
 | `showToast`, `escapeHtml`, `formatType`, `PRODUCT_TYPE_ICONS/COLORS` | `js/utils.js` | `marketplace.js`, `product-detail.js` |
 | `TIER_LIMITS`, `getRequiredTier`, `userHasAccess` | `js/marketplace.js` | don't duplicate |

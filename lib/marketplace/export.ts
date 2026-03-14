@@ -212,7 +212,7 @@ function formatToolProduct(
 
 /** Convert a SkillRecord into a MarketplaceProduct. */
 function skillToProduct(
-  s: { id: string; name: string; domain: string; description: string; version?: string; tags?: string; trigger_score?: number; quality_score?: number; tool_id?: string },
+  s: { id: string; name: string; domain: string; description: string; version?: string | null; tags?: string | null; trigger_score?: number | null; quality_score?: number | null; tool_id?: string | null },
   productType: string,
 ): MarketplaceProduct {
   const tags = s.tags ? s.tags.split(",").filter(Boolean) : [];

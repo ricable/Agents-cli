@@ -104,7 +104,7 @@ export async function repairSkill(
         let qualityPasses = true;
         try {
           const testResult = testSkillSync("inline", content);
-          qualityPasses = (testResult.quality ?? 0) >= minQuality;
+          qualityPasses = (testResult.qualityScore ?? 0) >= minQuality;
         } catch {
           // If quality check unavailable, accept trigger score alone
         }

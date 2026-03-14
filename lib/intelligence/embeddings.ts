@@ -6,7 +6,7 @@
  * unified SQLite store.
  */
 
-import { validateOllamaUrl, DEFAULT_DEFAULT_OLLAMA_URL } from "../guards.js";
+import { validateOllamaUrl, DEFAULT_OLLAMA_URL } from "../guards.js";
 import type { VecStore } from "../db/vec-store.js";
 import type { UnifiedStore, SkillRecord } from "../db/unified-store.js";
 import { readFileSync } from "node:fs";
