@@ -13,6 +13,7 @@
  */
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
+import { parseFrontmatter } from "./skills/frontmatter.js";
 import { join, basename, dirname } from "node:path";
 
 // ============================================================================
@@ -174,9 +175,10 @@ export function scoreWorkflowQuality(
  * Check if a skill is a workflow based on domain or content.
  */
 function isWorkflowSkill(content: string): boolean {
-  const domainMatch = content.match(/^domain:\s*["']?([^"'\n]+)["']?\s*$/m);
-  if (domainMatch && /workflow/i.test(domainMatch[1] ?? "")) return true;
-  // Check for workflow-specific content patterns
+  const fm = parseFrontmatter(content);
+  if (fm?.domain && /workflow/i.test(fm.domain)) return true;
+  if (fm?.tags?.some((t) => /workflow/i.test(t))) return true;
+  // Fallback: structural heuristic
   return /^ingredients:/m.test(content) && /## Steps/m.test(content);
 }
 

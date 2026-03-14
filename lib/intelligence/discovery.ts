@@ -168,12 +168,14 @@ Only output the tool types, nothing else.`;
     .map((line) => line.replace(/^[-*\d.)\s]+/, "").trim())
     .filter((line) => line.length > 3);
 
-  // Search for each sub-query
+  // Search for each sub-query in parallel
   const allSkills = new Map<string, SkillRecord>();
-  for (const subQuery of subQueries.slice(0, 8)) {
-    const subResult = await semanticDiscovery(store, vecStore, subQuery, 5, Date.now());
-    for (const skill of subResult.skills) {
-      allSkills.set(skill.id, skill);
+  const subResults = await Promise.allSettled(
+    subQueries.slice(0, 8).map((subQuery) => semanticDiscovery(store, vecStore, subQuery, 5, Date.now())),
+  );
+  for (const r of subResults) {
+    if (r.status === "fulfilled") {
+      for (const skill of r.value.skills) allSkills.set(skill.id, skill);
     }
   }
 

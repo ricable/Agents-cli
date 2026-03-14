@@ -10,6 +10,22 @@
 
 import { validateOllamaUrl, DEFAULT_OLLAMA_URL } from "../guards.js";
 
+// ── Constants ──────────────────────────────────────────────────────────
+
+const OLLAMA_HEALTH_TIMEOUT_MS = 3_000;
+const OLLAMA_MODEL_LIST_TIMEOUT_MS = 5_000;
+const OLLAMA_GENERATE_TIMEOUT_MS = 120_000;
+const CLAUDE_API_TIMEOUT_MS = 60_000;
+const DEFAULT_SYSTEM_PROMPT = "You are a workflow composition expert.";
+
+/** Extract text content from Claude API response blocks. */
+function parseClaudeContent(content: Array<{ type: string; text?: string }>): string {
+  return content
+    .filter((b) => b.type === "text")
+    .map((b) => b.text ?? "")
+    .join("");
+}
+
 // ── Types ──────────────────────────────────────────────────────────────
 
 export type LLMTask = "propose" | "repair" | "validate" | "refine";
@@ -43,6 +59,7 @@ export class TieredLLMClient {
   private readonly claudeApiKey: string | undefined;
   private readonly claudeModel: string;
   private readonly maxTokens: number;
+  private resolvedModel: string | null = null;
 
   constructor(config?: TieredLLMConfig) {
     this.ollamaUrl = config?.ollamaUrl ?? DEFAULT_OLLAMA_URL;
@@ -84,7 +101,7 @@ export class TieredLLMClient {
     try {
       validateOllamaUrl(this.ollamaUrl);
       const response = await fetch(`${this.ollamaUrl}/api/tags`, {
-        signal: AbortSignal.timeout(3000),
+        signal: AbortSignal.timeout(OLLAMA_HEALTH_TIMEOUT_MS),
       });
       return response.ok;
     } catch {
@@ -97,9 +114,10 @@ export class TieredLLMClient {
    * falls back to the first available model.
    */
   private async resolveOllamaModel(): Promise<string> {
+    if (this.resolvedModel) return this.resolvedModel;
     try {
       const response = await fetch(`${this.ollamaUrl}/api/tags`, {
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(OLLAMA_MODEL_LIST_TIMEOUT_MS),
       });
       if (!response.ok) return this.ollamaModel;
       const data = await response.json() as { models: Array<{ name: string }> };
@@ -109,10 +127,12 @@ export class TieredLLMClient {
       }
       // Check if configured model is available
       if (available.some((m) => m === this.ollamaModel || m.startsWith(this.ollamaModel + ":"))) {
-        return this.ollamaModel;
+        this.resolvedModel = this.ollamaModel;
+        return this.resolvedModel;
       }
       // Fall back to first available model
-      return available[0]!;
+      this.resolvedModel = available[0]!;
+      return this.resolvedModel;
     } catch (err) {
       if (err instanceof Error && err.message.includes("No Ollama models")) throw err;
       return this.ollamaModel;
@@ -149,7 +169,7 @@ export class TieredLLMClient {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(120_000), // 2 min timeout for large generations
+      signal: AbortSignal.timeout(OLLAMA_GENERATE_TIMEOUT_MS),
     });
 
     if (!response.ok) {
@@ -194,14 +214,11 @@ export class TieredLLMClient {
       const response = await client.messages.create({
         model: this.claudeModel,
         max_tokens: this.maxTokens,
-        system: systemPrompt ?? "You are a workflow composition expert.",
+        system: systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
         messages,
       });
 
-      const content = response.content
-        .filter((block: { type: string }) => block.type === "text")
-        .map((block: { type: string; text: string }) => block.text)
-        .join("");
+      const content = parseClaudeContent(response.content);
 
       return {
         content,
@@ -227,10 +244,10 @@ export class TieredLLMClient {
       body: JSON.stringify({
         model: this.claudeModel,
         max_tokens: this.maxTokens,
-        system: systemPrompt ?? "You are a workflow composition expert.",
+        system: systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
         messages: [{ role: "user", content: prompt }],
       }),
-      signal: AbortSignal.timeout(60_000),
+      signal: AbortSignal.timeout(CLAUDE_API_TIMEOUT_MS),
     });
 
     if (!response.ok) {
@@ -244,10 +261,7 @@ export class TieredLLMClient {
       usage?: { output_tokens: number };
     };
 
-    const content = result.content
-      .filter((b) => b.type === "text")
-      .map((b) => b.text)
-      .join("");
+    const content = parseClaudeContent(result.content);
 
     return {
       content,

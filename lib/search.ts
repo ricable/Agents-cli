@@ -11,7 +11,8 @@
 
 import path from "node:path";
 import { ensureSqlite } from "./db/sqlite.js";
-import { validateOllamaUrl, DEFAULT_OLLAMA_URL } from "./guards.js";
+import { validateOllamaUrl, DEFAULT_OLLAMA_URL, cosine } from "./guards.js";
+import { embedText } from "./intelligence/embeddings.js";
 
 // ── Public types ───────────────────────────────────────────────────────
 
@@ -49,31 +50,8 @@ function fromBlob(buf: Buffer): Float32Array {
   return new Float32Array(buf.buffer, buf.byteOffset, buf.byteLength / 4);
 }
 
-function cosine(a: Float32Array, b: Float32Array): number {
-  let dot = 0,
-    na = 0,
-    nb = 0;
-  for (let i = 0; i < a.length; i++) {
-    const ai = a[i]!;
-    const bi = b[i]!;
-    dot += ai * bi;
-    na += ai * ai;
-    nb += bi * bi;
-  }
-  const denom = Math.sqrt(na) * Math.sqrt(nb);
-  return denom === 0 ? 0 : dot / denom;
-}
-
 async function embedViaOllama(text: string): Promise<Float32Array> {
-  validateOllamaUrl(OLLAMA_URL);
-  const res = await fetch(`${OLLAMA_URL}/api/embed`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: OLLAMA_MODEL, input: [text] }),
-  });
-  if (!res.ok) throw new Error(`Ollama ${res.status}: ${await res.text()}`);
-  const data = (await res.json()) as { embeddings?: number[][] };
-  return new Float32Array(data.embeddings?.[0] ?? []);
+  return embedText(text, { ollamaUrl: OLLAMA_URL, model: OLLAMA_MODEL });
 }
 
 function normalise(v: Float32Array): Float32Array {

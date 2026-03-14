@@ -5,7 +5,7 @@
  * Safe to run multiple times (INSERT OR REPLACE).
  */
 
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { ensureSqlite } from "./sqlite.js";
 import { createUnifiedStore, type SkillRecord, type UnifiedStore } from "./unified-store.js";
@@ -104,42 +104,35 @@ export async function migrateToSqlite(opts: {
 
 // ── Data loaders ───────────────────────────────────────────────────────
 
-/** Load tools from the existing JSON store */
+/** Load tools from the existing JSON store (TOCTOU-safe) */
 function loadToolsJson(dataDir: string): Tool[] {
-  const storeFile = join(dataDir, "tools.json");
-  if (!existsSync(storeFile)) return [];
-
   try {
-    const data = JSON.parse(readFileSync(storeFile, "utf-8"));
-    if (!Array.isArray(data)) return [];
-    return data as Tool[];
+    const data = JSON.parse(readFileSync(join(dataDir, "tools.json"), "utf-8"));
+    return Array.isArray(data) ? data as Tool[] : [];
   } catch {
     return [];
   }
 }
 
-/** Load .skill-cache.json */
+/** Load .skill-cache.json (TOCTOU-safe) */
 function loadSkillCache(skillsDir: string): Record<string, { manifestHash: string; repoSha: string; generatedAt: number }> {
-  const cacheFile = join(skillsDir, ".skill-cache.json");
-  if (!existsSync(cacheFile)) return {};
-
   try {
-    return JSON.parse(readFileSync(cacheFile, "utf-8"));
+    return JSON.parse(readFileSync(join(skillsDir, ".skill-cache.json"), "utf-8"));
   } catch {
     return {};
   }
 }
 
-/** Discover skill directories */
+/** Discover skill directories (TOCTOU-safe) */
 function discoverSkills(skillsDir: string): string[] {
-  if (!existsSync(skillsDir)) return [];
-
   try {
     return readdirSync(skillsDir)
       .filter((d) => d.startsWith("src-"))
       .filter((d) => {
-        const skillMd = join(skillsDir, d, "SKILL.md");
-        return existsSync(skillMd);
+        try {
+          readFileSync(join(skillsDir, d, "SKILL.md"), "utf-8");
+          return true;
+        } catch { return false; }
       });
   } catch {
     return [];

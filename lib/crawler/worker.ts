@@ -13,6 +13,9 @@
 import { rmSync } from "node:fs";
 import { join } from "node:path";
 import type { UnifiedStore } from "../db/unified-store.js";
+
+const TOOL_PROCESSING_TARGET_MS = 30_000;
+const MAX_ERROR_REPORT = 50;
 import { AdaptiveSemaphore } from "../concurrency.js";
 import { toErrorMessage } from "../output.js";
 
@@ -77,7 +80,7 @@ export async function runCrawlWorker(
   const shouldPrune = opts.prune ?? true;
   const semaphore = new AdaptiveSemaphore({
     initial: opts.concurrency,
-    targetLatencyMs: 30_000, // Tools take a while to install + analyze
+    targetLatencyMs: TOOL_PROCESSING_TARGET_MS,
   });
 
   let processed = 0;
@@ -148,6 +151,6 @@ export async function runCrawlWorker(
     failed,
     prunedDirs,
     durationMs: Date.now() - start,
-    errors: errors.slice(0, 50), // Cap error list
+    errors: errors.slice(0, MAX_ERROR_REPORT),
   };
 }
