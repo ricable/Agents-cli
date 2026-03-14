@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ── Marketplace ─────────────────────────────────────────────────
 
-  const marketplace = initMarketplace(api, store, showProductDetail);
+  const marketplace = initMarketplace(api, store, showProductDetail, auth);
 
   // ── Forge UI ────────────────────────────────────────────────────
 
@@ -237,20 +237,36 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ── Pricing checkout buttons (Pro & Enterprise via API) ──────────
 
   const handleCheckout = async (priceId) => {
-    if (!auth.isLoggedIn()) {
-      signupModal?.classList.add('active');
-      const mountEl = document.getElementById('clerk-sign-up');
-      if (mountEl) await auth.openSignUp(mountEl);
-      return;
-    }
-    const result = await auth.checkout(priceId);
-    if (!result?.url) {
-      showToast('Checkout not available — please try again or contact support');
+    try {
+      const origin = window.location.origin;
+      const headers = { 'Content-Type': 'application/json' };
+      if (api.token) headers['Authorization'] = `Bearer ${api.token}`;
+      const resp = await fetch(api.baseUrl + '/api/billing/checkout', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          priceId,
+          successUrl: origin + '/?checkout=success',
+          cancelUrl: origin + '/',
+        }),
+      });
+      const json = await resp.json().catch(() => null);
+      if (json?.data?.url) {
+        window.location.href = json.data.url;
+      } else {
+        const detail = json?.error || json?.data?.message || `HTTP ${resp.status}`;
+        console.error('[checkout] server response:', json || resp.status);
+        showToast(`Checkout failed: ${detail}`);
+      }
+    } catch (err) {
+      console.error('[checkout] error:', err);
+      showToast(`Checkout error: ${err.message || 'network failure'}`);
     }
   };
 
-  document.getElementById('proPricingBtn')?.addEventListener('click', () => handleCheckout('price_pro'));
-  document.getElementById('enterprisePricingBtn')?.addEventListener('click', () => handleCheckout('price_enterprise'));
+  document.getElementById('starterPricingBtn')?.addEventListener('click', () => handleCheckout('price_1TAsLJ2QpzdUwTFgn4OhkLig'));
+  document.getElementById('proPricingBtn')?.addEventListener('click', () => handleCheckout('price_1TAsLK2QpzdUwTFgqe4HP5Jh'));
+  document.getElementById('enterprisePricingBtn')?.addEventListener('click', () => handleCheckout('price_1TAsLK2QpzdUwTFgZQQ56NrE'));
 
   // Auth state changes close modals and update nav
   auth.onAuthChange((user) => {
@@ -277,6 +293,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
   restoreAuthSession();
+
+  // ── Tier-based upsell visibility ────────────────────────────────
+
+  const setUpsellVisibility = (tier) => {
+    const banner = document.getElementById('tierUpsellBanner');
+    const valueSection = document.getElementById('valueComparisonSection');
+    const isFree = !tier || tier === 'free';
+    if (banner) banner.style.display = isFree ? '' : 'none';
+    if (valueSection) valueSection.style.display = isFree ? '' : 'none';
+  };
+
+  store.subscribe('tier', (tier) => setUpsellVisibility(tier));
+  setUpsellVisibility(store.get('tier'));
 
   // ── General Modal Close ───────────────────────────────────────────
   const closeBtns = document.querySelectorAll('.close-modal');

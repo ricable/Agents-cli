@@ -603,33 +603,34 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
       return;
     }
 
-    // POST /api/billing/checkout
+    // POST /api/billing/checkout — no auth required (guest checkout supported)
     if (method === "POST" && path === "/api/billing/checkout") {
-      const authed = await requireAuth(req);
-      if (!authed) { sendError(res, 401, "UNAUTHORIZED", "Missing or invalid Bearer token"); return; }
       try {
         const body = await parseBody(req, config.maxBodySize);
-        const parsed = JSON.parse(body) as { priceId?: string; successUrl?: string; cancelUrl?: string };
+        const parsed = JSON.parse(body) as { priceId?: string; successUrl?: string; cancelUrl?: string; email?: string };
 
-        // Resolve Stripe customer ID
-        let customerId: string;
-        if (authed.clerkUserId) {
+        const origin = `${req.headers["x-forwarded-proto"] ?? "http"}://${req.headers.host ?? "localhost"}`;
+        const billing = createBillingProvider("stripe");
+
+        // Try optional auth — if logged in, attach Stripe customer
+        const authed = await requireAuth(req);
+        let customerId: string | undefined;
+        let clerkUserId: string | undefined;
+
+        if (authed?.clerkUserId) {
           customerId = await getOrCreateStripeCustomer(
             authed.clerkUserId,
             authed.clerkEmail,
             authed.clerkMetadata ?? {},
           );
-        } else {
-          customerId = "cus_mock";
+          clerkUserId = authed.clerkUserId;
         }
 
-        const origin = `${req.headers["x-forwarded-proto"] ?? "http"}://${req.headers.host ?? "localhost"}`;
-        const billing = createBillingProvider("stripe");
         const result = await billing.createCheckoutSession(
           customerId,
           parsed.priceId || "price_default",
           parsed.successUrl ?? `${origin}/?checkout=success`,
-          authed.clerkUserId,
+          clerkUserId,
         );
         sendJson(res, 200, success("billing-checkout", result, Date.now()));
       } catch (err) {

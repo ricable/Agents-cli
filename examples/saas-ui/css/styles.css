@@ -2170,3 +2170,313 @@ textarea.form-control {
 .toast-success {
     border-left: 4px solid var(--accent-green);
 }
+
+/* ==========================================================================
+   TIERED MARKETPLACE ACCESS
+   ========================================================================== */
+
+/* Plugin card needs relative positioning for lock overlay */
+.plugin-card {
+    position: relative;
+    overflow: hidden;
+}
+
+/* Tier badge variants */
+.tier-badge {
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.tier-badge-free {
+    background: rgba(63, 185, 80, 0.15);
+    color: var(--accent-green);
+    border: 1px solid rgba(63, 185, 80, 0.3);
+}
+
+.tier-badge-included {
+    background: rgba(88, 166, 255, 0.15);
+    color: var(--accent-blue);
+    border: 1px solid rgba(88, 166, 255, 0.3);
+}
+
+.tier-badge-starter {
+    background: rgba(88, 166, 255, 0.15);
+    color: var(--accent-blue);
+    border: 1px solid rgba(88, 166, 255, 0.3);
+}
+
+.tier-badge-pro {
+    background: rgba(188, 140, 255, 0.15);
+    color: var(--accent-purple);
+    border: 1px solid rgba(188, 140, 255, 0.3);
+}
+
+.tier-badge-enterprise {
+    background: linear-gradient(135deg, rgba(255, 123, 114, 0.15), rgba(188, 140, 255, 0.15));
+    color: var(--accent-pink);
+    border: 1px solid rgba(255, 123, 114, 0.3);
+}
+
+/* Lock overlay — frosted glass on hover */
+.tier-lock-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(5, 5, 5, 0.5);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+    border-radius: var(--radius-md);
+}
+
+.plugin-card.tier-locked::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(5, 5, 5, 0.2);
+    border-radius: var(--radius-md);
+    pointer-events: none;
+    z-index: 4;
+    transition: opacity var(--transition-fast);
+}
+
+.plugin-card.tier-locked:hover::after {
+    opacity: 0;
+}
+
+.plugin-card.tier-locked:hover .tier-lock-overlay {
+    opacity: 1;
+}
+
+.tier-lock-content {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.tier-lock-icon {
+    font-size: 1.5rem;
+}
+
+.tier-lock-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.tier-lock-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+/* Upsell banner */
+.tier-upsell-banner {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding: 12px 20px;
+    margin-bottom: 16px;
+    border: 1px solid rgba(88, 166, 255, 0.2);
+    border-radius: var(--radius-md);
+    background: rgba(20, 20, 22, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.upsell-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.upsell-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.upsell-plan-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 2px 10px;
+    border-radius: var(--radius-pill);
+    background: rgba(88, 166, 255, 0.15);
+    color: var(--accent-blue);
+    border: 1px solid rgba(88, 166, 255, 0.3);
+}
+
+.upsell-counter {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+}
+
+.upsell-progress {
+    width: 80px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.upsell-progress-fill {
+    height: 100%;
+    background: var(--gradient-primary);
+    border-radius: 2px;
+    transition: width 0.4s ease;
+    width: 0%;
+}
+
+.upsell-cta {
+    animation: glow-pulse 2s ease-in-out infinite;
+}
+
+@keyframes glow-pulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(88, 166, 255, 0.3); }
+    50% { box-shadow: 0 0 20px rgba(88, 166, 255, 0.6); }
+}
+
+/* Value comparison section */
+.value-comparison-section {
+    padding: 80px 0 40px;
+}
+
+.value-comparison-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-top: 40px;
+}
+
+.value-card {
+    padding: 28px 24px;
+    text-align: center;
+    transition: transform var(--transition-fast);
+}
+
+.value-card h4 {
+    font-size: 1.1rem;
+    margin-bottom: 8px;
+}
+
+.value-price {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 12px 0;
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.value-price span {
+    font-size: 0.9rem;
+    font-weight: 400;
+    -webkit-text-fill-color: var(--text-secondary);
+}
+
+.value-list {
+    list-style: none;
+    text-align: left;
+    margin: 16px 0;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.value-list li {
+    padding: 4px 0;
+}
+
+.value-list li::before {
+    content: '\2713 ';
+    color: var(--accent-green);
+    margin-right: 6px;
+}
+
+.value-example {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    padding-top: 12px;
+    border-top: 1px solid var(--surface-border);
+}
+
+.value-card-highlight {
+    transform: scale(1.05);
+    border-color: rgba(88, 166, 255, 0.3);
+    box-shadow: 0 0 30px rgba(88, 166, 255, 0.1);
+    position: relative;
+}
+
+.savings-badge {
+    position: absolute;
+    top: -10px;
+    right: 16px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: var(--radius-pill);
+    background: var(--accent-green);
+    color: #000;
+}
+
+/* Tier comparison table */
+.tier-compare-table {
+    margin-top: 32px;
+    padding: 24px;
+    overflow-x: auto;
+}
+
+.tier-compare-table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.tier-compare-table th {
+    text-align: left;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--surface-border);
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.tier-compare-table td {
+    padding: 10px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    color: var(--text-secondary);
+}
+
+.tier-compare-table tr td:first-child {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+@media (max-width: 768px) {
+    .value-comparison-grid {
+        grid-template-columns: 1fr;
+    }
+    .value-card-highlight {
+        transform: none;
+    }
+    .upsell-content {
+        flex-direction: column;
+        text-align: center;
+    }
+}

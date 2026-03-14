@@ -242,6 +242,18 @@ Result: Success 200 OK</code></pre>
 
                         <!-- Pane: Discover -->
                         <div class="pane active" id="pane-discover">
+                            <!-- Tier Upsell Banner (free users only) -->
+                            <div id="tierUpsellBanner" class="tier-upsell-banner glass">
+                                <div class="upsell-content">
+                                    <div class="upsell-info">
+                                        <span class="upsell-plan-badge">Free Plan</span>
+                                        <span class="upsell-counter">0 / 3 installs used this month</span>
+                                        <div class="upsell-progress"><div class="upsell-progress-fill"></div></div>
+                                    </div>
+                                    <a href="#pricing" class="btn btn-primary btn-sm upsell-cta">Upgrade for Unlimited</a>
+                                </div>
+                            </div>
+
                             <div class="search-bar glass">
                                 <input type="text" id="marketplaceSearch" placeholder="Search products (e.g., 'python linting', 'database migration')..." />
                                 <select id="sortSelect" class="filter-select">
@@ -508,6 +520,71 @@ Authorization: Bearer ***</code></pre></div>
             </div>
         </section>
 
+        <!-- Value Comparison Section (free users) -->
+        <section id="valueComparisonSection" class="value-comparison-section">
+            <div class="container">
+                <div class="section-header text-center">
+                    <h2 class="section-title">Why Upgrade?</h2>
+                    <p class="section-description">Stop paying per tool. One plan unlocks everything.</p>
+                </div>
+                <div class="value-comparison-grid">
+                    <div class="value-card glass-card">
+                        <h4>One-Shot Purchase</h4>
+                        <div class="value-price">$4.99 <span>/ tool</span></div>
+                        <ul class="value-list">
+                            <li>Single tool access</li>
+                            <li>No updates included</li>
+                            <li>3 installs / month</li>
+                        </ul>
+                        <div class="value-example">10 tools = <strong>$49.90</strong></div>
+                    </div>
+                    <div class="value-card glass-card value-card-highlight">
+                        <div class="savings-badge">Save 40%+</div>
+                        <h4>Starter Plan</h4>
+                        <div class="value-price">$29 <span>/ month</span></div>
+                        <ul class="value-list">
+                            <li>15 tools included</li>
+                            <li>Auto-updates &amp; support</li>
+                            <li>50 installs / month</li>
+                            <li>NL discovery + SKILL.md</li>
+                        </ul>
+                        <a href="#pricing" class="btn btn-primary btn-block btn-sm">Get Starter</a>
+                    </div>
+                    <div class="value-card glass-card">
+                        <h4>Pro Plan</h4>
+                        <div class="value-price">$79 <span>/ month</span></div>
+                        <ul class="value-list">
+                            <li>Unlimited tools</li>
+                            <li>Agent defs &amp; deep analysis</li>
+                            <li>500 installs / month</li>
+                            <li>Priority MCP bridge</li>
+                        </ul>
+                        <a href="#pricing" class="btn btn-secondary btn-block btn-sm">Get Pro</a>
+                    </div>
+                </div>
+                <div class="tier-compare-table glass-card">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Feature</th>
+                                <th>Free</th>
+                                <th>Starter</th>
+                                <th>Pro</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Monthly installs</td><td>3</td><td>50</td><td>500</td></tr>
+                            <tr><td>Skills access</td><td>Free only</td><td>All skills</td><td>All + agents</td></tr>
+                            <tr><td>SKILL.md generation</td><td>Manual</td><td>Auto</td><td>AI-enhanced</td></tr>
+                            <tr><td>MCP Bridge tools</td><td>5</td><td>15</td><td>Unlimited</td></tr>
+                            <tr><td>Plugin publishing</td><td>&#x2717;</td><td>&#x2713;</td><td>&#x2713;</td></tr>
+                            <tr><td>Agent definitions</td><td>&#x2717;</td><td>&#x2717;</td><td>&#x2713;</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
         <!-- Pricing Section -->
         <section id="pricing" class="pricing-section">
             <div class="container">
@@ -552,7 +629,7 @@ Authorization: Bearer ***</code></pre></div>
                             </div>
                         </div>
                         <div class="tier-body">
-                            <button class="btn btn-primary btn-block shine" data-price-id="price_starter" onclick="window.open('https://buy.stripe.com/test_cNi28k5wmaNw5hd43KgEg00','_blank')">Subscribe Now</button>
+                            <button class="btn btn-primary btn-block shine" id="starterPricingBtn" data-price-id="price_1TAsLJ2QpzdUwTFgn4OhkLig">Subscribe Now</button>
                             <ul class="feature-list">
                                 <li><i class="icon-check">&#x2713;</i> 15 tools, 20 daily generations</li>
                                 <li><i class="icon-check">&#x2713;</i> Natural language tool discovery</li>
@@ -572,7 +649,7 @@ Authorization: Bearer ***</code></pre></div>
                             </div>
                         </div>
                         <div class="tier-body">
-                            <button class="btn btn-primary btn-block" data-price-id="price_pro" id="proPricingBtn">Start Pro Trial</button>
+                            <button class="btn btn-primary btn-block" data-price-id="price_1TAsLK2QpzdUwTFgqe4HP5Jh" id="proPricingBtn">Start Pro Trial</button>
                             <ul class="feature-list">
                                 <li><i class="icon-check">&#x2713;</i> 50 tools, 100 daily generations</li>
                                 <li><i class="icon-check">&#x2713;</i> Deep analysis &amp; AI generation</li>
@@ -592,7 +669,7 @@ Authorization: Bearer ***</code></pre></div>
                             </div>
                         </div>
                         <div class="tier-body">
-                            <button class="btn btn-block btn-gradient shine" data-price-id="price_enterprise" id="enterprisePricingBtn">Get Enterprise</button>
+                            <button class="btn btn-block btn-gradient shine" data-price-id="price_1TAsLK2QpzdUwTFgZQQ56NrE" id="enterprisePricingBtn">Get Enterprise</button>
                             <ul class="feature-list">
                                 <li><i class="icon-check">&#x2713;</i> 200 tools, unlimited generations</li>
                                 <li><i class="icon-check">&#x2713;</i> Unlimited MCP Bridge scale</li>
