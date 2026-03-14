@@ -101,7 +101,8 @@ export async function verifyClerkToken(
 
 /**
  * Update a Clerk user's public metadata.
- * Used to store stripeCustomerId after creation.
+ * Merges new fields into existing metadata (does not overwrite unrelated fields).
+ * Used to store stripeCustomerId, tier, etc.
  */
 export async function updateUserMetadata(
   userId: string,
@@ -109,5 +110,16 @@ export async function updateUserMetadata(
   config: ClerkConfig,
 ): Promise<void> {
   const clerk = createClerkClient({ secretKey: config.secretKey });
-  await clerk.users.updateUserMetadata(userId, { publicMetadata: metadata });
+
+  // Fetch existing metadata and merge to avoid overwriting unrelated fields
+  let existing: Record<string, unknown> = {};
+  try {
+    const user = await clerk.users.getUser(userId);
+    existing = (user.publicMetadata as Record<string, unknown>) ?? {};
+  } catch {
+    // Non-fatal — proceed with provided metadata only
+  }
+
+  const merged = { ...existing, ...metadata };
+  await clerk.users.updateUserMetadata(userId, { publicMetadata: merged });
 }
