@@ -672,6 +672,11 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
         const body = await parseBody(req, config.maxBodySize);
         const parsed = JSON.parse(body) as { priceId?: string; successUrl?: string; cancelUrl?: string; email?: string };
 
+        // Validate priceId against allowlist
+        if (!parsed.priceId || !PRICE_TO_TIER[parsed.priceId]) {
+          sendError(res, 400, "INVALID_INPUT", "Invalid or missing priceId"); return;
+        }
+
         const origin = `${req.headers["x-forwarded-proto"] ?? "http"}://${req.headers.host ?? "localhost"}`;
         const billing = createBillingProvider("stripe");
 
@@ -691,7 +696,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
 
         const result = await billing.createCheckoutSession(
           customerId,
-          parsed.priceId || "price_default",
+          parsed.priceId,
           parsed.successUrl ?? `${origin}/?checkout=success`,
           clerkUserId,
         );
