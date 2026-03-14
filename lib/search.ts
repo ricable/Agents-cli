@@ -11,7 +11,7 @@
 
 import path from "node:path";
 import { ensureSqlite } from "./db/sqlite.js";
-import { isPrivateUrl } from "./resolver.js";
+import { validateOllamaUrl, DEFAULT_OLLAMA_URL } from "./guards.js";
 
 // ── Public types ───────────────────────────────────────────────────────
 
@@ -41,10 +41,7 @@ type SqliteDb = any;
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
-const OLLAMA_URL =
-  typeof process !== "undefined"
-    ? (process.env.OLLAMA_URL ?? "http://127.0.0.1:11434")
-    : "http://127.0.0.1:11434";
+const OLLAMA_URL = DEFAULT_OLLAMA_URL;
 const OLLAMA_MODEL = "nomic-embed-text";
 const LOCAL_MODEL = "Xenova/all-MiniLM-L6-v2";
 
@@ -65,25 +62,6 @@ function cosine(a: Float32Array, b: Float32Array): number {
   }
   const denom = Math.sqrt(na) * Math.sqrt(nb);
   return denom === 0 ? 0 : dot / denom;
-}
-
-/** Validate that OLLAMA_URL points to localhost or a public host (not private network). */
-function validateOllamaUrl(url: string): void {
-  try {
-    const parsed = new URL(url);
-    const host = parsed.hostname;
-    // Allow localhost — the expected Ollama host
-    if (host === "localhost" || host === "127.0.0.1" || host === "[::1]") return;
-    // Block private/internal network IPs (e.g. 10.x, 172.16.x, 192.168.x)
-    if (isPrivateUrl(url)) {
-      throw new Error(
-        `Ollama URL "${url}" points to a private network — only localhost or public hosts allowed`
-      );
-    }
-  } catch (e) {
-    if (e instanceof Error && e.message.includes("private network")) throw e;
-    throw new Error(`Invalid Ollama URL: ${url}`);
-  }
 }
 
 async function embedViaOllama(text: string): Promise<Float32Array> {

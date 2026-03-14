@@ -71,6 +71,15 @@ const INPUT_PATTERNS: Array<[RegExp, IOType]> = [
   [/\.csv\b/i, "csv"],
   [/\.md\b/i, "markdown"],
   [/\.html?\b/i, "html"],
+  [/docker\s+(image|container)/i, "docker-image"],
+  [/--repo\s+\S+/i, "git-repo"],
+  [/--git\s+\S+/i, "git-repo"],
+  [/git\s+(clone|pull|fetch)/i, "git-repo"],
+  [/stdin|pipe|<\s+\S+/i, "stdin"],
+  [/--endpoint\s+\S+/i, "api-endpoint"],
+  [/api\s+(url|endpoint|server)/i, "api-endpoint"],
+  [/\.tar\.gz\b|\.zip\b|\.whl\b/i, "binary"],
+  [/\.png\b|\.jpg\b|\.jpeg\b|\.gif\b|\.svg\b|\.webp\b/i, "image"],
 ];
 
 const OUTPUT_PATTERNS: Array<[RegExp, IOType]> = [
@@ -89,6 +98,14 @@ const OUTPUT_PATTERNS: Array<[RegExp, IOType]> = [
   [/test\s+report/i, "test-report"],
   [/lint(ing)?\s+report/i, "lint-report"],
   [/log(s|ging)?\s+(output|file)/i, "log-output"],
+  [/\.json\b.*output/i, "json"],
+  [/\.ya?ml\b.*output/i, "yaml"],
+  [/\.csv\b.*output/i, "csv"],
+  [/exports?\s+(to\s+)?(files?|JSON|CSV|YAML)/i, "file"],
+  [/saves?\s+(to\s+)?(files?|disk|database)/i, "file"],
+  [/pushes?\s+(to\s+)?(docker|registry)/i, "docker-image"],
+  [/publishes?\s+(to\s+)?(npm|pypi|crates)/i, "binary"],
+  [/--format\s+(json|yaml|csv|html|markdown)/i, "stdout"],
 ];
 
 const SIDE_EFFECT_PATTERNS: RegExp[] = [

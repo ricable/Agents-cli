@@ -12,7 +12,7 @@
  * is async for backward compatibility.
  */
 
-import { mkdirSync, existsSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { getSqlite, applyWalPragmas } from "./sqlite.js";
 import type {
@@ -290,6 +290,38 @@ export class UnifiedStore implements ToolStore {
   private stmtGetNeighborsAll: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private stmtGetNeighborsTyped: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private stmtAddEdge: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private stmtMarkDone: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private stmtGetSkill: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private stmtGetSkillCache: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private stmtCountTools: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private stmtCountSkills: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private stmtCountSkillsDomain: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private stmtCountWorkflows: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private stmtCountEdges: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private stmtCrawlStats: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private stmtEnqueue: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private stmtUpsertDomain: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private stmtGetDomain: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private stmtGetChildDomains: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private stmtUpsertWorkflow: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private stmtGetWorkflow: any;
 
   constructor(dataDir: string) {
     this.toolsDir = join(dataDir, "tools");
@@ -341,6 +373,46 @@ export class UnifiedStore implements ToolStore {
     `);
     this.stmtGetNeighborsAll = this.db.prepare("SELECT target_id as id, weight, edge_type as edgeType FROM skill_edges WHERE source_id = ?");
     this.stmtGetNeighborsTyped = this.db.prepare("SELECT target_id as id, weight, edge_type as edgeType FROM skill_edges WHERE source_id = ? AND edge_type = ?");
+
+    // Edge insert
+    this.stmtAddEdge = this.db.prepare(`
+      INSERT OR REPLACE INTO skill_edges (source_id, target_id, edge_type, weight, metadata_json, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+
+    // Crawl queue
+    this.stmtMarkDone = this.db.prepare("UPDATE crawl_queue SET status = 'done', updated_at = ? WHERE id = ?");
+
+    // Cached count statements
+    this.stmtGetSkill = this.db.prepare("SELECT * FROM skills WHERE id = ?");
+    this.stmtGetSkillCache = this.db.prepare("SELECT manifest_hash, repo_sha, generated_at FROM skills WHERE id = ?");
+    this.stmtCountTools = this.db.prepare("SELECT COUNT(*) as c FROM tools");
+    this.stmtCountSkills = this.db.prepare("SELECT COUNT(*) as c FROM skills");
+    this.stmtCountSkillsDomain = this.db.prepare("SELECT COUNT(*) as c FROM skills WHERE domain = ?");
+    this.stmtCountWorkflows = this.db.prepare("SELECT COUNT(*) as c FROM workflows");
+    this.stmtCountEdges = this.db.prepare("SELECT COUNT(*) as c FROM skill_edges");
+    this.stmtCrawlStats = this.db.prepare("SELECT status, COUNT(*) as c FROM crawl_queue GROUP BY status");
+
+    // Crawl queue + domain + workflow statements
+    this.stmtEnqueue = this.db.prepare(`
+      INSERT OR IGNORE INTO crawl_queue (source, registry, priority, status, attempts, metadata_json, created_at, updated_at)
+      VALUES (?, ?, ?, 'pending', 0, ?, ?, ?)
+    `);
+    this.stmtUpsertDomain = this.db.prepare(`
+      INSERT OR REPLACE INTO domains (id, parent_id, label, trigger_phrase, depth, tool_count)
+      VALUES (?, ?, ?, ?, ?, COALESCE((SELECT tool_count FROM domains WHERE id = ?), 0))
+    `);
+    this.stmtGetDomain = this.db.prepare("SELECT * FROM domains WHERE id = ?");
+    this.stmtGetChildDomains = this.db.prepare("SELECT * FROM domains WHERE parent_id = ? ORDER BY label");
+    this.stmtUpsertWorkflow = this.db.prepare(`
+      INSERT OR REPLACE INTO workflows
+        (id, name, description, domain, steps_json, env_json, data_flow_json,
+         estimated_duration, quality_json, skill_dir, created_at, updated_at)
+      VALUES
+        (@id, @name, @description, @domain, @steps_json, @env_json, @data_flow_json,
+         @estimated_duration, @quality_json, @skill_dir, @created_at, @updated_at)
+    `);
+    this.stmtGetWorkflow = this.db.prepare("SELECT * FROM workflows WHERE id = ?");
   }
 
   // ── ToolStore interface ────────────────────────────────────────────
@@ -370,9 +442,13 @@ export class UnifiedStore implements ToolStore {
     }
 
     if (query?.text) {
-      // Use FTS5 for text search if available
-      conditions.push("id IN (SELECT id FROM tools WHERE name LIKE ? OR description LIKE ?)");
-      params.push(`%${query.text}%`, `%${query.text}%`);
+      // Use FTS5 for text search — escape special chars and use prefix matching
+      const escaped = query.text.replace(/['"*()]/g, " ").trim();
+      if (escaped) {
+        conditions.push("rowid IN (SELECT rowid FROM tools_fts WHERE tools_fts MATCH ?)");
+        // Append * for prefix matching (e.g. "ruf" matches "ruff")
+        params.push(escaped.split(/\s+/).map(w => `"${w}"*`).join(" "));
+      }
     }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -408,11 +484,9 @@ export class UnifiedStore implements ToolStore {
     validateToolId(id);
     const result = this.stmtDelete.run(id);
     if (result.changes > 0) {
+      // rmSync with force:true is safe even if dir doesn't exist — no TOCTOU
       const toolDir = join(this.toolsDir, id);
-      if (existsSync(toolDir)) {
-        const { rmSync } = await import("node:fs");
-        rmSync(toolDir, { recursive: true, force: true });
-      }
+      rmSync(toolDir, { recursive: true, force: true });
       return true;
     }
     return false;
@@ -453,8 +527,7 @@ export class UnifiedStore implements ToolStore {
 
   /** Get tool count */
   count(): number {
-    const row = this.db.prepare("SELECT COUNT(*) as c FROM tools").get();
-    return row?.c ?? 0;
+    return this.stmtCountTools.get()?.c ?? 0;
   }
 
   // ── Skills table operations ────────────────────────────────────────
@@ -475,15 +548,12 @@ export class UnifiedStore implements ToolStore {
 
   /** Get a skill by ID */
   getSkill(id: string): SkillRecord | null {
-    return this.db.prepare("SELECT * FROM skills WHERE id = ?").get(id) ?? null;
+    return this.stmtGetSkill.get(id) ?? null;
   }
 
   /** Check skill cache (replaces SkillCache.get) */
   getSkillCache(id: string): { manifest_hash: string; repo_sha: string; generated_at: number } | null {
-    const row = this.db
-      .prepare("SELECT manifest_hash, repo_sha, generated_at FROM skills WHERE id = ?")
-      .get(id);
-    return row ?? null;
+    return this.stmtGetSkillCache.get(id) ?? null;
   }
 
   /** List skills with optional domain filter */
@@ -526,33 +596,24 @@ export class UnifiedStore implements ToolStore {
   /** Get skill count */
   skillCount(domain?: string): number {
     if (domain) {
-      const row = this.db.prepare("SELECT COUNT(*) as c FROM skills WHERE domain = ?").get(domain);
-      return row?.c ?? 0;
+      return this.stmtCountSkillsDomain.get(domain)?.c ?? 0;
     }
-    const row = this.db.prepare("SELECT COUNT(*) as c FROM skills").get();
-    return row?.c ?? 0;
+    return this.stmtCountSkills.get()?.c ?? 0;
   }
 
   // ── Skill edges ────────────────────────────────────────────────────
 
   /** Add a skill graph edge */
   addEdge(sourceId: string, targetId: string, edgeType: EdgeType, weight = 1.0, metadata?: Record<string, unknown>): void {
-    this.db.prepare(`
-      INSERT OR REPLACE INTO skill_edges (source_id, target_id, edge_type, weight, metadata_json, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(sourceId, targetId, edgeType, weight, metadata ? JSON.stringify(metadata) : null, new Date().toISOString());
+    this.stmtAddEdge.run(sourceId, targetId, edgeType, weight, metadata ? JSON.stringify(metadata) : null, new Date().toISOString());
   }
 
   /** Bulk insert edges in a transaction */
   bulkAddEdges(edges: Array<{ sourceId: string; targetId: string; edgeType: EdgeType; weight?: number; metadata?: Record<string, unknown> }>): number {
-    const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO skill_edges (source_id, target_id, edge_type, weight, metadata_json, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
     const now = new Date().toISOString();
     const tx = this.db.transaction((items: typeof edges) => {
       for (const e of items) {
-        stmt.run(e.sourceId, e.targetId, e.edgeType, e.weight ?? 1.0, e.metadata ? JSON.stringify(e.metadata) : null, now);
+        this.stmtAddEdge.run(e.sourceId, e.targetId, e.edgeType, e.weight ?? 1.0, e.metadata ? JSON.stringify(e.metadata) : null, now);
       }
     });
     tx(edges);
@@ -568,8 +629,7 @@ export class UnifiedStore implements ToolStore {
 
   /** Get edge count */
   edgeCount(): number {
-    const row = this.db.prepare("SELECT COUNT(*) as c FROM skill_edges").get();
-    return row?.c ?? 0;
+    return this.stmtCountEdges.get()?.c ?? 0;
   }
 
   // ── Crawl queue ────────────────────────────────────────────────────
@@ -577,23 +637,16 @@ export class UnifiedStore implements ToolStore {
   /** Enqueue a source for crawling */
   enqueue(source: string, registry: string, priority = 0, metadata?: Record<string, unknown>): void {
     const now = Date.now();
-    this.db.prepare(`
-      INSERT OR IGNORE INTO crawl_queue (source, registry, priority, status, attempts, metadata_json, created_at, updated_at)
-      VALUES (?, ?, ?, 'pending', 0, ?, ?, ?)
-    `).run(source, registry, priority, metadata ? JSON.stringify(metadata) : null, now, now);
+    this.stmtEnqueue.run(source, registry, priority, metadata ? JSON.stringify(metadata) : null, now, now);
   }
 
   /** Bulk enqueue sources */
   bulkEnqueue(items: Array<{ source: string; registry: string; priority?: number; metadata?: Record<string, unknown> }>): number {
-    const stmt = this.db.prepare(`
-      INSERT OR IGNORE INTO crawl_queue (source, registry, priority, status, attempts, metadata_json, created_at, updated_at)
-      VALUES (?, ?, ?, 'pending', 0, ?, ?, ?)
-    `);
     const now = Date.now();
     let inserted = 0;
     const tx = this.db.transaction((batch: typeof items) => {
       for (const item of batch) {
-        const result = stmt.run(item.source, item.registry, item.priority ?? 0, item.metadata ? JSON.stringify(item.metadata) : null, now, now);
+        const result = this.stmtEnqueue.run(item.source, item.registry, item.priority ?? 0, item.metadata ? JSON.stringify(item.metadata) : null, now, now);
         if (result.changes > 0) inserted++;
       }
     });
@@ -602,15 +655,17 @@ export class UnifiedStore implements ToolStore {
   }
 
   /** Dequeue the next item(s) for processing (atomic SELECT+UPDATE in transaction) */
-  dequeue(limit = 1): CrawlQueueItem[] {
+  dequeue(limit = 1, registry?: string): CrawlQueueItem[] {
     const now = Date.now();
     const tx = this.db.transaction(() => {
+      const registryClause = registry ? " AND registry = ?" : "";
+      const params = registry ? [now, registry, limit] : [now, limit];
       const rows = this.db.prepare(`
         SELECT * FROM crawl_queue
-        WHERE status = 'pending' AND (next_retry_at IS NULL OR next_retry_at <= ?)
+        WHERE status = 'pending' AND (next_retry_at IS NULL OR next_retry_at <= ?)${registryClause}
         ORDER BY priority DESC, created_at ASC
         LIMIT ?
-      `).all(now, limit);
+      `).all(...params);
 
       if (rows.length === 0) return [];
 
@@ -626,32 +681,45 @@ export class UnifiedStore implements ToolStore {
 
   /** Mark a crawl item as done */
   markDone(id: number): void {
-    this.db.prepare("UPDATE crawl_queue SET status = 'done', updated_at = ? WHERE id = ?").run(Date.now(), id);
+    this.stmtMarkDone.run(Date.now(), id);
   }
 
-  /** Mark a crawl item as failed with exponential backoff */
+  /** Mark a crawl item as failed with exponential backoff (1min → 5min → 30min) */
   markFailed(id: number, error: string): void {
     const now = Date.now();
-    const row = this.db.prepare("SELECT attempts FROM crawl_queue WHERE id = ?").get(id);
-    const attempts = (row?.attempts ?? 0) + 1;
-    // Exponential backoff: 1min, 5min, 30min
-    const backoffMs = [60_000, 300_000, 1_800_000][Math.min(attempts - 1, 2)] ?? 1_800_000;
-    const nextRetry = now + backoffMs;
+    const BACKOFFS = [60_000, 300_000, 1_800_000] as const; // 1min, 5min, 30min
+    const MAX_ATTEMPTS = 3;
 
-    this.db.prepare(`
-      UPDATE crawl_queue SET status = 'failed', attempts = ?, last_error = ?, next_retry_at = ?, updated_at = ?
-      WHERE id = ?
-    `).run(attempts, error, nextRetry, now, id);
+    const tx = this.db.transaction(() => {
+      // Read current attempts inside the transaction to avoid TOCTOU
+      const row = this.db.prepare("SELECT attempts FROM crawl_queue WHERE id = ?").get(id);
+      if (!row) return;
 
-    // After max retries (3), leave as failed permanently
-    if (attempts < 3) {
-      this.db.prepare("UPDATE crawl_queue SET status = 'pending' WHERE id = ?").run(id);
-    }
+      const newAttempts = (row.attempts ?? 0) + 1;
+      const backoffMs = BACKOFFS[Math.min(newAttempts - 1, BACKOFFS.length - 1)] ?? 1_800_000;
+
+      if (newAttempts >= MAX_ATTEMPTS) {
+        // Permanently failed — leave status as 'failed'
+        this.db.prepare(`
+          UPDATE crawl_queue SET status = 'failed', attempts = ?, last_error = ?,
+            next_retry_at = NULL, updated_at = ?
+          WHERE id = ?
+        `).run(newAttempts, error, now, id);
+      } else {
+        // Will retry — set back to 'pending' with backoff
+        this.db.prepare(`
+          UPDATE crawl_queue SET status = 'pending', attempts = ?, last_error = ?,
+            next_retry_at = ?, updated_at = ?
+          WHERE id = ?
+        `).run(newAttempts, error, now + backoffMs, now, id);
+      }
+    });
+    tx();
   }
 
   /** Get crawl queue stats */
   crawlStats(): { pending: number; processing: number; done: number; failed: number } {
-    const rows = this.db.prepare("SELECT status, COUNT(*) as c FROM crawl_queue GROUP BY status").all();
+    const rows = this.stmtCrawlStats.all();
     const stats = { pending: 0, processing: 0, done: 0, failed: 0 };
     for (const row of rows) {
       if (row.status in stats) {
@@ -665,20 +733,17 @@ export class UnifiedStore implements ToolStore {
 
   /** Upsert a domain */
   upsertDomain(id: string, label: string, triggerPhrase: string, parentId?: string, depth = 0): void {
-    this.db.prepare(`
-      INSERT OR REPLACE INTO domains (id, parent_id, label, trigger_phrase, depth, tool_count)
-      VALUES (?, ?, ?, ?, ?, COALESCE((SELECT tool_count FROM domains WHERE id = ?), 0))
-    `).run(id, parentId ?? null, label, triggerPhrase, depth, id);
+    this.stmtUpsertDomain.run(id, parentId ?? null, label, triggerPhrase, depth, id);
   }
 
   /** Get domain by ID */
   getDomain(id: string): DomainRecord | null {
-    return this.db.prepare("SELECT * FROM domains WHERE id = ?").get(id) ?? null;
+    return this.stmtGetDomain.get(id) ?? null;
   }
 
   /** Get child domains */
   getChildDomains(parentId: string): DomainRecord[] {
-    return this.db.prepare("SELECT * FROM domains WHERE parent_id = ? ORDER BY label").all(parentId);
+    return this.stmtGetChildDomains.all(parentId);
   }
 
   /** Get all domains */
@@ -696,19 +761,12 @@ export class UnifiedStore implements ToolStore {
 
   /** Upsert a workflow */
   upsertWorkflow(workflow: WorkflowRecord): void {
-    this.db.prepare(`
-      INSERT OR REPLACE INTO workflows
-        (id, name, description, domain, steps_json, env_json, data_flow_json,
-         estimated_duration, quality_json, skill_dir, created_at, updated_at)
-      VALUES
-        (@id, @name, @description, @domain, @steps_json, @env_json, @data_flow_json,
-         @estimated_duration, @quality_json, @skill_dir, @created_at, @updated_at)
-    `).run(workflow);
+    this.stmtUpsertWorkflow.run(workflow);
   }
 
   /** Get workflow by ID */
   getWorkflow(id: string): WorkflowRecord | null {
-    return this.db.prepare("SELECT * FROM workflows WHERE id = ?").get(id) ?? null;
+    return this.stmtGetWorkflow.get(id) ?? null;
   }
 
   /** List workflows */
@@ -723,8 +781,7 @@ export class UnifiedStore implements ToolStore {
 
   /** Get workflow count */
   workflowCount(): number {
-    const row = this.db.prepare("SELECT COUNT(*) as c FROM workflows").get();
-    return row?.c ?? 0;
+    return this.stmtCountWorkflows.get()?.c ?? 0;
   }
 
   // ── Marketplace query methods ────────────────────────────────────
@@ -771,17 +828,16 @@ export class UnifiedStore implements ToolStore {
     const unionSql = parts.join(" UNION ALL ");
     const sortClause = opts?.sort === "quality" ? "ORDER BY quality DESC NULLS LAST" : opts?.sort === "newest" ? "ORDER BY _rowid DESC" : "ORDER BY name ASC";
 
-    // Fetch limit+1 to detect hasMore without a separate COUNT query
+    // Get exact total count via a wrapping SELECT COUNT(*)
+    const countSql = `SELECT COUNT(*) as c FROM (${unionSql})`;
+    const totalRow = this.db.prepare(countSql).get(...filterParams);
+    const total: number = totalRow?.c ?? 0;
+
+    // Fetch paginated results
     const pageSql = `${unionSql} ${sortClause} LIMIT ? OFFSET ?`;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rows: any[] = this.db.prepare(pageSql).all(...filterParams, lim + 1, off);
-    const hasMore = rows.length > lim;
-    const pageRows = hasMore ? rows.slice(0, lim) : rows;
-
-    // Lightweight total from base tables (avoids re-executing full UNION for count)
-    let total = 0;
-    if (includeSkills) total += this.skillCount();
-    if (includeWorkflows) total += this.workflowCount();
+    const pageRows: any[] = this.db.prepare(pageSql).all(...filterParams, lim, off);
+    const hasMore = off + pageRows.length < total;
 
     const products = pageRows.map((r: Record<string, unknown>) => ({
       id: r.id,
@@ -833,15 +889,23 @@ export class UnifiedStore implements ToolStore {
     this.db.close();
   }
 
-  /** Get comprehensive stats */
+  /** Get comprehensive stats (single query instead of 6 round-trips) */
   stats(): StoreStats {
+    const row = this.db.prepare(`
+      SELECT
+        (SELECT COUNT(*) FROM tools) as tools,
+        (SELECT COUNT(*) FROM skills) as skills,
+        (SELECT COUNT(*) FROM workflows) as workflows,
+        (SELECT COUNT(*) FROM skill_edges) as edges,
+        (SELECT COUNT(*) FROM domains) as domains
+    `).get();
     return {
-      tools: this.count(),
-      skills: this.skillCount(),
-      workflows: this.workflowCount(),
-      edges: this.edgeCount(),
+      tools: row?.tools ?? 0,
+      skills: row?.skills ?? 0,
+      workflows: row?.workflows ?? 0,
+      edges: row?.edges ?? 0,
       crawl: this.crawlStats(),
-      domains: this.db.prepare("SELECT COUNT(*) as c FROM domains").get()?.c ?? 0,
+      domains: row?.domains ?? 0,
     };
   }
 }
@@ -926,8 +990,11 @@ export function createUnifiedStore(dataDir: string): UnifiedStore {
   if (_store) {
     const expectedPath = join(dataDir, "agents.sqlite");
     if (_store.getDbPath() !== expectedPath) {
-      _store.close();
-      _store = new UnifiedStore(dataDir);
+      throw new Error(
+        `UnifiedStore singleton already initialized with a different dataDir. ` +
+        `Existing: ${_store.getDbPath()}, requested: ${expectedPath}. ` +
+        `Call closeUnifiedStore() first if you need a different path.`
+      );
     }
     return _store;
   }

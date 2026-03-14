@@ -8,7 +8,7 @@
  * Falls back to Ollama-only mode when Claude API key is not set.
  */
 
-import { validateOllamaUrl } from "../guards.js";
+import { validateOllamaUrl, DEFAULT_OLLAMA_URL } from "../guards.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -45,7 +45,7 @@ export class TieredLLMClient {
   private readonly maxTokens: number;
 
   constructor(config?: TieredLLMConfig) {
-    this.ollamaUrl = config?.ollamaUrl ?? process.env.OLLAMA_URL ?? "http://127.0.0.1:11434";
+    this.ollamaUrl = config?.ollamaUrl ?? DEFAULT_OLLAMA_URL;
     this.ollamaModel = config?.ollamaModel ?? process.env.OLLAMA_MODEL ?? "llama3.2";
     this.claudeApiKey = config?.claudeApiKey ?? process.env.ANTHROPIC_API_KEY;
     this.claudeModel = config?.claudeModel ?? "claude-sonnet-4-20250514";

@@ -6,9 +6,11 @@
  * unified SQLite store.
  */
 
-import { validateOllamaUrl } from "../guards.js";
+import { validateOllamaUrl, DEFAULT_DEFAULT_OLLAMA_URL } from "../guards.js";
 import type { VecStore } from "../db/vec-store.js";
 import type { UnifiedStore, SkillRecord } from "../db/unified-store.js";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -32,7 +34,6 @@ export interface EmbedResult {
 
 // ── Constants ──────────────────────────────────────────────────────────
 
-const OLLAMA_URL = process.env.OLLAMA_URL ?? "http://127.0.0.1:11434";
 const DEFAULT_MODEL = "nomic-embed-text";
 
 // ── Embedding functions ────────────────────────────────────────────────
@@ -41,7 +42,7 @@ const DEFAULT_MODEL = "nomic-embed-text";
  * Embed a single text string via Ollama.
  */
 export async function embedText(text: string, config?: EmbeddingConfig): Promise<Float32Array> {
-  const url = config?.ollamaUrl ?? OLLAMA_URL;
+  const url = config?.ollamaUrl ?? DEFAULT_OLLAMA_URL;
   const model = config?.model ?? DEFAULT_MODEL;
 
   validateOllamaUrl(url);
@@ -76,7 +77,7 @@ export async function embedBatch(
 ): Promise<Array<{ id: string; embedding: Float32Array }>> {
   const results: Array<{ id: string; embedding: Float32Array }> = [];
   const batchSize = config?.batchSize ?? 50;
-  const url = config?.ollamaUrl ?? OLLAMA_URL;
+  const url = config?.ollamaUrl ?? DEFAULT_OLLAMA_URL;
   const model = config?.model ?? DEFAULT_MODEL;
 
   validateOllamaUrl(url);
@@ -114,12 +115,17 @@ export async function embedBatch(
  * Build the embedding text for a skill.
  * Concatenates name + domain + description + first 500 chars of body.
  */
-export function buildEmbeddingText(skill: SkillRecord): string {
+export function buildEmbeddingText(skill: SkillRecord, body?: string): string {
   const parts = [
     skill.name,
     skill.domain,
     skill.description,
   ];
+
+  // Include first 500 chars of body content for richer embeddings
+  if (body) {
+    parts.push(body.slice(0, 500));
+  }
 
   return parts.filter(Boolean).join(" ").slice(0, 1000);
 }
@@ -142,10 +148,10 @@ export async function embedAllSkills(
     return { embedded: 0, skipped: skills.length, failed: 0, durationMs: Date.now() - start };
   }
 
-  // Build texts
+  // Build texts (load body content for richer embeddings)
   const texts = toEmbed.map((s) => ({
     id: s.id,
-    text: buildEmbeddingText(s),
+    text: buildEmbeddingText(s, loadSkillBody(s)),
   }));
 
   // Embed in batch
@@ -164,5 +170,22 @@ export async function embedAllSkills(
     failed: toEmbed.length - embeddings.length,
     durationMs: Date.now() - start,
   };
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────
+
+/**
+ * Load the SKILL.md body content for a skill (TOCTOU-safe: no existsSync).
+ */
+function loadSkillBody(skill: SkillRecord): string | undefined {
+  if (!skill.skill_dir) return undefined;
+  try {
+    const content = readFileSync(join(skill.skill_dir, "SKILL.md"), "utf-8");
+    // Strip frontmatter, return body only
+    const fmEnd = content.indexOf("---", content.indexOf("---") + 3);
+    return fmEnd >= 0 ? content.slice(fmEnd + 3).trim() : content;
+  } catch {
+    return undefined;
+  }
 }
 

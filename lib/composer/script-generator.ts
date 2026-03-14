@@ -71,13 +71,16 @@ export function generateRunScript(workflow: WorkflowYAML): string {
       case "skip":
         lines.push(`${cmd} || echo "WARN: Step '${step.name}' failed, skipping"`);
         break;
-      case "retry":
-        lines.push(`for _attempt in 1 2 ${step.retries ?? 3}; do`);
+      case "retry": {
+        const maxRetries = step.retries ?? workflow.spec.errorHandling.maxRetries ?? 3;
+        const seq = Array.from({ length: maxRetries }, (_, i) => i + 1).join(" ");
+        lines.push(`for _attempt in ${seq}; do`);
         lines.push(`  ${cmd} && break`);
-        lines.push(`  echo "WARN: Step '${step.name}' failed (attempt $_attempt), retrying..."`);
+        lines.push(`  echo "WARN: Step '${step.name}' failed (attempt $_attempt/${maxRetries}), retrying..."`);
         lines.push(`  sleep ${parseRetryDelay(workflow.spec.errorHandling.retryDelay)}`);
         lines.push("done");
         break;
+      }
       default: // "stop"
         lines.push(cmd);
         break;
@@ -183,12 +186,14 @@ export function generateSkillMdFromWorkflow(workflow: WorkflowYAML): string {
   lines.push("---");
   lines.push("");
 
-  // Description with trigger phrases
+  // Description with trigger phrases (all on one line for proper trigger scoring)
   const skills = workflow.spec.steps.map((s) => s.skill);
-  lines.push(`Use when orchestrating ${workflow.metadata.domain} workflows, `);
-  lines.push(`composing ${skills.join(", ")} into automated pipelines, `);
-  lines.push(`running ${workflow.metadata.name} sequences. `);
-  lines.push(`Do NOT use for individual tool invocation or unrelated domains.`);
+  lines.push(
+    `Use when orchestrating ${workflow.metadata.domain} workflows, ` +
+    `composing ${skills.join(", ")} into automated pipelines, ` +
+    `running ${workflow.metadata.name} sequences. ` +
+    `Do NOT use for individual tool invocation or unrelated domains.`,
+  );
   lines.push("");
 
   // Pipeline overview

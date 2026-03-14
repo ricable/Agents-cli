@@ -76,14 +76,14 @@ export function gatherStats(store: UnifiedStore, vecStore?: VecStore | null): Sy
   const embeddedCount = vecStore?.count() ?? 0;
   const embeddingModel = vecStore?.getMeta("model") ?? null;
 
-  // Graph stats
-  const totalEdges = base.edges;
+  // Graph stats (derive total from grouped query to avoid redundant COUNT)
   const edgesByType = db.prepare(`
     SELECT edge_type as type, COUNT(*) as count
     FROM skill_edges
     GROUP BY edge_type
     ORDER BY count DESC
   `).all() as Array<{ type: string; count: number }>;
+  const totalEdges = edgesByType.reduce((sum, row) => sum + row.count, 0);
 
   const avgEdgesPerSkill = base.skills > 0 ? totalEdges / base.skills : 0;
 

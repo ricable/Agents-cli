@@ -6,7 +6,7 @@ Any GitHub repo, npm package, PyPI package, or crates.io crate with a CLI become
 
 Built on the ["Rewrite Your CLI for AI Agents"](https://justin.poehnelt.com/posts/rewrite-your-cli-for-ai-agents/) philosophy — structured JSON output, schema introspection, context window discipline, input hardening, dry-run safety, and rich skill generation.
 
-> For contributor guidelines and strict implementation rules, see **[CLAUDE.md](./CLAUDE.md)**.
+> **Cross-references:** [CLAUDE.md](./CLAUDE.md) (contributor rules, project structure, pitfalls, canonical imports), [`.claude/skills/agents-cli-dev/SKILL.md`](./.claude/skills/agents-cli-dev/SKILL.md) (dev skill for Claude Code), [`.claude/agents/forge-expert.md`](./.claude/agents/forge-expert.md) (forge expert agent), [`deploy-local.sh`](./deploy-local.sh) (local dev launcher).
 
 ## What it does
 
@@ -400,36 +400,73 @@ agents-cli schema ruff --json --depth 3
 
 ## SaaS UI & Companion Server
 
-The SaaS marketplace UI lives at `examples/saas-ui/`. Serve it with the companion server:
+The SaaS marketplace UI lives at `examples/saas-ui/`, deployed to [ui.spectredve.com](https://ui.spectredve.com) via Vercel. See [CLAUDE.md — SaaS UI](./CLAUDE.md#saas-ui-examplessaas-ui) for full architecture, pricing, auth, and deployment details.
+
+### Local dev
 
 ```bash
-# Start companion server (UI at http://localhost:3100)
-agents-cli mcp start
+# Start both servers (UI :8080 + companion :3100)
+./deploy-local.sh
+./deploy-local.sh --no-build   # skip npm build
+
+# Or manual companion start
+npx tsx examples/skill-forge.ts --companion --serve --port 3100
+
+# Stripe webhook testing
+stripe listen --forward-to localhost:3100/api/billing/webhook
 ```
 
-The UI includes:
+Env vars in `.env` (gitignored): `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (must be `whsec_...`).
 
-- **Marketplace** — product grid with Agent-Native filter, Workflows tab (NEW badge), bulk select, `▶ Try` button (pre-fills Forge)
-- **Skill Forge** — cost estimator, quality preview bar, AI persona selector, generation history, batch CSV upload
-- **Dashboard** — usage meter, revenue tracker with split bar, agent wallet with 24h heatmap
-- **Agent Economy** — creator earnings, per-skill revenue with SVG sparklines, agent leaderboard
-- **API Keys** — create/revoke scoped keys (one-time secret reveal)
-- **Product Detail** — 3-tab view (Overview / Pricing / Changelog), live SSE invocation feed, MCP deploy button
+### Production deploy
 
-### Companion API
+```bash
+cd examples/saas-ui && vercel --prod    # deploy from this dir, NOT repo root
+git tag v1.2.0 && git push --tags      # GH Actions prod deploy
+```
 
-All endpoints require `Authorization: Bearer <token>`.
+### Landing page (`index.html`)
+
+- **Workflow Showcase** — animated pipeline demo, 3 featured workflow cards
+- **Skill Forge** — cost estimator, quality preview bar, AI persona selector, batch CSV
+- **Pricing** — 50% OFF launch promo (Starter $14.99/mo, Pro $39.99/mo, Enterprise $99/mo) via Stripe Checkout
+- Links to dedicated `/marketplace` page
+
+### Marketplace (`marketplace.html` at `/marketplace`)
+
+**Dedicated standalone page** with its own CSS (`css/marketplace-page.css`) and JS (`js/marketplace-page.js`):
+- **How It Works** — walkthrough section
+- **Sources** — registry sources overview
+- **Workflows** — workflow showcase + browse
+- **Demos** — interactive demos
+- **Browse** — full product grid with Agent-Native filter, Workflows tab (2nd, NEW badge), bulk select, `▶ Try` button, tier-gated installs
+- **Product Detail** — 4-tab view (Overview / Pricing / Changelog / Pipeline for workflows), live SSE feed, DAG visualization
+- **Pricing** — subscription plans with Stripe Checkout
+
+### Admin panel (`admin.html` at `/admin`)
+
+Auth-gated standalone SPA with hash routing:
+- **Dashboard** — revenue tracker, agent wallet, 24h heatmap
+- **Economy** — creator earnings, per-skill revenue with SVG sparklines, leaderboard
+- **API Keys** — create/revoke scoped keys
+- **Settings** — profile/preferences
+
+### Auth
+
+Dual-mode: Clerk JWT (production) with mock OAuth fallback (offline dev). `AuthManager` in `js/auth.js`. `AppStore` in `js/store.js` (pub/sub + localStorage).
+
+### Companion API (`lib/companion/web-service.ts` @ :3100)
+
+Auth: API-key SHA256 first, Clerk JWT fallback. All `/api/*` require `Authorization: Bearer <token>` (except `/api/health`, `/api/config`).
 
 ```
-GET  /api/earnings?period=month        — creator revenue summary
-GET  /api/agents/:id/metrics           — call/cost/latency stats
-GET  /api/agents/:id/heatmap           — 24h invocation heatmap
-POST /api/agent-keys                   — create scoped API key
-DELETE /api/agent-keys/:id             — revoke key
+GET  /api/health|config|auth/me|catalog|usage|earnings|catalog/domains|graph/:skillId
+GET  /api/catalog?page=1&limit=50&domain=X&type=Y&sort=quality&q=Z
+POST /api/generate | billing/checkout | billing/webhook | agent-keys
+GET  /api/billing/portal | status/:jobId | download/:jobId
+GET  /api/agents/:id/metrics | agents/:id/heatmap
 GET  /api/invocations/stream?skill=X   — SSE live invocation feed
-GET  /api/catalog / /api/usage / /api/health
-POST /api/generate | GET /api/status/:id | GET /api/download/:id
-POST /api/billing/checkout | GET /api/billing/portal
+DELETE /api/agent-keys/:id
 ```
 
 ## Full pipeline example
@@ -527,10 +564,16 @@ npm run lint         # tsc --noEmit type check
 ```
 
 See **[CLAUDE.md](./CLAUDE.md)** for the complete contributor reference:
-- Hard rules (ESM, security, output format, dry-run, no process.exit, etc.)
-- Full project structure with all file paths and module responsibilities
-- Key function signatures and their module locations
-- Common pitfalls and the Do-NOT list
+- [Hard rules](./CLAUDE.md#hard-rules) (ESM, security, output format, dry-run, no process.exit, etc.)
+- [Project structure](./CLAUDE.md#project-structure) with all file paths and module responsibilities
+- [Key function signatures](./CLAUDE.md#key-function-signatures) and their module locations
+- [Common pitfalls](./CLAUDE.md#common-pitfalls) and the [Do-NOT list](./CLAUDE.md#do-not)
+- [Canonical imports](./CLAUDE.md#canonical-imports) — which module to import from
+- [SaaS UI](./CLAUDE.md#saas-ui-examplessaas-ui) — deployment, auth, pricing, admin panel
+
+For Claude Code integration:
+- [`.claude/skills/agents-cli-dev/SKILL.md`](./.claude/skills/agents-cli-dev/SKILL.md) — dev skill with quick commands
+- [`.claude/agents/forge-expert.md`](./.claude/agents/forge-expert.md) — forge expert agent
 
 ## License
 

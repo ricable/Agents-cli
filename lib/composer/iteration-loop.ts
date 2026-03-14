@@ -108,9 +108,9 @@ export async function composeWorkflow(opts: ComposeOptions): Promise<ComposeResu
 
   opts.onProgress?.(1, report);
 
-  // 2-N. Refinement loop
+  // 2-N. Refinement loop (continue if score below target OR there are issues)
   let iteration = 2;
-  while (iteration <= maxIterations && report.score < minQuality && report.issues.length > 0) {
+  while (iteration <= maxIterations && (report.score < minQuality || report.issues.length > 0)) {
     const iterStart = Date.now();
     const prevIssues = [...report.issues];
     const prevScore = report.score;

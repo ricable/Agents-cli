@@ -1,4 +1,6 @@
 import { Command } from "commander";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { success, failure, emit, toErrorMessage } from "../../lib/output.js";
 import { DATA_DIR, isJsonMode, getStore } from "./shared.js";
 
@@ -13,7 +15,7 @@ export function registerCrawlCommand(program: Command): void {
     .command("seed")
     .description("Seed the crawl queue from package registries")
     .option("--registry <name>", "Seed from specific registry (pypi, npm, crates, github, mcp)")
-    .option("--all-registries", "Seed from all registries")
+    .option("--all", "Seed from all registries")
     .option("--limit <n>", "Maximum items to seed per registry", "1000")
     .option("--category <names>", "Comma-separated category filter")
     .option("--min-quality <n>", "Minimum quality/stars threshold", "5")
@@ -21,7 +23,7 @@ export function registerCrawlCommand(program: Command): void {
     .option("--dry-run", "Show what would be seeded without inserting")
     .action(async (opts: {
       registry?: string;
-      allRegistries?: boolean;
+      all?: boolean;
       limit?: string;
       category?: string;
       minQuality?: string;
@@ -43,19 +45,19 @@ export function registerCrawlCommand(program: Command): void {
         if (opts.dryRun) {
           const result = success("crawl seed", {
             dryRun: true,
-            registry: opts.allRegistries ? "all" : (opts.registry ?? "all"),
+            registry: opts.all ? "all" : (opts.registry ?? "all"),
             limit: seederOpts.limit,
             categories: seederOpts.categories ?? "default",
           }, start);
           if (json) { emit(result, true); return; }
-          console.log(`[dry-run] Would seed ${seederOpts.limit} items from ${opts.allRegistries ? "all registries" : opts.registry ?? "all"}`);
+          console.log(`[dry-run] Would seed ${seederOpts.limit} items from ${opts.all ? "all registries" : opts.registry ?? "all"}`);
           return;
         }
 
         const seeders = await import("../../lib/crawler/seeders.js");
         let results;
 
-        if (opts.allRegistries || !opts.registry) {
+        if (opts.all || !opts.registry) {
           results = await seeders.seedAll(store, seederOpts);
         } else {
           const fn = {
@@ -102,21 +104,50 @@ export function registerCrawlCommand(program: Command): void {
     .option("--limit <n>", "Max items to process")
     .option("--registry <name>", "Process only this registry")
     .option("--no-prune", "Keep installed package dirs after skill generation")
+    .option("--dry-run", "Show what would be processed without running")
     .option("--json", "Output as structured JSON")
     .action(async (opts: {
       concurrency?: string;
       limit?: string;
       registry?: string;
       prune?: boolean;
+      dryRun?: boolean;
       json?: boolean;
     }) => {
       const start = Date.now();
       const json = isJsonMode(opts);
 
+      if (opts.dryRun) {
+        try {
+          const store = await getStore();
+          const stats = store.crawlStats();
+          const result = success("crawl start", {
+            dryRun: true,
+            pending: stats.pending,
+            concurrency: opts.concurrency ? parseInt(opts.concurrency, 10) : "auto (CPU count)",
+            limit: opts.limit ? parseInt(opts.limit, 10) : "unlimited",
+            registry: opts.registry ?? "all",
+            prune: opts.prune ?? true,
+          }, start);
+          if (json) { emit(result, true); return; }
+          console.log(`[dry-run] Would process ${stats.pending} pending items`);
+          return;
+        } catch (err) {
+          const result = failure("crawl start", "WORKER_ERROR", toErrorMessage(err), start);
+          if (json) { emit(result, true); return; }
+          console.error(`Worker failed: ${toErrorMessage(err)}`);
+          process.exitCode = 1;
+          return;
+        }
+      }
+
       try {
         const store = await getStore();
 
         const { runCrawlWorker } = await import("../../lib/crawler/worker.js");
+        // Pre-load modules once outside the per-item callback
+        const { validateSource } = await import("../../lib/guards.js");
+        const { installTool, generateRichSkillMd } = await import("../../lib/skills.js");
 
         const workerResult = await runCrawlWorker(store, {
           concurrency: opts.concurrency ? parseInt(opts.concurrency, 10) : undefined,
@@ -124,17 +155,25 @@ export function registerCrawlCommand(program: Command): void {
           registry: opts.registry,
           prune: opts.prune,
           dataDir: DATA_DIR,
-          skillsDir: "examples/generated-skills",
-          processItem: async (source, _itemOpts) => {
-            // Lazy-load forge pipeline to avoid circular deps
+          skillsDir: join(DATA_DIR, "generated-skills"),
+          processItem: async (source, itemOpts) => {
             try {
-              const { validateSource } = await import("../../lib/guards.js");
               validateSource(source);
-              // In a real implementation, this would call the full forge pipeline
-              // For now, return success stub
-              return { ok: true, skillId: source.replace(/[:/]/g, "-") };
+
+              const tool = await installTool(source, itemOpts.dataDir, {
+                store,
+                verbose: false,
+                recursive: false,
+              });
+
+              const skillContent = generateRichSkillMd(tool);
+              const skillDir = join(itemOpts.skillsDir, `src-${tool.id}`);
+              mkdirSync(skillDir, { recursive: true });
+              writeFileSync(join(skillDir, "SKILL.md"), skillContent, "utf-8");
+
+              return { ok: true, skillId: tool.id };
             } catch (err) {
-              return { ok: false, error: String(err) };
+              return { ok: false, error: toErrorMessage(err) };
             }
           },
           onProgress: (stats) => {

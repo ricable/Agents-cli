@@ -15,6 +15,14 @@
  */
 
 import type { WorkflowYAML, ValidationResult } from "./schema.js";
+import { scoreWorkflowQuality } from "../skill-tester.js";
+import { generateRunScript, generateSetupScript, generateSkillMdFromWorkflow } from "./script-generator.js";
+
+/** Minimum per-axis quality threshold (per CLAUDE.md: all 4 axes >= 0.5). */
+const MIN_AXIS_SCORE = 0.5;
+/** Blend weights: static checks vs workflow quality. */
+const STATIC_WEIGHT = 0.4;
+const QUALITY_WEIGHT = 0.6;
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -68,11 +76,44 @@ export function validateWorkflow(
   checks.push(checkMetadata(workflow, issues));
 
   const passedCount = checks.filter((c) => c.passed).length;
-  const score = checks.length > 0 ? passedCount / checks.length : 0;
+  const staticScore = checks.length > 0 ? passedCount / checks.length : 0;
+
+  // Integrate scoreWorkflowQuality for the 4-axis quality gate
+  let qualityScore = staticScore;
+  if (workflow.spec.steps.length > 0) {
+    try {
+      const skillMd = generateSkillMdFromWorkflow(workflow);
+      const runSh = generateRunScript(workflow);
+      const setupSh = generateSetupScript(workflow);
+      const files: Record<string, string> = {
+        "scripts/run.sh": runSh,
+        "scripts/setup.sh": setupSh,
+      };
+      const wq = scoreWorkflowQuality(skillMd, files);
+
+      // All 4 axes must be >= 0.5 per project rules
+      const axisScores = [wq.stepCompleteness, wq.dataFlowValidity, wq.envVarDocumentation, wq.setupRunnability];
+      const axisAvg = axisScores.reduce((a, b) => a + b, 0) / axisScores.length;
+      const allAxesMet = axisScores.every((s) => s >= MIN_AXIS_SCORE);
+
+      if (!allAxesMet) {
+        const axisNames = ["stepCompleteness", "dataFlowValidity", "envVarDocumentation", "setupRunnability"] as const;
+        const failedAxes = axisNames
+          .filter((_, i) => axisScores[i]! < MIN_AXIS_SCORE)
+          .map((name, i) => `${name}=${axisScores[i]}`);
+        issues.push(`Workflow quality axes below ${MIN_AXIS_SCORE}: ${failedAxes.join(", ")}`);
+      }
+
+      qualityScore = (staticScore * STATIC_WEIGHT) + (axisAvg * QUALITY_WEIGHT);
+    } catch {
+      // If quality scoring fails, fall back to static-only score
+      qualityScore = staticScore;
+    }
+  }
 
   return {
     passed: issues.length === 0,
-    score,
+    score: Math.round(qualityScore * 100) / 100,
     issues,
     checks,
   };

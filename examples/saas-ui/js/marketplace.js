@@ -45,6 +45,9 @@ export function initMarketplace(api, store, showProductDetail, auth) {
 
   if (!grid) return;
 
+  // Set up event delegation once (prevents listener stacking on infinite scroll)
+  setupGridDelegation(grid, showProductDetail, store, auth);
+
   // ── Load catalog ────────────────────────────────────────────────
 
   async function loadAndRender() {
@@ -84,7 +87,7 @@ export function initMarketplace(api, store, showProductDetail, auth) {
 
     const userTier = store.get('tier') || 'free';
     grid.innerHTML = results.map(p => renderCard(p, { userTier })).join('');
-    attachCardListeners(grid, showProductDetail, store, auth);
+
     updateInstallCounter(store);
   }
 
@@ -234,7 +237,7 @@ export function initMarketplace(api, store, showProductDetail, auth) {
           const userTier = store.get('tier') || 'free';
           const html = result.products.map(p => renderCard(p, { userTier })).join('');
           grid.insertAdjacentHTML('beforeend', html);
-          attachCardListeners(grid, showProductDetail, store, auth);
+      
           hasMoreProducts = result.hasMore;
         } else {
           hasMoreProducts = false;
@@ -361,54 +364,60 @@ function renderSkeletons(count) {
   `).join('');
 }
 
-function attachCardListeners(grid, showProductDetail, store, auth) {
-  grid.querySelectorAll('.plugin-card').forEach(card => {
-    card.addEventListener('click', (e) => {
-      if (e.target.closest('.install-card-btn')) {
-        const id = e.target.dataset.id;
-        showProductDetail(id);
-        return;
-      }
-      if (e.target.closest('.try-card-btn')) return;
-      if (e.target.closest('.oneshot-buy-btn')) return;
-      if (e.target.closest('.tier-lock-actions a')) return;
-      const id = card.dataset.productId;
-      if (id) showProductDetail(id);
-    });
-  });
+/** Set up event delegation on grid (call once, not per render). */
+let _gridDelegated = false;
+function setupGridDelegation(grid, showProductDetail, store, auth) {
+  if (_gridDelegated) return;
+  _gridDelegated = true;
 
-  grid.querySelectorAll('.try-card-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+  grid.addEventListener('click', (e) => {
+    // Try button
+    const tryBtn = e.target.closest('.try-card-btn');
+    if (tryBtn) {
       e.stopPropagation();
-      const id = btn.dataset.id;
+      const id = tryBtn.dataset.id;
       const userTier = store.get('tier') || 'free';
       const limit = TIER_LIMITS[userTier] || 3;
       const used = store.getMonthlyInstallCount();
-
       if (used >= limit) {
         showToast(`Monthly install limit reached (${limit}). Upgrade for more.`, 'error');
         return;
       }
-
       store.incrementInstallCount();
-
       const forgeSidebar = document.querySelector('[data-pane="forge"]');
       if (forgeSidebar) forgeSidebar.click();
       const toolInput = document.getElementById('forgeToolInput');
-      if (toolInput) {
-        toolInput.value = id;
-        toolInput.dispatchEvent(new Event('blur'));
-      }
-    });
-  });
+      if (toolInput) { toolInput.value = id; toolInput.dispatchEvent(new Event('blur')); }
+      return;
+    }
 
-  grid.querySelectorAll('.oneshot-buy-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+    // Oneshot buy button
+    const buyBtn = e.target.closest('.oneshot-buy-btn');
+    if (buyBtn) {
       e.stopPropagation();
-      const tier = btn.dataset.tier;
+      const tier = buyBtn.dataset.tier;
       const price = ONESHOT_PRICES[tier];
       showToast(`One-shot purchase ($${price}) — coming soon!`);
-    });
+      return;
+    }
+
+    // Tier lock actions
+    if (e.target.closest('.tier-lock-actions a')) return;
+
+    // Install button
+    const installBtn = e.target.closest('.install-card-btn');
+    if (installBtn) {
+      const id = installBtn.dataset.id;
+      showProductDetail(id);
+      return;
+    }
+
+    // Card click → product detail
+    const card = e.target.closest('.plugin-card');
+    if (card) {
+      const id = card.dataset.productId;
+      if (id) showProductDetail(id);
+    }
   });
 }
 

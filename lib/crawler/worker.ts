@@ -86,11 +86,13 @@ export async function runCrawlWorker(
   let prunedDirs = 0;
   const errors: Array<{ source: string; error: string }> = [];
   const limit = opts.limit ?? Infinity;
+  // Snapshot initial pending count to avoid per-item DB query
+  const initialPending = limit === Infinity ? store.crawlStats().pending : limit;
 
   while (processed < limit) {
     // Dequeue a batch
     const remaining = Math.min(batchSize, limit - processed);
-    const items = store.dequeue(remaining);
+    const items = store.dequeue(remaining, opts.registry);
     if (items.length === 0) break;
 
     // Process batch concurrently
@@ -120,8 +122,9 @@ export async function runCrawlWorker(
             failed++;
           }
         } catch (err) {
-          store.markFailed(item.id, toErrorMessage(err));
-          errors.push({ source: item.source, error: toErrorMessage(err) });
+          const errMsg = toErrorMessage(err);
+          store.markFailed(item.id, errMsg);
+          errors.push({ source: item.source, error: errMsg });
           failed++;
         } finally {
           semaphore.release(Date.now() - taskStart);
@@ -131,7 +134,7 @@ export async function runCrawlWorker(
             processed,
             succeeded,
             failed,
-            remaining: limit === Infinity ? store.crawlStats().pending : limit - processed,
+            remaining: Math.max(0, initialPending - processed),
             currentConcurrency: semaphore.concurrency,
           });
         }

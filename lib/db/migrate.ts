@@ -18,7 +18,7 @@ import { parseFrontmatter } from "../skills/frontmatter.js";
 export interface MigrationResult {
   toolsMigrated: number;
   skillsMigrated: number;
-  domainsSeededed: number;
+  domainsSeeded: number;
   cacheEntriesMigrated: number;
   errors: string[];
   durationMs: number;
@@ -37,7 +37,7 @@ export interface MigrationResult {
  */
 export async function migrateToSqlite(opts: {
   dataDir: string;
-  skillsDir: string;
+  skillsDir?: string;
   dryRun?: boolean;
 }): Promise<MigrationResult> {
   const start = Date.now();
@@ -46,17 +46,20 @@ export async function migrateToSqlite(opts: {
   let skillsMigrated = 0;
   let cacheEntriesMigrated = 0;
 
+  // Default skillsDir to {dataDir}/skills if not specified
+  const skillsDir = opts.skillsDir ?? join(opts.dataDir, "skills");
+
   await ensureSqlite();
 
   if (opts.dryRun) {
     // Count what would be migrated without touching the DB
     const tools = loadToolsJson(opts.dataDir);
-    const skills = discoverSkills(opts.skillsDir);
-    const cache = loadSkillCache(opts.skillsDir);
+    const skills = discoverSkills(skillsDir);
+    const cache = loadSkillCache(skillsDir);
     return {
       toolsMigrated: tools.length,
       skillsMigrated: skills.length,
-      domainsSeededed: Object.keys(DOMAIN_TRIGGERS).length,
+      domainsSeeded: Object.keys(DOMAIN_TRIGGERS).length,
       cacheEntriesMigrated: Object.keys(cache).length,
       errors: [],
       durationMs: Date.now() - start,
@@ -76,10 +79,10 @@ export async function migrateToSqlite(opts: {
   }
 
   // 2. Seed domain taxonomy
-  const domainsSeededed = seedDomains(store);
+  const domainsSeeded = seedDomains(store);
 
   // 3. Migrate skills + cache
-  const skillRecords = buildSkillRecords(opts.skillsDir);
+  const skillRecords = buildSkillRecords(skillsDir);
   if (skillRecords.length > 0) {
     try {
       skillsMigrated = store.bulkUpsertSkills(skillRecords);
@@ -92,7 +95,7 @@ export async function migrateToSqlite(opts: {
   return {
     toolsMigrated,
     skillsMigrated,
-    domainsSeededed,
+    domainsSeeded,
     cacheEntriesMigrated,
     errors,
     durationMs: Date.now() - start,

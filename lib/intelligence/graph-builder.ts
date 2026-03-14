@@ -11,7 +11,8 @@
 import type { UnifiedStore, SkillRecord, EdgeType } from "../db/unified-store.js";
 import type { VecStore } from "../db/vec-store.js";
 import { extractIOProfile, type IOProfile } from "./io-extractor.js";
-import { readFileSync, existsSync } from "node:fs";
+import { cosine } from "../guards.js";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -138,26 +139,32 @@ export async function buildSkillGraph(
     opts?.onProgress?.("embedding-similar", 0, total);
     const embEdges: Array<{ sourceId: string; targetId: string; edgeType: EdgeType; weight: number }> = [];
 
+    // Pre-load all embeddings via the database for cosine comparison
+    const db = store.getDb();
+    const allEmbRows = db.prepare(`SELECT id, embedding FROM vec_skills`).all() as Array<{ id: string; embedding: Buffer }>;
+    const embeddingMap = new Map<string, Float32Array>();
+    for (const row of allEmbRows) {
+      if (row.embedding) {
+        embeddingMap.set(row.id, new Float32Array(
+          row.embedding.buffer,
+          row.embedding.byteOffset,
+          row.embedding.byteLength / 4,
+        ));
+      }
+    }
+
     for (let i = 0; i < skills.length; i++) {
       const skill = skills[i]!;
-      if (!vecStore.has(skill.id)) continue;
+      const embedding = embeddingMap.get(skill.id);
+      if (!embedding) continue;
 
-      // Get embedding for this skill
-      const db = store.getDb();
-      const row = db.prepare(`SELECT embedding FROM vec_skills WHERE id = ?`).get(skill.id);
-      if (!row?.embedding) continue;
-
-      const embedding = new Float32Array(
-        row.embedding.buffer,
-        row.embedding.byteOffset,
-        row.embedding.byteLength / 4,
-      );
-
-      // Find nearest neighbors
+      // Find nearest neighbors using vecStore KNN, then verify with cosine()
       const neighbors = vecStore.search(embedding, 10);
       for (const neighbor of neighbors) {
         if (neighbor.id === skill.id) continue;
-        const similarity = 1 - neighbor.distance;
+        const neighborEmb = embeddingMap.get(neighbor.id);
+        // Use cosine() from guards.ts for similarity computation
+        const similarity = neighborEmb ? cosine(embedding, neighborEmb) : 1 - neighbor.distance;
         if (similarity >= threshold) {
           embEdges.push({
             sourceId: skill.id,
@@ -268,7 +275,6 @@ async function computeLlmInferredEdges(
 function loadSkillMd(skill: SkillRecord): string | null {
   if (!skill.skill_dir) return null;
   const path = join(skill.skill_dir, "SKILL.md");
-  if (!existsSync(path)) return null;
   try {
     return readFileSync(path, "utf-8");
   } catch {

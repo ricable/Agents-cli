@@ -241,6 +241,9 @@ export function shellQuote(s: string): string {
 
 import { isPrivateUrl } from "./resolver.js";
 
+/** Default Ollama URL — single source of truth for all modules. */
+export const DEFAULT_OLLAMA_URL = process.env.OLLAMA_URL ?? "http://127.0.0.1:11434";
+
 /** Validate Ollama URL points to localhost or public host */
 export function validateOllamaUrl(url: string): void {
   const parsed = new URL(url);

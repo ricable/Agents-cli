@@ -1,22 +1,22 @@
 # agents-cli
 
-Package manager for AI agent tools. Resolves, installs, analyzes, exposes CLI tools from GitHub/npm/PyPI/crates.io/local. Stored in `~/.agents-cli/`. Built on "Rewrite Your CLI for AI Agents" — structured JSON output, schema introspection, context window discipline, input hardening, rich skill generation, multi-surface output, dry-run safety.
+Package manager for AI agent tools. Resolves, installs, analyzes, exposes CLI tools from GitHub/npm/PyPI/crates.io/local. Stored in `~/.agents-cli/`. ESM-only TypeScript, structured JSON output, dry-run safety.
 
-> See **README.md** for full usage guide, examples, and architecture overview.
+> **Cross-references:** [README.md](./README.md) (usage guide, examples, full pipeline), [`.claude/skills/agents-cli-dev/SKILL.md`](./.claude/skills/agents-cli-dev/SKILL.md) (dev skill for Claude Code), [`.claude/agents/forge-expert.md`](./.claude/agents/forge-expert.md) (forge expert agent), [`deploy-local.sh`](./deploy-local.sh) (local dev launcher), [`battle-test-ecosystem.sh`](./battle-test-ecosystem.sh) (41-check validation).
 
-## Key Dependencies
+## Key Deps
 
-- `@clerk/backend` — Clerk JWT verification (server-side). Canonical import location: `lib/companion/clerk-auth.ts`. `ClerkConfig` now supports `authorizedParties?: string[]` (reads `CLERK_AUTHORIZED_PARTIES` env var, comma-separated). `verifyClerkToken()` gets `publicMetadata` from `clerk.users.getUser()` (not session claims).
-- `stripe` — official Stripe Node.js SDK used by `StripeProvider` in `lib/companion/billing.ts` (customers, checkout, billing portal, invoices, webhook verification) and by the Vercel serverless checkout function (`examples/saas-ui/api/billing/checkout.js`). Do NOT use raw fetch for Stripe API calls. `createCheckoutSession` now accepts `clerkUserId?: string` (4th arg) — embeds it in `session.metadata` + `subscription_data.metadata` for webhook reverse-lookup.
+- `@clerk/backend` — JWT verification. Canonical import: `lib/companion/clerk-auth.ts`. `ClerkConfig` supports `authorizedParties?: string[]` (reads `CLERK_AUTHORIZED_PARTIES` env, comma-separated). `verifyClerkToken()` gets `publicMetadata` from `clerk.users.getUser()` (not session claims).
+- `stripe` — official SDK in `lib/companion/billing.ts` + `examples/saas-ui/api/billing/checkout.js`. Never raw fetch. `createCheckoutSession` accepts `clerkUserId?: string` (4th arg) — embeds in `session.metadata` + `subscription_data.metadata` for webhook reverse-lookup.
 
 ## Build & Test
 
 ```bash
-npm run build          # tsup (required before running)
-npm run dev            # watch mode
-npm test               # vitest (369 tests, 19 files)
-npm run lint           # tsc --noEmit
-npx tsx bin/agents-cli.ts <cmd>          # dev mode (no build needed)
+npm run build                            # tsup (required before running)
+npm run dev                              # watch mode
+npm test                                 # vitest (369 tests, 19 files)
+npm run lint                             # tsc --noEmit
+npx tsx bin/agents-cli.ts <cmd>          # dev (no build needed)
 npx tsx score-all.ts                     # score all skills
 npx tsx examples/skill-forge.ts --audit  # quality audit
 bash battle-test-ecosystem.sh --quick    # battle test (41 checks)
@@ -24,577 +24,255 @@ bash battle-test-ecosystem.sh --quick    # battle test (41 checks)
 
 ## Hard Rules
 
-- **ESM only** — `.js` extensions on all imports, named exports only, no `require()`, no default exports
-- **Never modify `dist/`** — edit `lib/` + `bin/`, then rebuild with `npm run build`
-- **Types in `lib/types.ts`** — all shared interfaces/types defined there
-- **Security** — never bypass SSRF (`isPrivateUrl`), path traversal (`rejectPathTraversal`), size limits, input validation (`validateSource`, `validateToolName`)
-- **SSRF**: `fetchHtml()` github.com only; `fetchJson()` uses `isPrivateUrl()`. New HTTP helpers must check hosts + cap response size (`MAX_RESPONSE_BYTES`)
-- **Shell safety** — `validateToolName()` + `shellQuote()` (from `lib/guards.ts`) before interpolating into shell
-- **Path containment** — `resolve(path).startsWith(resolve(baseDir) + "/")`. Use `rejectPathTraversal()` on user paths
-- **Promise safety** — `settled` flag to prevent double-resolve/reject on streams
+- **ESM only** — `.js` extensions, named exports, no `require()`, no default exports
+- **Never modify `dist/`** — edit `lib/`+`bin/`, rebuild
+- **Types in `lib/types.ts`** — all shared interfaces/types
+- **Security** — never bypass SSRF (`isPrivateUrl`), path traversal (`rejectPathTraversal`), size limits, input validation (`validateSource`, `validateToolName`). `fetchHtml()` github.com only; new HTTP helpers must check hosts + cap `MAX_RESPONSE_BYTES`
+- **Shell safety** — `validateToolName()` + `shellQuote()` (canonical: `lib/guards.ts`, re-exported from `lib/skills.ts` for compat) before shell interpolation
+- **Path containment** — `resolve(path).startsWith(resolve(baseDir) + "/")`, use `rejectPathTraversal()`
+- **Promise safety** — `settled` flag prevents double-resolve/reject on streams
 - **Error handling** — `toErrorMessage(err)` from `lib/output.ts`, never `(err as Error).message`
-- **Structured output** — all commands use `success()`/`failure()`/`emit()` via `CliOutput<T>`. `--json` + `OUTPUT_FORMAT=json` everywhere. Error paths use `emit(failure(...))` when `--json` active
-- **Dry-run** — all mutating commands support `--dry-run` (file writes, index gen, lockfile)
-- **No interactive prompts** — CI/agent-friendly
-- **Atomic writes** — temp-file + rename pattern
-- **No `process.exit()`** — use `process.exitCode`
+- **Structured output** — `success()`/`failure()`/`emit()` via `CliOutput<T>`. `--json`+`OUTPUT_FORMAT=json` everywhere. Error paths use `emit(failure(...))` when `--json` active
+- **Dry-run** — all mutating commands support `--dry-run`
+- **Atomic writes** — temp-file + rename. No `process.exit()` (use `process.exitCode`). No interactive prompts
 - **No fabricated commands** — only from actual `--help` or README code blocks
-- **Ecosystem-aware** — `detectToolLanguage()` checks source→topics→files→category. Never use the wrong package manager
+- **Ecosystem-aware** — `detectToolLanguage()` checks source→topics→files→category. Never use wrong package manager
 - **Binary name inference** — `inferBinaryNames()` checks Cargo.toml `[[bin]]`, Go `cmd/`, `go.mod`. Use binary names in templates
-- **Frontmatter** — use `parseFrontmatter()` return values (from `lib/skills/frontmatter.ts`), never regex on full content
-- **Version fallbacks** — GitHub releases→tags→`readSourceVersion()`→package.json→"0.0.0". Set `GITHUB_TOKEN` for higher rate limits
-- **Skill descriptions** — must have "Use when" + action verbs + "Do NOT use for" + TechNames for trigger score ≥ 0.80. Use `CATEGORY_ACTION_MAP` with `%` templates. `DOMAIN_NEGATIVE_TRIGGERS` for negative clauses
-- **Frontmatter fields** — `ALLOWED_FIELDS` in `guards.ts`: name, description, version, ingredients, tags, domain, allowed-tools, compatibility, license, metadata, context, argument-hint, disable-model-invocation, agent, hooks, user-invocable, model
-- **shellQuote canonical location** — `lib/guards.ts`. Re-exported from `lib/skills.ts` for compat. In new code always import from `./guards.js`
+- **Frontmatter** — `parseFrontmatter()` from `lib/skills/frontmatter.ts`, never regex on full content
+- **Version fallbacks** — releases→tags→`readSourceVersion()`→package.json→"0.0.0". Set `GITHUB_TOKEN` for rate limits
+- **Skill descriptions** — "Use when" + action verbs + "Do NOT use for" + TechNames for trigger ≥ 0.80. Use `CATEGORY_ACTION_MAP` with `%` templates + `DOMAIN_NEGATIVE_TRIGGERS`
+- **ALLOWED_FIELDS** in `guards.ts`: name, description, version, ingredients, tags, domain, allowed-tools, compatibility, license, metadata, context, argument-hint, disable-model-invocation, agent, hooks, user-invocable, model
 
 ## Source Prefixes
 
-| Prefix | Example | Registry |
-|--------|---------|----------|
-| (none) | `owner/repo` | GitHub |
-| `@scope/` | `@anthropic-ai/sdk` | npm scoped |
-| `npm:` | `npm:express` | npm bare |
-| `pypi:` | `pypi:ruff` | PyPI |
-| `crates:` | `crates:ripgrep` | crates.io |
-| `./` `/` | `./local-path` | local |
-
-Bare names (e.g. `httpie`) → `pypi:` fallback.
+`owner/repo`→GitHub, `@scope/pkg`→npm scoped, `npm:X`→npm, `pypi:X`→PyPI, `crates:X`→crates.io, `./path`→local. Bare names→`pypi:` fallback.
 
 ## CLI Commands (all support `--json`)
 
 ```bash
-# Tools: add/list/describe/run/update/remove (all support --dry-run)
 agents-cli add owner/repo [--deep --skill --force --dry-run]
 agents-cli add pypi:ruff | npm:express | crates:ripgrep | @scope/pkg | ./path
-agents-cli list [--fields name,version]
-agents-cli describe <tool> [--fields commands,globalFlags]
-agents-cli run <tool> [--dry-run] -- <args>
-agents-cli update/remove <tool> [--dry-run]
-
-# Schema introspection
-agents-cli schema <tool> [--depth 5 --refresh --json]
-
-# Skills
-agents-cli skills generate [--from-tool <name>]
-agents-cli skills install/list/remove
-agents-cli init --name "my-skill"
-
-# Lockfile
-agents-cli freeze | install | verify
-
-# Registry
+agents-cli list [--fields name,version] | describe <tool> | run <tool> [--dry-run] -- <args>
+agents-cli update/remove <tool> [--dry-run] | schema <tool> [--depth 5 --refresh]
+agents-cli skills generate [--from-tool <name>] | install/list/remove
+agents-cli init --name "my-skill" | freeze | install | verify
 agents-cli search "query" | scan ./dir [--deep] | info <name>
-
-# MCP
 agents-cli mcp start | list
-
-# Plugin (Claude Code spec)
 agents-cli plugin init | publish <name> | test [dir] | group | factory | pipeline <prompt> | index <source>
-
-# Crawl (scale discovery)
 agents-cli crawl seed [--registry pypi|npm|crates|github|mcp] [--limit N] [--all]
-agents-cli crawl start [--concurrency N] [--limit N] [--registry X]
-agents-cli crawl status [--json]
-
-# Compose (agentic workflow generation)
-agents-cli compose "Python CI pipeline" [--iterations 5] [--sandbox] [--creative] [--domain X]
+agents-cli crawl start [--concurrency N] [--limit N] | status
+agents-cli compose "prompt" [--iterations 5] [--sandbox] [--creative] [--domain X]
 agents-cli compose --from-skills src-ruff,src-pytest [--creative --output <dir>]
-
-# Stats (system monitoring)
 agents-cli stats [--json]
 ```
 
 ## Skill Forge (`npx tsx examples/skill-forge.ts`)
 
 ```bash
-# Direct tool
 --tool pypi:ruff [--deep --json --factory --monorepo --force --no-cache]
-
-# Discovery (NL → multi-registry search)
-"build a RAG pipeline" [--limit 5 --dry-run]
-
-# Modes
+"NL query" [--limit 5 --dry-run]           # discovery
 --trending [--language rust --since weekly --limit 10]
 --curated [--category ai-ml/llm-inference --skip-installed --force --limit 600]
 --workflow "CI/CD pipeline" [--list --skill-output]
---audit [--domain agent --ai --strict]
---search "query" [--search-mode hybrid --pkg ruff]
---index [--domain agent]
---plugin [--full --multi-runtime --domain git --ai --output-dir ~/plugins]
---agent-defs [--domain agent --ai]
---workflow-gen <dir> [--domain <domain> --out <dir> --dry-run --json]
---marketplace [--dry-run]
---freeze | --verify
---system [--limit 20 --deep]
---mcp
---audit-plugins [--json]
---benchmark [--json]
-
-# Common flags: --deep --dry-run --json --strict --limit N --no-cache --force
-# --domain X --ai --full --multi-runtime --output-dir --batch-size N
-# --timeout <ms> --concurrency N --resume <path> --no-index
+--audit [--domain agent --ai --strict] | --search "query" [--search-mode hybrid --pkg ruff]
+--index [--domain agent] | --plugin [--full --multi-runtime --domain git --ai --output-dir ~/plugins]
+--agent-defs [--domain agent --ai] | --workflow-gen <dir> [--domain X --out <dir> --dry-run --json]
+--marketplace [--dry-run] | --freeze | --verify | --system [--limit 20 --deep]
+--mcp | --audit-plugins [--json] | --benchmark [--json]
+# Flags: --deep --dry-run --json --strict --limit N --no-cache --force --domain X --ai --full
+# --multi-runtime --output-dir --batch-size N --timeout <ms> --concurrency N --resume <path>
 ```
 
 ## Project Structure
 
 ```
 bin/
-  agents-cli.ts       — 67-line dispatcher; all logic in bin/commands/
-  agent-run.ts        — tool execution engine
-  commands/           — 25 command files (one registerXCommand per file)
-    shared.ts         — isJsonMode(), pickFields(), DATA_DIR, getStore()
-    add.ts / list.ts / describe.ts / schema.ts / run.ts
-    remove.ts / update.ts / search.ts / scan.ts / info.ts
-    freeze.ts / install.ts / verify.ts
-    skills.ts         — skills subcommand group
-    mcp.ts            — mcp subcommand group
-    plugin.ts         — plugin subcommand group
-    generate.ts / init.ts / pipeline.ts / publish.ts / index-cmd.ts
-    crawl.ts          — crawl seed/start/status subcommands
-    compose.ts        — agentic workflow composition
-    stats.ts          — system stats display
+  agents-cli.ts          — dispatcher; logic in bin/commands/
+  agent-run.ts           — tool execution engine
+  commands/              — 25 files (shared.ts has isJsonMode/pickFields/DATA_DIR/getStore)
+    add|list|describe|schema|run|remove|update|search|scan|info|freeze|install|verify.ts
+    skills|mcp|plugin.ts — subcommand groups
+    generate|init|pipeline|publish|index-cmd|crawl|compose|stats.ts
 lib/
-  types.ts            — CliOutput, Tool, ManifestEntry, etc.
-  index.ts            — public SDK entry (re-exports everything)
-  output.ts           — success(), failure(), emit(), toErrorMessage()
-  guards.ts           — validateSource, validateToolName, rejectPathTraversal, shellQuote
-  resolver.ts         — source detection + metadata (github/npm/pypi/crates/local)
-  installer.ts        — download, extract, build (branch fallback: main→master→develop)
-  analyzer.ts         — --help probing, deepProbe(), detectInteractionMode()
-  store.ts            — flat-file JSON store + CONTEXT.md + createSqliteStore() factory
-  registry.ts         — 4-layer cascade (local→community→github→npm)
-  skills.ts           — backward-compat barrel → lib/skills/index.ts
-  skills/             — split from monolithic skills.ts (3105 → 5 focused modules)
-    frontmatter.ts    — parseFrontmatter(), discoverResources(), RESOURCE_DIRS
-    lockfile.ts       — computeIntegrity(), parseLockfile(), writeLockfile(), readLockfile()
-    description.ts    — CATEGORY_ACTION_MAP, DOMAIN_NEGATIVE_TRIGGERS, buildDescription(tool)
-                        detectToolLanguage(), inferDomain(), isLikelyCli(), inferLibraryInstallCommand()
-    lifecycle.ts      — installTool(), installSkill(), listSkills(), removeSkill(), buildContext()
-    generators.ts     — generateRichSkillMd(), generateSkillDirectory(), generateInstallScript()
-    index.ts          — re-exports all public symbols
-  skill-content.ts    — structural SKILL.md gen; buildShortDescription(entry: ManifestEntry)
-  skill-tester.ts     — quality gate: scoreTrigger(), testSkillSync()
-  skill-factory.ts    — 3-layer pipeline (structural→AI)
-  mcp.ts              — MCP bridge
-  extractor.ts        — README parsing, inferBinaryNames(), readSourceVersion()
-  curated-tools.ts    — 91 general tools; loadAllTools() reads examples/data/ai-ml-tools.json
-  search.ts           — hybridSearch(), FTS5 + sqlite-vec KNN integration
-  concurrency.ts      — AdaptiveSemaphore, TokenBucketRateLimiter, mapConcurrent()
-  indexer.ts / indexes.ts / domains.ts / cache.ts / chunker.ts
-  classifier/         — npm.ts, github.ts, crates.ts, pypi.ts, libraries-io.ts, github-graphql.ts
-  pipeline/           — intent.ts, entity-extractor.ts, prompt-parser.ts, capability-map.ts,
-                        agent-analyzer.ts (script parser: imports, env vars, SDK calls, cross-deps),
-                        workflow-manifest-inference.ts (topo sort, data flow, env merge, duration est),
-                        workflow-composer.ts (WorkflowEnvVar, DataFlowEdge, SkillWorkflow extensions)
-  hooks/              — types.ts, generator.ts, validator.ts, templates/
-  plugin/             — builder.ts, publisher.ts, marketplace.ts, audit-report.ts, versioning.ts, ...
-  db/                 — domain-db.ts, aggregated-db.ts, sqlite.ts, unified-store.ts, vec-store.ts, migrate.ts
-  adapters/           — types.ts (SourceAdapter), registry-adapter.ts, pipeline.ts (UnifiedPipeline)
-  intelligence/       — embeddings.ts, io-extractor.ts, graph-builder.ts, discovery.ts, auto-repair.ts
-  composer/           — schema.ts, llm-client.ts, proposer.ts, validator.ts, iteration-loop.ts, script-generator.ts, Dockerfile.sandbox
-  crawler/            — worker.ts (crawl queue worker), seeders.ts (registry seeders)
-  marketplace/        — export.ts (SQLite -> registry-data.json)
-  monitoring/         — stats.ts (system stats aggregator)
-  companion/          — web-service.ts, billing.ts, oauth.ts, metering.ts, tiers.ts, clerk-auth.ts, ...
+  types.ts|index.ts|output.ts — CliOutput, Tool, ManifestEntry, success/failure/emit/toErrorMessage
+  guards.ts              — validateSource/ToolName, rejectPathTraversal, shellQuote, validateOllamaUrl, cosine
+  resolver.ts            — source detection + metadata (github/npm/pypi/crates/local)
+  installer.ts           — download/extract/build (branch fallback: main→master→develop)
+  analyzer.ts            — --help probing, deepProbe(), detectInteractionMode(), smokeTest()
+  store.ts               — flat-file JSON createStore() + createSqliteStore() factory (SQLite→flat-file fallback)
+  registry.ts            — 4-layer cascade (local→community→github→npm)
+  skills/                — frontmatter.ts, lockfile.ts, description.ts (CATEGORY_ACTION_MAP, DOMAIN_NEGATIVE_TRIGGERS,
+                           buildDescription(Tool), detectToolLanguage, inferDomain, isLikelyCli, inferLibraryInstallCommand),
+                           lifecycle.ts (installTool, installSkill, listSkills, removeSkill, buildContext),
+                           generators.ts (generateRichSkillMd, generateSkillDirectory, generateInstallScript)
+  skills.ts              — backward-compat barrel → lib/skills/index.ts
+  skill-content.ts       — buildShortDescription(ManifestEntry) [≠ buildDescription(Tool)]
+  skill-tester.ts        — scoreTrigger(), testSkillSync(), scoreWorkflowQuality(), scoreContentQuality()
+  skill-factory.ts       — 3-layer pipeline (structural→AI)
+  mcp.ts                 — MCP bridge
+  extractor.ts           — extractReadmeSections(), inferBinaryNames(), readSourceVersion()
+  search.ts              — hybridSearch(), FTS5 + sqlite-vec KNN
+  concurrency.ts         — AdaptiveSemaphore, TokenBucketRateLimiter, mapConcurrent()
+  curated-tools.ts       — GENERAL_TOOLS, loadAllTools(projectRoot) reads examples/data/ai-ml-tools.json
+  indexer.ts|indexes.ts|domains.ts|cache.ts|chunker.ts
+  classifier/            — npm|github|crates|pypi.ts, libraries-io.ts (55 req/min), github-graphql.ts (cursor pagination, 4500pt budget)
+  pipeline/              — intent|entity-extractor|prompt-parser|capability-map.ts,
+                           agent-analyzer.ts (regex parser: imports, env, SDK calls, cross-deps),
+                           workflow-manifest-inference.ts (topo sort, data flow, env merge, duration est),
+                           workflow-composer.ts (WorkflowEnvVar, DataFlowEdge, SkillWorkflow extensions)
+  hooks/                 — types.ts, generator.ts, validator.ts, templates/
+  plugin/                — builder.ts, publisher.ts, marketplace.ts, audit-report.ts, versioning.ts
+  db/                    — unified-store.ts, vec-store.ts, migrate.ts, domain-db.ts, aggregated-db.ts, sqlite.ts
+  adapters/              — types.ts (SourceAdapter), registry-adapter.ts, pipeline.ts (UnifiedPipeline)
+  intelligence/          — embeddings.ts, io-extractor.ts, graph-builder.ts, discovery.ts, auto-repair.ts
+  composer/              — schema.ts, llm-client.ts, proposer.ts, validator.ts, iteration-loop.ts,
+                           script-generator.ts, Dockerfile.sandbox
+  crawler/               — worker.ts (CrawlWorker), seeders.ts
+  marketplace/           — export.ts (SQLite→registry-data.json)
+  monitoring/            — stats.ts
+  companion/             — web-service.ts, billing.ts, oauth.ts, metering.ts, tiers.ts, clerk-auth.ts
 examples/
-  skill-forge.ts      — thin dispatcher → forge/ modules
-  forge/              — types, helpers, parse-args, stages, 16 mode-* modules (incl. mode-workflow-gen.ts)
-  regenerate-skills.ts — batch regeneration
-  generated-skills/   — auto-generated skills (trigger ≥ 0.80)
-  data/
-    ai-ml-tools.json  — 502 AI/ML tool entries (was at project root, now here)
-  saas-ui/            — SaaS marketplace UI, deployed to https://ui.spectredve.com
-    package.json      — dependencies for Vercel serverless functions (stripe ^17.0.0)
-    index.html        — main app (marketplace, forge). Dashboard/economy/keys moved to admin.html. Includes JetBrains Mono font, workflow showcase section (`#workflowShowcase` between Chrome Extension and Marketplace), 50% OFF launch promo pricing
-    admin.html        — standalone admin SPA, auth-gated, hash routing (#dashboard, #economy, #keys, #settings)
-    api/              — Vercel serverless functions (Node.js, ESM)
-      health.js       — GET /api/health — returns {ok, ts}, no auth
-      config.js       — GET /api/config — returns {clerkPublishableKey}, no auth
-      billing/
-        checkout.js   — POST /api/billing/checkout — creates Stripe Checkout session, returns {url}
-    css/styles.css    — design system + economy / heatmap / bulk-select / tier badges / value comparison / workflow (mini pipeline, DAG, step table, NEW badge) / workflow showcase / launch promo styles. CSS vars: `--accent-cyan: #00d4ff`, `--font-tech` (JetBrains Mono)
-    css/admin.css     — admin panel styles: fixed 220px sidebar, cyan border glow, scan-line top bar, command bridge aesthetic
-    vercel.json       — Vercel deploy config (SPA rewrites incl. /admin→admin.html, /api/* → serverless, no-cache HTML, long-cache assets)
-    registry-data.json — static data for marketplace: github/npm/pypi/crates/agent_defs/harnesses/cli_anything/generated_skills/workflows
-    js/
-      app.js          — bootstrap, router, auth wiring, nav state, modal logic, pricing checkout wiring, tier-based upsell visibility
-      store.js        — AppStore pub/sub + localStorage (searchFilters excluded — session-only). Monthly install tracking
-      api.js          — AgentsApi; auto-detects baseUrl (localhost:3100 dev, '' prod)
-      auth.js         — AuthManager: loginWithGoogle/Github/Email, logout, onAuthChange, mock fallback
-      utils.js        — shared utilities: PRODUCT_TYPE_ICONS, PRODUCT_TYPE_COLORS, formatType(), escapeHtml(), showToast()
-      marketplace.js  — product grid, agent-native filter, bulk select, Try button, tier access gating, catalog-updated event. Re-exports utils.js symbols
-      registries.js   — registry panes (GitHub/npm/PyPI/crates/cli-anything); injects agent_defs+generated_skills into catalog
-      dashboard.js    — revenue tracker, agent wallet, heatmap. Imports from utils.js. Key links → /admin#keys
-      product-detail.js — 4-tab detail (overview/pricing/changelog/pipeline for workflows), SSE feed, DAG viz. Re-exports showToast from utils.js. Workflow detail defaults to Pipeline tab (not Overview). `renderStepTable(steps, opts)` accepts optional `{ enhanced: true }` for zebra striping
-      workflow-dag.js — pure CSS/HTML DAG renderer for workflow detail modal pipeline tab
-      forge-ui.js     — cost estimator, quality preview, persona selector, batch CSV
-      economy.js      — agent economy: earnings, leaderboard, sparklines. Imports escapeHtml from utils.js
-      admin.js        — admin bootstrap: imports api/store/auth/dashboard/economy, auth gate, inline API key CRUD + settings
-      profile.js      — openSettingsModal() redirects to /admin#settings
-    playground.html   — SaaS playground demo
-tests/                — 19 test files, 369 tests
+  skill-forge.ts         — thin dispatcher → forge/ (16 mode-* modules)
+  regenerate-skills.ts   — batch regeneration
+  generated-skills/      — auto-generated (trigger ≥ 0.80)
+  data/ai-ml-tools.json  — 502 AI/ML tool entries
+  saas-ui/               — SaaS marketplace @ ui.spectredve.com (see SaaS sections below)
+    index.html|marketplace.html|admin.html|playground.html|vercel.json|registry-data.json|package.json
+    api/ (health|config|billing/checkout.js) | css/ (styles|admin.css)
+    css/ (styles|admin|marketplace-page.css)
+    js/ (app|store|api|auth|utils|marketplace|marketplace-page|registries|dashboard|product-detail|
+         workflow-dag|forge-ui|economy|admin|profile.js)
+tests/                   — 19 files, 369 tests
 ```
 
 ## Pipeline Flow
 
-1. **Resolve** — detect format, fetch metadata. GitHub: releases→tags→`readSourceVersion()`. Local: package.json→basename
-2. **Install** — download tarball (branch fallback), extract, install deps. `HUGE_REPOS` skipped
-3. **Analyze** — `--help` parsing, recursive. `deepProbe(bin, {maxDepth})` → `{tree, totalCommands}`
-4. **Store** — persist JSON + CONTEXT.md
-5. **Generate** — `generateSkillDirectory()` → SKILL.md + refs/ + scripts/. Uses `_curatedMeta` for triggers, `_readmeSections` for content, `detectToolLanguage()` for ecosystem, `inferBinName()` for binary names, `extractCommandsFromReadme()` fallback when 0 commands
-6. **Quality** — `testSkillSync()`: trigger ≥ 0.80, quality ≥ 6, content ≥ 5
-7. **Index** — `groupByDomain()` + `generateMasterIndex()`
-8. **Factory** — `runSkillFactory()` optional 3-layer
-9. **MCP** — `McpBridge` exposes tools
-10. **Workflow Gen** — `--workflow-gen <dir>` analyzes agent scripts → infers manifest (topo sort + data flow) → generates SKILL.md + run.sh + setup.sh + workflow.md + copies scripts
+1. **Resolve** → detect format, fetch metadata (releases→tags→`readSourceVersion()`)
+2. **Install** → download tarball (branch fallback), extract, deps. `HUGE_REPOS` skipped
+3. **Analyze** → `deepProbe(bin, {maxDepth})` → `{tree, totalCommands}`
+4. **Store** → persist JSON + CONTEXT.md
+5. **Generate** → `generateSkillDirectory()` → SKILL.md+refs/+scripts/. Uses `_curatedMeta`, `_readmeSections`, `detectToolLanguage()`, `inferBinName()`, `extractCommandsFromReadme()` fallback
+6. **Quality** → `testSkillSync()`: trigger≥0.80, quality≥6, content≥5. Workflows: `scoreWorkflowQuality()` 4 axes (stepCompleteness, dataFlowValidity, envVarDocumentation, setupRunnability) all≥0.5
+7. **Index** → `groupByDomain()` + `generateMasterIndex()`
+8. **Factory/MCP** → optional 3-layer factory, `McpBridge`
+9. **Workflow Gen** → analyzes scripts→topo sort+data flow→SKILL.md+run.sh+setup.sh+workflow.md
 
-## Scaling Infrastructure (SQLite + Crawlers + Intelligence + Composer)
+## Scaling Infrastructure
 
 ### Unified SQLite Store (`lib/db/unified-store.ts`)
-- Tables: `tools`, `skills`, `workflows`, `skill_edges`, `crawl_queue`, `domains` + FTS5 indexes + `vec_skills` (sqlite-vec)
-- Implements `ToolStore` interface for backward compatibility
-- Singleton factory: `createUnifiedStore(dataDir)` — detects dataDir mismatch
-- Prepared statements for hot-path queries
-- Atomic `dequeue()` with transaction wrapper
-- `searchProducts()` — UNION across skills+workflows with FTS5/pagination
-- `listDomainsWithCounts()` — domain hierarchy with skill counts
-- `bulkAddEdges()` — batch insert skill graph edges
-- `CrawlStatus`: `"pending" | "processing" | "done" | "failed"`
-- `EdgeType`: `"io_chain" | "same_domain" | "embedding_similar" | "llm_inferred"`
+Tables: `tools`, `skills`, `workflows`, `skill_edges`, `crawl_queue`, `domains` + FTS5 + `vec_skills` (sqlite-vec). Implements `ToolStore`. Singleton: `createUnifiedStore(dataDir)` — different dataDir throws; use `getStore()` from `bin/commands/shared.ts`. Prepared statements, atomic `dequeue()`, `searchProducts()` (UNION FTS5/pagination), `listDomainsWithCounts()`, `bulkAddEdges()`.
+- `CrawlStatus`: `"pending"|"processing"|"done"|"failed"` | `EdgeType`: `"io_chain"|"same_domain"|"embedding_similar"|"llm_inferred"`
 
 ### sqlite-vec (`lib/db/vec-store.ts`)
-- Graceful fallback when `sqlite-vec` not installed (dynamic import)
-- `createVecStore(db, dimension)` — KNN search, filtered search, brute-force cosine fallback
-- `cosine()` function lives in `lib/guards.ts` (DRY)
+Graceful fallback via dynamic import. `createVecStore(db, dimension)` — KNN, filtered, brute-force cosine. `cosine()` in `lib/guards.ts`.
 
 ### Migration (`lib/db/migrate.ts`)
-- `migrateToSqlite(dataDir)` — tools.json + .skill-cache.json + generated-skills -> SQLite
-- Seeds hierarchical domain taxonomy (27 flat + 20 sub-domains)
+`migrateToSqlite(dataDir)` — tools.json+.skill-cache.json+generated-skills→SQLite. Seeds 27+20 domain taxonomy.
 
-### Crawl System (`lib/crawler/`)
-- `CrawlWorker` — adaptive concurrency, exponential backoff (1min -> 5min -> 30min)
-- Install-analyze-prune cycle: delete `package/` dir after skill generation
-- `seedFromPyPI/Npm/Crates/GitHub/MCPRegistry()` — generic `seedFromLibrariesIo()` base
-- `seedAll()` — parallelize across all registries
-
-### Classifiers
-- `lib/classifier/libraries-io.ts` — Libraries.io unified connector (npm/PyPI/crates), 55 req/min rate limited
-- `lib/classifier/github-graphql.ts` — cursor-based pagination beyond 1000, cost tracking (4500pt budget)
+### Crawl (`lib/crawler/`)
+`CrawlWorker` — adaptive concurrency, exponential backoff (1→5→30min), install-analyze-prune cycle, TOCTOU-safe (`rmSync(force:true)` without existsSync, try/catch readFileSync). `seedFromPyPI/Npm/Crates/GitHub/MCPRegistry()` via generic `seedFromLibrariesIo()`. `seedAll()` parallelizes all.
 
 ### Concurrency (`lib/concurrency.ts`)
-- `AdaptiveSemaphore` — auto-detect CPU count, ramp up/down based on p95 latency
-- `TokenBucketRateLimiter` — configurable tokens/interval, `.unref()` timer
-- `mapConcurrent(items, fn, concurrency)` — concurrent map with back-pressure
+`AdaptiveSemaphore` (CPU-aware, p95 latency), `TokenBucketRateLimiter` (`.unref()` timer), `mapConcurrent(items, fn, N)`.
 
-### Intelligence Layer (`lib/intelligence/`)
-- `embeddings.ts` — `embedText()`, `embedBatch()` (Ollama batch API), `embedAllSkills()`
-- `io-extractor.ts` — `extractIOProfile(skillMd)` -> `{inputs, outputs, sideEffects, categories}`
-- `graph-builder.ts` — pre-computes 4 edge types via inverted index (O(n*k) not O(n^2))
-- `discovery.ts` — 4 methods: `semantic`, `domain-semantic`, `multi-hop-llm`, `graph-traversal`
-- `auto-repair.ts` — LLM-powered quality repair (up to 3 retries)
+### Intelligence (`lib/intelligence/`)
+`embedText/Batch()` (Ollama), `embedAllSkills()`, `extractIOProfile()` → `{inputs, outputs, sideEffects, categories}`, `buildSkillGraph()` (4 edge types, inverted index O(n*k)), `discoverSkills()` (semantic/domain-semantic/multi-hop-llm/graph-traversal), `autoRepairSkill()` (LLM, 3 retries).
 
-### Agentic Composer (`lib/composer/`)
-- `schema.ts` — `WorkflowYAML` interface + template-based YAML serializer (no yaml dependency)
-- `llm-client.ts` — `TieredLLMClient`: Ollama (propose/repair) + Claude API (validate/refine)
-- `proposer.ts` — uses 4 discovery methods, builds context, prompts LLM for workflow.yaml
-- `validator.ts` — 7 static validation checks + optional Docker sandbox
-- `iteration-loop.ts` — `composeWorkflow()`: propose -> validate -> refine (3-5 iterations, target quality >= 0.8)
-- `script-generator.ts` — `generateRunScript()`, `generateSetupScript()`, `generateSkillMd()`
-- `Dockerfile.sandbox` — Docker container definition for sandbox validation
+### Composer (`lib/composer/`)
+`TieredLLMClient`: propose/repair→Ollama, validate/refine→Claude API. `composeWorkflow()`: propose→validate→refine (3-5 iters, target≥0.8). `WorkflowYAML` + template serializer (no yaml dep). Optional Docker sandbox. `generateRunScript()`, `generateSetupScript()`, `generateSkillMd()`.
 
-### Source Adapters (`lib/adapters/`)
-- `types.ts` — `SourceAdapter` interface + `SkillCandidate` intermediate format
-- `registry-adapter.ts` — wraps existing resolve-install-analyze pipeline
-- `pipeline.ts` — `UnifiedPipeline` routes to correct adapter by source prefix
-
-### Store Factory (`lib/store.ts`)
-- `createSqliteStore(dataDir)` — tries SQLite, falls back to flat-file JSON
-- `createStore(dataDir)` — original flat-file store (still available)
-
-### Key Functions (new)
-```typescript
-// Guards (lib/guards.ts) — new additions
-validateOllamaUrl(url): void            // Ollama endpoint validation
-cosine(a, b: Float32Array): number      // cosine similarity (DRY extraction)
-
-// Store (lib/store.ts)
-createSqliteStore(dataDir): Promise<ToolStore>   // SQLite with fallback
-
-// Concurrency (lib/concurrency.ts)
-AdaptiveSemaphore(opts): { acquire, release }
-TokenBucketRateLimiter(tokens, intervalMs): { acquire }
-mapConcurrent<T,R>(items, fn, concurrency): Promise<R[]>
-
-// Intelligence (lib/intelligence/)
-embedText(text, ollamaUrl?): Promise<Float32Array>
-embedBatch(texts, ollamaUrl?): Promise<Float32Array[]>
-embedAllSkills(store, vecStore, opts?): Promise<EmbedResult>
-extractIOProfile(skillMd, commands?): IOProfile
-buildSkillGraph(store, vecStore, opts?): Promise<GraphBuildResult>
-discoverSkills(store, vecStore, { method, query }): Promise<DiscoveredSkill[]>
-autoRepairSkill(skillDir, store, opts?): Promise<RepairResult>
-
-// Composer (lib/composer/)
-composeWorkflow(opts): Promise<ComposeResult>
-proposeWorkflow(opts): Promise<WorkflowYAML>
-validateWorkflow(workflow, store): ValidationReport
-TieredLLMClient.generate(tier, prompt): Promise<LLMResponse>
-
-// Crawler (lib/crawler/)
-CrawlWorker.start(opts): Promise<CrawlResult>
-seedFromPyPI/Npm/Crates/GitHub/MCPRegistry(store, opts): Promise<number>
-seedAll(store, opts): Promise<SeedResult>
-
-// Classifiers (new)
-searchLibrariesIo(query, opts): Promise<LibrariesIoResult[]>
-crawlTopicRepos(topic, opts): AsyncGenerator<GraphQLRepo>
-
-// Monitoring (lib/monitoring/stats.ts)
-gatherStats(dataDir): Promise<SystemStats>
-
-// Marketplace (lib/marketplace/export.ts)
-exportRegistryData(dataDir, outputPath): Promise<void>
-```
+### Adapters (`lib/adapters/`)
+`SourceAdapter` interface + `SkillCandidate` intermediate format. `UnifiedPipeline` routes by source prefix.
 
 ## Skill Quality
 
-`scoreTrigger()` (max 1.0, clamped): +0.3 "Use when", +0.4 action verbs (3×0.15 from 60+ verbs), +0.2 "Do NOT use for", +0.1 comma triggers (≥2 clauses), +0.1 TechNames (≥2 capitalized words). `buildDescription()` in `lib/skills/description.ts` auto-generates via `CATEGORY_ACTION_MAP` + `DOMAIN_NEGATIVE_TRIGGERS` + `detectToolLanguage()`. Note: `buildShortDescription()` in `lib/skill-content.ts` is a separate function for `ManifestEntry` structural content.
+`scoreTrigger()` (max 1.0): +0.3 "Use when", +0.4 action verbs (3x0.15 from 60+ verbs), +0.2 "Do NOT use for", +0.1 comma triggers (≥2 clauses), +0.1 TechNames (≥2 capitalized). Auto-generated via `CATEGORY_ACTION_MAP`+`DOMAIN_NEGATIVE_TRIGGERS`+`detectToolLanguage()`.
 
-**Workflow quality gates** — `scoreWorkflowQuality()` in `lib/skill-tester.ts` scores 4 axes (each must be ≥ 0.5):
-- `stepCompleteness` — every step has command + description
-- `dataFlowValidity` — no dangling edges, inputs match prior outputs
-- `envVarDocumentation` — all env vars have descriptions
-- `setupRunnability` — setup.sh has shebang, `set -e`, tool checks
+## Plugin System
 
-Integrated into `testSkillSync()` — workflows are scored on all 4 axes plus the standard trigger/quality/content gates.
+`.claude-plugin/plugin.json` (only: name, version, description, keywords, license), `skills/<name>/SKILL.md+refs+scripts`, `agents/<name>.md` (YAML frontmatter+prompt), `commands/<name>.md`. Basic: 2 cmds, 1 agent. Full (`--full`): 8 cmds, multi-agents, hooks (7 event types), settings.json, CLAUDE.md, team skills. `--multi-runtime` adds pi-mono+opencode. Domains flattened (`ai-ml/x`→`ai-ml-x`), no external path refs, `$ARGUMENTS` for user input.
 
-## Plugin System (Claude Code spec)
-
-**Structure** — `.claude-plugin/plugin.json` (official fields only: name, version, description, keywords, license), `skills/<name>/SKILL.md+refs+scripts`, `agents/<name>.md` (YAML frontmatter+prompt), `commands/<name>.md`
-
-**Basic** (`--plugin`): 2 commands, 1 agent. **Full** (`--plugin --full`): 8 commands, multi-agents, hooks (7 event types), settings.json, CLAUDE.md, team skills. `--multi-runtime` adds pi-mono + opencode adapters.
-
-**Rules** — no non-standard plugin.json fields, skills self-contained, domains flattened (`ai-ml/x`→`ai-ml-x`), no external path refs, `$ARGUMENTS` for user input in commands.
-
-**Key functions**: `buildPlugins(opts)`, `generateHooksJson(domain, entries)`, `generatePluginCommands(domain, entries)`, `auditPlugin(dir)`, `generateMarketplace(opts)`, `publishPlugin(domain, dryRun)`, `computePluginHash(dir)`, `bumpVersion(current, type)`
+Key: `buildPlugins(opts)`, `generateHooksJson()`, `generatePluginCommands()`, `auditPlugin(dir)`, `generateMarketplace(opts)`, `publishPlugin(domain, dryRun)`, `computePluginHash(dir)`, `bumpVersion(current, type)`.
 
 ## Workflow Generation (`--workflow-gen`)
 
-Analyzes a directory of agent scripts (.py/.ts/.js/.sh), infers a workflow manifest (step ordering via topological sort, data flow, env vars), generates SKILL.md + scripts + references, and runs quality gates.
+Analyzes agent scripts (.py/.ts/.js/.sh) → infers manifest (topo sort, data flow, env vars) → generates output in `examples/generated-workflows/<name>/`: SKILL.md, scripts/run.sh, scripts/setup.sh, references/workflow.md, agents/*.py.
 
+`agent-analyzer.ts` — pure regex parser, 50+ SDK patterns, extracts imports/env/IO/cross-deps. `workflow-manifest-inference.ts` — topo sort, data flow, duration est.
+
+**Tier entitlements** (`lib/companion/tiers.ts`): Free=view-only, Starter=5/mo, Pro/Enterprise=unlimited+publish.
+
+**SaaS workflow features:** Workflows tab (2nd after All, NEW badge), mini pipeline preview on cards, step count+duration, Pipeline tab default in detail modal (DAG via `workflow-dag.js`, step table, env vars). `"workflow"` in ProductType union — include in exhaustiveness checks.
+
+## SaaS UI (`examples/saas-ui/`)
+
+Deployed to `ui.spectredve.com` via Vercel. Deploy from this dir only (not repo root).
+
+### Deployment
 ```bash
-npx tsx examples/skill-forge.ts --workflow-gen ./my-agents [--domain ai-ml --out ./output --dry-run --json]
+cd examples/saas-ui && vercel --prod    # production deploy
+git tag v1.2.0 && git push --tags      # GH Actions prod deploy
 ```
+GH Actions: push any branch→preview, push `v*` tag→production. Secrets: `VERCEL_TOKEN`, `VERCEL_ORG_ID` (`team_sPtjjiJVOLGPrwDr8PCCHqqU`), `VERCEL_PROJECT_ID` (`prj_a8P8OO3AkotB3hR5Yoq4F01oXyve`). Vercel env: `STRIPE_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`.
 
-**Output structure:**
+### Key Rules
+- `vercel.json`: `/admin`→admin.html, `/marketplace`→marketplace.html, `/api/*`→serverless, SPA fallback (excludes admin/marketplace/api), no-cache HTML, 1yr assets
+- `registry-data.json` is static data source for all marketplace tabs
+- `api.js` auto-detects baseUrl: `localhost:3100` dev, `''` prod
+- `AuthManager` falls back to mock OAuth when server unavailable
+- Marketplace re-renders on `catalog-updated` event from `registries.js`
+
+### Structure
+- `index.html` — landing page + forge, JetBrains Mono, `#workflowShowcase` (between Chrome Extension & Marketplace sections for conversion flow), 50% OFF promo pricing with yearly toggle, "7 Product Types", workflow value comparison row. Links to `/marketplace` for full marketplace
+- `marketplace.html` — **dedicated standalone marketplace page** at `/marketplace` with own nav, hero, walkthrough, sources, workflows, demos, browse grid, pricing. Own CSS (`css/marketplace-page.css`) + JS (`js/marketplace-page.js`). NOT part of index.html SPA
+- `admin.html` — standalone admin SPA at `/admin`, auth-gated, hash routing (#dashboard/#economy/#keys/#settings). Design: command bridge — `#030308` bg, `#00d4ff` cyan accents, fixed 220px sidebar, monospace, pulsing indicators, scan-line top bar (`css/admin.css`)
+- `js/utils.js` — canonical: PRODUCT_TYPE_ICONS/COLORS, formatType(), escapeHtml(), showToast()
+- `js/marketplace.js` — grid, tier gating, TIER_LIMITS/getRequiredTier()/userHasAccess() (canonical), bulk select, `catalog-updated` event. `initMarketplace(api, store, showProductDetail, auth)` — 4 args
+- `js/product-detail.js` — 4-tab detail (overview/pricing/changelog/pipeline), SSE, DAG. Workflows default to Pipeline tab. `renderStepTable(steps, {enhanced?: true})` for zebra striping
+- `js/workflow-dag.js` — pure CSS/HTML DAG (`.wf-dag-arrow-animated` gradient-pulse, `.wf-dag-node-glow` hover, artifact float)
+- `js/admin.js` — imports api/store/auth/dashboard/economy, auth gate, inline API key CRUD+settings
+- `js/profile.js` — `openSettingsModal()` redirects to /admin#settings
+
+### Auth & Store
+`AuthManager`: loginWithGoogle/Github/Email(), signupWithEmail(), logout(), isLoggedIn(), getUser() → `{email, name, avatar, provider, token}`, getTier(), onAuthChange(cb), checkout(priceId). `AppStore`: get/set/update(key, fn)/subscribe(key|'*', cb), getMonthlyInstallCount(), incrementInstallCount(). Persisted: user, tier, installed, earnings, agentKeys, monthlyInstalls `{count, month: "YYYY-MM"}`. **NOT persisted**: searchFilters (session-only — stale filters cause 0 products bug).
+
+### Pricing
+- All tiers→`POST /api/billing/checkout`→Stripe Checkout session (subscription mode)→redirect. `handleCheckout(priceId)` sends `{priceId, successUrl, cancelUrl}`. Generic button handler in `app.js` skips buttons with `data-price-id`
+- Original: Starter $29 `price_1TAsLJ2QpzdUwTFgn4OhkLig`, Pro $79 `price_1TAsLK2QpzdUwTFgqe4HP5Jh`, Enterprise $199 `price_1TAsLK2QpzdUwTFgZQQ56NrE`
+- **Active 50% promo**: Starter $14.99 `price_1TAumR2QpzdUwTFgUWWQsbTe`, Pro $39.99 `price_1TAumW2QpzdUwTFgMyJIn89A`, Enterprise $99 `price_1TAumX2QpzdUwTFgDDWYS4V8`
+- Both in allowlist (`checkout.js`+`web-service.ts` `PRICE_TO_TIER`). End promo: swap `data-price-id` in `index.html` + `handleCheckout()` in `app.js`
+- Promo CSS: `.tier-price-promo` wrapper, `.price-original` (strikethrough), `.promo-amount` (green glow), `.promo-ribbon` (`clip-path: polygon()` — test cross-browser)
+- `TIER_LIMITS`: `{ free: 3, starter: 50, pro: 500, enterprise: Infinity }`. Tier upsell banner (`#tierUpsellBanner`) + value comparison (`#valueComparisonSection`) hidden when not free
+- `?checkout=success` triggers toast+URL cleanup
+
+## Companion API (`lib/companion/web-service.ts` @ :3100)
+
+Static files from `examples/saas-ui/`. All `/api/*` require `Authorization: Bearer <token>`. Auth: API-key SHA256 first, Clerk JWT fallback. Tier from `user.publicMetadata.tier` (set by Stripe webhook). Webhook handles checkout.session.completed/subscription.updated/deleted→updates `clerk.users.updateUserMetadata(userId, {tier, stripeCustomerId})`. `clerkUserId` stored in Stripe customer+session metadata for reverse-lookup. `STRIPE_WEBHOOK_SECRET` must be `whsec_...`.
+
 ```
-examples/generated-workflows/<name>/
-  SKILL.md              # frontmatter + workflow description
-  scripts/run.sh        # orchestrator
-  scripts/setup.sh      # env var + tool validation
-  references/workflow.md # pipeline diagram + step table
-  agents/*.py           # copied agent scripts
-```
-
-**Agent analyzer** (`lib/pipeline/agent-analyzer.ts`) — pure TS regex/heuristic parser. Extracts imports, env vars, file I/O, SDK calls (50+ known SDKs), entry points, cross-script dependencies.
-
-**Manifest inference** (`lib/pipeline/workflow-manifest-inference.ts`) — topological sort from cross-script imports + file I/O chains, data flow inference, env var merging, duration estimation.
-
-**Tier entitlements for workflows** (in `lib/companion/tiers.ts`):
-- Free: view-only (0 installs)
-- Starter: 5/month
-- Pro: unlimited + publish
-- Enterprise: unlimited + publish
-
-**SaaS UI workflow features:**
-- Workflows tab (2nd position after All, with NEW badge) in marketplace
-- Mini pipeline preview on workflow cards (scout → ghostwriter → image-gen → ...)
-- Step count + duration estimate on workflow cards
-- Pipeline tab in detail modal with DAG visualization (`workflow-dag.js`), step table, env vars table
-- Tier gating: workflows require at least Starter tier to install
-
-**Modified files for workflow support:**
-- `lib/marketplace/types.ts` — `"workflow"` added to ProductType union
-- `lib/companion/tiers.ts` — workflow entitlements per tier
-- `lib/pipeline/workflow-composer.ts` — `WorkflowEnvVar`, `DataFlowEdge`, `envVars`, `dataFlow`, `estimatedDuration`, `pricing` on SkillWorkflow
-- `lib/skill-tester.ts` — `scoreWorkflowQuality()` integrated into `testSkillSync()`
-- `lib/skills/description.ts` — `"workflow"` in CATEGORY_ACTION_MAP and DOMAIN_NEGATIVE_TRIGGERS
-- `examples/forge/types.ts` — `workflowGen` field on CliArgs
-- `examples/forge/parse-args.ts` — `--workflow-gen` flag parsing
-- `examples/skill-forge.ts` — dispatch for workflowGen mode
-- `examples/saas-ui/index.html` — Workflows tab with NEW badge
-- `examples/saas-ui/js/utils.js` — workflow in PRODUCT_TYPE_ICONS/COLORS
-- `examples/saas-ui/js/marketplace.js` — workflow tier gating, mini pipeline renderer
-- `examples/saas-ui/js/product-detail.js` — Pipeline tab with DAG, step table, env vars
-- `examples/saas-ui/js/registries.js` — injects workflows from registry-data.json
-- `examples/saas-ui/css/styles.css` — workflow CSS (mini pipeline, DAG, step table, NEW badge), `--accent-cyan`, `--font-tech`, workflow showcase section, launch promo styles (ribbon, strikethrough, gradient-pulse animation)
-- `examples/saas-ui/index.html` — JetBrains Mono font, `#workflowShowcase` section (animated pipeline demo, 3 featured cards), 50% OFF promo pricing with yearly toggle, "7 Product Types", workflow row in value comparison
-- `examples/saas-ui/js/marketplace.js` — `.workflow-card` cyan left border, `.wf-pulse` gradient-pulse on mini-pipeline arrows
-- `examples/saas-ui/js/product-detail.js` — Pipeline tab default for workflows, CTA upsell note for free users, enhanced step table with `{ enhanced: true }` option
-- `examples/saas-ui/js/workflow-dag.js` — `.wf-dag-arrow-animated` gradient-pulse, `.wf-dag-node-glow` hover, artifact float animation
-- `examples/saas-ui/registry-data.json` — 6 showcase workflows
-
-## SaaS UI Deployment
-
-Linked Vercel project: `saas-ui` (in `examples/saas-ui/.vercel/project.json`). Domain: `ui.spectredve.com` → Cloudflare CNAME → Vercel.
-
-```bash
-# Deploy production (run from examples/saas-ui/)
-cd examples/saas-ui && vercel --prod
-
-# Redeploy after changes
-vercel --prod
-
-# Check deployments
-vercel ls
-```
-
-**Key rules:**
-- `vercel.json` rewrites `/admin` to `admin.html`, `/api/*` routes to serverless functions, all other non-asset paths to `index.html` (SPA routing)
-- Serverless functions in `api/` use the `stripe` dependency from `examples/saas-ui/package.json`
-- HTML served with `no-cache, no-store` — assets (js/css/woff/png/svg) cached 1 year immutable
-- `registry-data.json` is the static data source for all marketplace tabs — edit to add/update products
-- `api.js` auto-detects API base: `localhost:3100` when running locally, `''` (relative) in production
-- `AuthManager` falls back to mock OAuth when server unavailable — always works offline
-- `searchFilters` is **session-only state** (not persisted to localStorage) — stale filters caused 0 products bug
-- Marketplace re-renders on `catalog-updated` custom event fired by `registries.js` after async inject
-
-## SaaS Admin Panel (examples/saas-ui/admin.html)
-
-Standalone admin SPA at `/admin`, separate from the main marketplace UI. Auth-gated — redirects to `/` if not logged in.
-
-**Routing:** hash-based — `#dashboard` (revenue/wallet/heatmap), `#economy` (earnings/leaderboard), `#keys` (API key CRUD), `#settings` (profile/preferences).
-
-**Design:** "command bridge" aesthetic — deep black `#030308` background, cyan `#00d4ff` accents, monospace data display, pulsing status indicators, scan-line top bar. Separate from main site design system (`css/admin.css`).
-
-**Imports:** `admin.js` bootstraps the panel using `api.js`, `store.js`, `auth.js`, `dashboard.js`, `economy.js`. API key create/revoke and settings panel are inline in `admin.js`.
-
-**Pricing checkout flow:**
-- All tiers (Starter/Pro/Enterprise) use `POST /api/billing/checkout` → Vercel serverless function → Stripe Checkout session → redirect
-- Original Stripe test price IDs: Starter ($29/mo) `price_1TAsLJ2QpzdUwTFgn4OhkLig`, Pro ($79/mo) `price_1TAsLK2QpzdUwTFgqe4HP5Jh`, Enterprise ($199/mo) `price_1TAsLK2QpzdUwTFgZQQ56NrE`
-- **50% OFF launch promo** Stripe price IDs (currently active): Starter ($14.99/mo) `price_1TAumR2QpzdUwTFgUWWQsbTe`, Pro ($39.99/mo) `price_1TAumW2QpzdUwTFgMyJIn89A`, Enterprise ($99/mo) `price_1TAumX2QpzdUwTFgDDWYS4V8`
-- Both original and promo price IDs are in the checkout allowlist (`checkout.js` + `web-service.ts` `PRICE_TO_TIER`). To end the promo: swap `data-price-id` in `index.html` and `handleCheckout()` in `app.js` back to originals
-- Pricing cards use `.tier-price-promo` wrapper with `.price-original` (strikethrough) and `.promo-amount` (green glow). `.promo-ribbon` uses `clip-path: polygon()`
-- `handleCheckout(priceId)` in `app.js` sends `{priceId, successUrl, cancelUrl}` → serverless fn creates `stripe.checkout.sessions.create()` in subscription mode
-- On success redirect, `?checkout=success` query param triggers a toast + URL cleanup
-- Generic button handler in `app.js` skips pricing buttons with `data-price-id` attributes
-
-## GitHub Actions Deploy (.github/workflows/deploy.yml)
-
-| Trigger | Action |
-|---|---|
-| Push any branch | Vercel preview deploy |
-| Push tag `v*` | Vercel production deploy → ui.spectredve.com |
-
-Required secrets: `VERCEL_TOKEN`, `VERCEL_ORG_ID` (`team_sPtjjiJVOLGPrwDr8PCCHqqU`), `VERCEL_PROJECT_ID` (`prj_a8P8OO3AkotB3hR5Yoq4F01oXyve`)
-
-Required Vercel env vars (set in Vercel Dashboard → Settings → Environment Variables): `STRIPE_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`
-
-```bash
-# Release to production
-git tag v1.2.0 && git push --tags
+GET  /api/health|config|auth/me|catalog|usage|earnings|catalog/domains|graph/:skillId
+GET  /api/catalog?page=1&limit=50&domain=X&type=Y&sort=quality&q=Z
+GET  /api/status/:jobId | download/:jobId | agents/:id/metrics | agents/:id/heatmap
+GET  /api/invocations/stream?skill=X    — SSE mock (3-8s)
+GET  /api/config                        — {publishableKey} for Clerk init (public, no auth)
+POST /api/generate | billing/checkout | billing/webhook | agent-keys
+GET  /api/billing/portal
+DELETE /api/agent-keys/:id
 ```
 
 ## Local Dev
 
 ```bash
-# Start both servers (sources .env, validates keys, opens browser)
-./deploy-local.sh              # build + serve saas-ui :8080 + companion :3100
-./deploy-local.sh --no-build   # skip npm build
-./deploy-local.sh --port 3000  # different UI port
-
-# Manual companion start (loads .env automatically)
-npx tsx examples/skill-forge.ts --companion --serve --port 3100
-
-# Stripe webhook local testing
-stripe listen --forward-to localhost:3100/api/billing/webhook
-stripe trigger checkout.session.completed
+./deploy-local.sh                        # build + serve :8080 + companion :3100
+./deploy-local.sh --no-build             # skip build
+./deploy-local.sh --port 3000            # different UI port
+npx tsx examples/skill-forge.ts --companion --serve --port 3100  # manual
+stripe listen --forward-to localhost:3100/api/billing/webhook    # webhook testing
+stripe trigger checkout.session.completed                        # test trigger
 ```
+Env (`.env`, gitignored): `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (`whsec_...` from `stripe listen`). Auto-loaded on startup, does NOT override existing env.
 
-**Ports:** SaaS UI → :8080, Companion API → :3100
-
-**Env vars** (in `.env` at project root, gitignored):
-```
-CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...   # from `stripe listen` output
-```
-`skill-forge.ts` auto-loads `.env` on startup (does NOT override existing process.env vars).
-
-## SaaS UI Auth (examples/saas-ui/js/auth.js)
-
-`AuthManager` — wire in `app.js` via `new AuthManager(api, store)`.
-
-```javascript
-import { AuthManager } from './auth.js';
-const auth = new AuthManager(api, store);
-
-auth.loginWithGoogle()         // PKCE OAuth popup → mock fallback
-auth.loginWithGithub()         // PKCE OAuth popup → mock fallback
-auth.loginWithEmail(email, pw) // mock always succeeds
-auth.signupWithEmail(email, pw)
-auth.logout()                  // clears store user/tier, fires onAuthChange(null)
-auth.isLoggedIn()              // → boolean
-auth.getUser()                 // → {email, name, avatar, provider, token} | null
-auth.getTier()                 // → 'free' | 'starter' | 'pro' | 'enterprise'
-auth.onAuthChange(cb)          // → unsubscribe fn; cb(user | null)
-auth.checkout(priceId)         // opens billing portal or mock
-```
-
-`AppStore` — reactive pub/sub with localStorage persistence.
-
-```javascript
-import { AppStore } from './store.js';
-store.get(key)               // read state
-store.set(key, value)        // write + notify + autoPersist
-store.update(key, fn)        // set(key, fn(current))
-store.subscribe(key, cb)     // → unsubscribe fn; cb(value, old)
-store.subscribe('*', cb)     // wildcard: cb(key, value, old)
-store.getMonthlyInstallCount() // → number; auto-resets when month changes
-store.incrementInstallCount()  // bumps monthly count, persisted
-// State: monthlyInstalls: { count: number, month: "YYYY-MM" }
-// Persisted keys: user, tier, installed, earnings, agentKeys, monthlyInstalls
-// NOT persisted: searchFilters (session-only to prevent stale filter bugs)
-```
-
-## SaaS Companion API (lib/companion/web-service.ts)
-
-Served at `:3100`. Static files served from `examples/saas-ui/`. All `/api/*` endpoints require `Authorization: Bearer <token>`.
-
-Auth is dual-mode: API-key SHA256 checked first, then Clerk JWT fallback via `verifyClerkToken()`.
-
-- Clerk tier is read from `user.publicMetadata.tier` (set by Stripe webhook on subscription events)
-- Stripe webhook at `POST /api/billing/webhook` handles: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted` → updates `clerk.users.updateUserMetadata(userId, { tier, stripeCustomerId })`
-- `clerkUserId` stored in Stripe customer metadata + checkout session metadata for webhook reverse-lookup
-- `STRIPE_WEBHOOK_SECRET` must be `whsec_...` format (from `stripe listen` or Stripe Dashboard → Webhooks → Signing secret)
-
-Required env vars: `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`.
-
-```
-GET  /api/health
-GET  /api/config                       — returns {publishableKey} for frontend Clerk init (public, no auth)
-GET  /api/auth/me
-GET  /api/catalog
-GET  /api/usage
-POST /api/generate                     — async skill generation
-GET  /api/status/:jobId
-GET  /api/download/:jobId
-POST /api/billing/checkout
-GET  /api/billing/portal
-POST /api/billing/webhook              — Stripe webhook (raw body + stripe-signature header)
-GET  /api/earnings?period=month        — creator revenue summary
-GET  /api/agents/:id/metrics           — call/cost/latency metrics stub
-GET  /api/agents/:id/heatmap           — 24h invocation heatmap stub
-POST /api/agent-keys                   — create key {id, secret, scopes, createdAt}
-DELETE /api/agent-keys/:id             — revoke key
-GET  /api/invocations/stream?skill=X   — SSE: live invocation events (mock every 3-8s)
-GET  /api/catalog?page=1&limit=50&domain=X&type=Y&sort=quality&q=Z — paginated catalog (SQLite-backed)
-GET  /api/catalog/domains              — domain tree with counts
-GET  /api/graph/:skillId               — skill graph neighbors
-```
-
-## Key Functions
+## Key Function Signatures
 
 ```typescript
 // Output (lib/output.ts)
@@ -604,146 +282,105 @@ emit<T>(result, json): void
 toErrorMessage(err: unknown): string
 
 // Guards (lib/guards.ts)
-validateSource(source): void
-validateToolName(name): void
-rejectPathTraversal(path, label): void
-shellQuote(s): string                  // canonical location
+validateSource(source): void | validateToolName(name): void | rejectPathTraversal(path, label): void
+shellQuote(s): string | validateOllamaUrl(url): void | cosine(a, b: Float32Array): number
 
 // Analysis (lib/analyzer.ts)
 deepProbe(bin, {maxDepth}): {tree, totalCommands}
 detectInteractionMode(cmds, flags, help?): "repl"|"subcommand"|"single"
 smokeTest(tool, installDir, cachedBin?): SmokeTestResult
 
-// Skills — lib/skills/* modules
-parseFrontmatter(content): SkillFrontmatter | null      // frontmatter.ts
-discoverResources(skillDir): SkillResources             // frontmatter.ts
-computeIntegrity(uri, version): string                  // lockfile.ts
-writeLockfile(path, tools): void                        // lockfile.ts
-buildDescription(tool): string                          // description.ts (Tool)
-buildShortDescription(entry): string                    // skill-content.ts (ManifestEntry)
-detectToolLanguage(tool): ToolLanguage                  // description.ts
-isLikelyCli(tool): boolean                              // description.ts
-installTool(source, dataDir, opts): Promise<Tool>       // lifecycle.ts
-listSkills(dataDir): InstalledSkillMeta[]               // lifecycle.ts
-generateRichSkillMd(tool): string                       // generators.ts
-generateSkillDirectory(tool): SkillDirectory            // generators.ts
-generateInstallScript(tool): string                     // generators.ts
+// Skills (lib/skills/*)
+parseFrontmatter(content): SkillFrontmatter | null       // frontmatter.ts
+discoverResources(skillDir): SkillResources              // frontmatter.ts
+computeIntegrity(uri, version): string                   // lockfile.ts
+writeLockfile(path, tools): void                         // lockfile.ts
+buildDescription(tool: Tool): string                     // description.ts
+detectToolLanguage(tool): ToolLanguage                   // description.ts
+installTool(source, dataDir, opts): Promise<Tool>        // lifecycle.ts
+listSkills(dataDir): InstalledSkillMeta[]                // lifecycle.ts
+generateSkillDirectory(tool): SkillDirectory             // generators.ts
 
 // Quality (lib/skill-tester.ts)
-testSkillSync(path, preloaded?): SkillTestResult
-scoreTrigger(description): number
-scoreContentQuality(skillMd): {score, issues}
+testSkillSync(path, preloaded?): SkillTestResult | scoreTrigger(desc): number | scoreContentQuality(md): {score, issues}
 
-// Classifiers (all: query?, limit?) → Promise<ExtendedManifestEntry[]>
-discoverNpmPackages / discoverGitHubRepos / discoverCratesPackages / discoverPyPIPackages
+// Classifiers — all: (query?, limit?) → Promise<ExtendedManifestEntry[]>
+discoverNpmPackages | discoverGitHubRepos | discoverCratesPackages | discoverPyPIPackages
 
 // Extractor (lib/extractor.ts)
-extractReadmeSections(readme, maxChars?): ReadmeSections
-inferBinaryNames(repoDir): string[]
-readSourceVersion(repoDir): string | undefined
-
-// Curated (lib/curated-tools.ts)
-loadAllTools(projectRoot): CliTool[]   // loads examples/data/ai-ml-tools.json
-GENERAL_TOOLS: CliTool[]
+extractReadmeSections(readme, maxChars?): ReadmeSections | inferBinaryNames(repoDir): string[] | readSourceVersion(repoDir): string | undefined
 
 // Indexes (lib/indexes.ts)
-groupByDomain(entries): Map<string, ManifestEntry[]>
-generateMasterIndex(manifest, triggers): string
+groupByDomain(entries): Map<string, ManifestEntry[]> | generateMasterIndex(manifest, triggers): string
 
-// Workflow generation (lib/pipeline/)
-analyzeAgentScript(path): AgentScriptAnalysis           // agent-analyzer.ts — extracts imports, env vars, SDK calls, file I/O, entry points
-inferWorkflowManifest(analyses): WorkflowManifest       // workflow-manifest-inference.ts — topo sort, data flow, env merge, duration est
-scoreWorkflowQuality(skillMd): WorkflowQualityResult    // skill-tester.ts — 4-axis quality (stepCompleteness, dataFlowValidity, envVarDocumentation, setupRunnability)
+// Workflow (lib/pipeline/)
+analyzeAgentScript(path): AgentScriptAnalysis | inferWorkflowManifest(analyses): WorkflowManifest
+scoreWorkflowQuality(skillMd): WorkflowQualityResult
 
-// Clerk Auth (lib/companion/clerk-auth.ts) — canonical @clerk/backend import location
-verifyClerkToken(req: IncomingMessage, config: ClerkConfig): Promise<ClerkSession | null>
-updateUserMetadata(userId, metadata, config: ClerkConfig): Promise<void>
-// ClerkSession: { userId, sessionId, email?, publicMetadata }
-// ClerkConfig: { secretKey, publishableKey? }
+// Clerk (lib/companion/clerk-auth.ts)
+verifyClerkToken(req, config: ClerkConfig): Promise<ClerkSession | null>
+updateUserMetadata(userId, metadata, config): Promise<void>
+// ClerkSession: { userId, sessionId, email?, publicMetadata } | ClerkConfig: { secretKey, publishableKey?, authorizedParties? }
+
+// Intelligence: embedText/Batch(), embedAllSkills(), extractIOProfile(), buildSkillGraph(), discoverSkills(), autoRepairSkill()
+// Composer: composeWorkflow(), proposeWorkflow(), validateWorkflow(), TieredLLMClient.generate()
+// Crawler: CrawlWorker.start(), seedFromPyPI/Npm/Crates/GitHub/MCPRegistry(), seedAll()
+// Monitoring: gatherStats(dataDir) | Marketplace: exportRegistryData(dataDir, outputPath)
 ```
 
 ## Data Directory
 
 ```
-~/.agents-cli/tools.json              — flat-file metadata store (legacy, migrated to SQLite)
-~/.agents-cli/agents-cli.db           — unified SQLite database (tools, skills, workflows, edges, crawl queue)
-~/.agents-cli/tools/<id>/package/     — installed files (pruned after skill generation in crawl mode)
-~/.agents-cli/tools/<id>/CONTEXT.md   — auto-docs
-~/.agents-cli/skills/<name>/skill.json + CONTEXT.md
+~/.agents-cli/tools.json         — legacy flat-file (migrated to SQLite)
+~/.agents-cli/agents-cli.db      — unified SQLite (tools/skills/workflows/edges/crawl)
+~/.agents-cli/tools/<id>/        — package/ (pruned in crawl) + CONTEXT.md
+~/.agents-cli/skills/<name>/     — skill.json + CONTEXT.md
 ```
 
 ## Common Pitfalls
 
-- `shellQuote` canonical location is `lib/guards.ts` — import from `./guards.js` in new code
-- `buildDescription(tool)` in `lib/skills/description.ts` takes `Tool`; `buildShortDescription(entry)` in `lib/skill-content.ts` takes `ManifestEntry` — they are different functions
-- `ai-ml-tools.json` is at `examples/data/` (not project root)
-- SaaS UI is at `examples/saas-ui/` (not root `saas-ui/`)
-- `loadAllTools(projectRoot)` needs project root path, not data dir
-- Bare tool names (e.g. `ruff`) don't match FORMAT_PATTERNS — need `pypi:` prefix
-- `IntentResult` has `.intent` (not `.type`); `ExtractedEntity` has `.packageName` (not `.packages`)
-- `ToolCapabilities.commands` is `readonly` — use spread
-- Cache treats `repoSha: "unknown"` as miss (PyPI installs never get stale-hit)
-- Linter hook may auto-add imports or revert changes — re-read files after edits
-- SaaS UI `searchFilters` must NOT be in localStorage `persistKeys` — stale filter state (e.g. `productType:"agent-def"`) across sessions causes 0 products in all marketplace tabs
-- SaaS UI Vercel: deploy from `examples/saas-ui/` dir (linked to `saas-ui` project). Do NOT deploy from repo root — rootDirectory is not configured on `agents-cli-saas` project
-- `AgentsApi.baseUrl` (not `._base`) is the correct field name for the API base URL
-- `clerkPublishableKey: null` in `/api/config` means `CLERK_SECRET_KEY` not loaded — check `.env` is populated and `skill-forge.ts --companion --serve` was restarted after editing `.env`
-- Clerk `publicMetadata` comes from `clerk.users.getUser(userId).publicMetadata` (not session claims `public_metadata`)
-- `STRIPE_WEBHOOK_SECRET` wrong format (`sk_test_...` instead of `whsec_...`) causes all webhook verifications to fail silently
-- `showToast` canonical location is `js/utils.js` — re-exported from `product-detail.js` for backward compat
-- `PRODUCT_TYPE_ICONS`, `PRODUCT_TYPE_COLORS`, `formatType()`, `escapeHtml()` canonical location is `js/utils.js` — re-exported from `marketplace.js` for backward compat
-- `TIER_LIMITS`, `getRequiredTier()`, `userHasAccess()` canonical location is `js/marketplace.js`
-- Admin panel is at `examples/saas-ui/admin.html` (NOT a route handled by `index.html` SPA — it has its own `/admin` rewrite in `vercel.json`)
-- Pricing checkout: all tiers use `POST /api/billing/checkout` → Vercel serverless → Stripe Checkout session (no more direct payment links)
-- `initMarketplace(api, store, showProductDetail, auth)` takes 4 args — `auth` is required for tier-gated install checks
-- `TIER_LIMITS` in `marketplace.js`: `{ free: 3, starter: 50, pro: 500, enterprise: Infinity }` — monthly install caps per tier
-- `getRequiredTier(product)` and `userHasAccess(userTier, requiredTier)` are in `marketplace.js` — do not duplicate logic elsewhere
-- Tier upsell banner (`#tierUpsellBanner`) and value comparison (`#valueComparisonSection`) are hidden when user tier is not `free`
-- `scoreWorkflowQuality()` returns 4 axes — all must be ≥ 0.5 for workflow to pass quality gate
-- `analyzeAgentScript()` is a pure regex/heuristic parser (no AST) — it recognizes 50+ SDK patterns but may miss custom frameworks
-- Workflow DAG renderer (`workflow-dag.js`) is pure CSS/HTML — no external dependencies (no D3, no Mermaid)
-- `"workflow"` is a valid ProductType — must be included in any ProductType union exhaustiveness checks
-- Workflow tier gating requires at least Starter — free users get view-only access (0 installs)
-- Promo prices are display-only — Stripe price IDs and actual billing amounts are unchanged. Do not create new Stripe prices for promo
-- `renderStepTable(steps, opts)` now accepts optional `{ enhanced: true }` second argument for zebra striping
-- `.promo-ribbon` uses `clip-path: polygon()` — test in target browsers before modifying
-- Workflow detail modal defaults to Pipeline tab (not Overview) for workflow products — do not reset this behavior
-- `#workflowShowcase` section is positioned between Chrome Extension and Marketplace sections in `index.html`
-- `createUnifiedStore(dataDir)` is a singleton — calling with a different `dataDir` throws. Use `getStore()` from `bin/commands/shared.ts` in commands
-- `sqlite-vec` and `@anthropic-ai/sdk` are optional deps — use dynamic import via variable name (`const m = "sqlite-vec"; await import(m)`) to bypass TSC module resolution
-- `validateOllamaUrl()` and `cosine()` canonical location is `lib/guards.ts` — do not duplicate
-- `CrawlWorker` uses TOCTOU-safe patterns: `rmSync(force: true)` without prior `existsSync`, `try/catch readFileSync` instead of `existsSync+readFileSync`
-- `seedFromLibrariesIo()` is the generic base — `seedFromPyPI/Npm/Crates` are one-liner wrappers
-- `TieredLLMClient` routes: `"propose"/"repair"` -> Ollama (free), `"validate"/"refine"` -> Claude API (quality)
-- `composeWorkflow()` iteration loop targets quality >= 0.8, max 5 iterations — do not lower the threshold
+- `ai-ml-tools.json` at `examples/data/` (not root). SaaS UI at `examples/saas-ui/` (not root)
+- `loadAllTools(projectRoot)` needs project root, not data dir
+- Bare names (e.g. `ruff`) need `pypi:` prefix to match FORMAT_PATTERNS
+- `IntentResult.intent` (not `.type`); `ExtractedEntity.packageName` (not `.packages`); `ToolCapabilities.commands` is `readonly` (use spread)
+- Cache: `repoSha: "unknown"` treated as miss (PyPI never stale-hit)
+- Linter hook may auto-add imports or revert changes — re-read after edits
+- `AgentsApi.baseUrl` (not `._base`)
+- `clerkPublishableKey: null` → CLERK_SECRET_KEY not loaded; restart after `.env` edit
+- Clerk `publicMetadata` from `clerk.users.getUser().publicMetadata` (not session `public_metadata`)
+- `sqlite-vec`/`@anthropic-ai/sdk` optional — dynamic import via variable (`const m = "sqlite-vec"; await import(m)`)
+- Promo prices are display-only — don't create new Stripe prices. Workflow `.workflow-card` has cyan left border, `.wf-pulse` gradient-pulse on arrows
 
 ## Do NOT
 
-- Add `yaml`/`js-yaml` (custom frontmatter parser in `lib/skills/frontmatter.ts`)
-- Skip build, remove security guards, use `process.exit()`, add interactive prompts
+- Add `yaml`/`js-yaml` — custom parser in `lib/skills/frontmatter.ts`, template serializer in `lib/composer/schema.ts`
+- Skip build, remove security guards, use `process.exit()`, add interactive prompts, use `require()`
 - Bypass `CliOutput<T>`, hardcode `dryRun: false`, use bare `console.error` with `--json`
-- Add HTTP helpers without SSRF checks, use `require()`, use magic numbers
-- Match frontmatter with full-content regex — use `parseFrontmatter()`
-- Fabricate CLI subcommands not present in actual `--help`
+- Add HTTP helpers without SSRF checks, use magic numbers, match frontmatter with regex
+- Fabricate CLI subcommands not in actual `--help` or README code blocks
+- Write files outside output dir, interpolate unsanitized input into shell
+- Use `existsSync` before `rmSync(force:true)` or `readFileSync` with error handling (TOCTOU)
 - Use same trigger text for different categories; suggest wrong package managers
-- Write files outside output dir; interpolate unsanitized input into shell
-- Import `shellQuote` from `lib/skills.ts` in new code — use `lib/guards.ts`
-- Import `@clerk/backend` directly in new files — use `lib/companion/clerk-auth.ts` as the canonical import location
-- Use raw fetch for Stripe API calls — `StripeProvider` in `lib/companion/billing.ts` uses the official `stripe` npm SDK
-- Set `STRIPE_WEBHOOK_SECRET` to a `sk_test_...` key — it must be `whsec_...` from `stripe listen` or the Dashboard
-- Re-add dashboard/economy/agent-keys panes to `index.html` — they live in `admin.html` now
-- Import `showToast`/`escapeHtml`/`formatType`/`PRODUCT_TYPE_ICONS` from `marketplace.js` or `product-detail.js` in new code — use `utils.js` as the canonical import location
-- Use direct Stripe payment links (`buy.stripe.com`) for pricing checkout — all tiers now go through `POST /api/billing/checkout` serverless function
-- Hardcode Stripe price IDs outside `app.js` — the canonical price ID mapping is in the `handleCheckout` wiring in `app.js`
-- Duplicate tier access logic — use `getRequiredTier()` and `userHasAccess()` from `marketplace.js`
-- Add external DAG rendering libs (D3, Mermaid) to workflow visualization — `workflow-dag.js` is intentionally pure CSS/HTML
-- Bypass workflow quality gates (all 4 axes must be ≥ 0.5) — `scoreWorkflowQuality()` is integrated into `testSkillSync()`
-- Put workflow tier entitlements anywhere except `lib/companion/tiers.ts` — that is the canonical location
-- Change promo display prices without updating all 3 views (monthly cards, yearly cards, value comparison table)
-- Remove or reorder `#workflowShowcase` section — it is intentionally between Chrome Extension and Marketplace for conversion flow
-- Override workflow detail modal's default Pipeline tab — workflows should always open to Pipeline, not Overview
-- Import `cosine` or `validateOllamaUrl` from anywhere except `lib/guards.ts`
-- Use `existsSync` before `rmSync(force: true)` or before `readFileSync` with error handling — TOCTOU anti-pattern
-- Add `yaml`/`js-yaml` for workflow YAML — `lib/composer/schema.ts` uses template-based serialization
+- Import `shellQuote` from `lib/skills.ts`, `@clerk/backend` directly, `showToast`/`escapeHtml`/`formatType`/`PRODUCT_TYPE_ICONS` from `marketplace.js`/`product-detail.js`, `cosine`/`validateOllamaUrl` from anywhere except `lib/guards.ts` — see Canonical Imports below
 - Call `createUnifiedStore()` directly in commands — use `getStore()` from `bin/commands/shared.ts`
-- Bypass the crawl queue for batch processing — use `CrawlWorker` with adaptive concurrency
+- Re-add dashboard/economy/keys to `index.html` (→`admin.html`). Don't merge marketplace.html back into index.html — it's a dedicated standalone page
+- Use direct Stripe payment links — all tiers via `POST /api/billing/checkout`. Don't hardcode price IDs outside `app.js`
+- Add D3/Mermaid — `workflow-dag.js` is pure CSS/HTML
+- Bypass workflow quality gates (4 axes≥0.5) or lower compose threshold (≥0.8)
+- Put workflow tier entitlements outside `lib/companion/tiers.ts`
+- Change promo prices without updating all 3 views (monthly/yearly/comparison)
+- Remove/reorder `#workflowShowcase` section or override workflow detail Pipeline tab default
+- Bypass crawl queue — use `CrawlWorker` with adaptive concurrency
+- Set `STRIPE_WEBHOOK_SECRET` to `sk_test_...` — must be `whsec_...`
+- Duplicate tier logic — use `getRequiredTier()`/`userHasAccess()` from `marketplace.js`
+
+## Canonical Imports
+
+| Symbol | From | Not From |
+|---|---|---|
+| `shellQuote`, `cosine`, `validateOllamaUrl` | `lib/guards.ts` | `lib/skills.ts` or elsewhere |
+| `@clerk/backend` | `lib/companion/clerk-auth.ts` | direct import |
+| `showToast`, `escapeHtml`, `formatType`, `PRODUCT_TYPE_ICONS/COLORS` | `js/utils.js` | `marketplace.js`, `product-detail.js` |
+| `TIER_LIMITS`, `getRequiredTier`, `userHasAccess` | `js/marketplace.js` | don't duplicate |
+| Stripe SDK | `lib/companion/billing.ts` | raw fetch |
+| `getStore()` | `bin/commands/shared.ts` | `createUnifiedStore()` directly |

@@ -10,6 +10,7 @@ import type { TieredLLMClient } from "../composer/llm-client.js";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { toErrorMessage } from "../output.js";
+import { scoreTrigger, testSkillSync } from "../skill-tester.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -60,6 +61,7 @@ export async function repairSkill(
 ): Promise<RepairResult> {
   const maxRetries = opts?.maxRetries ?? 3;
   const minTrigger = opts?.minTrigger ?? 0.80;
+  const minQuality = opts?.minQuality ?? 6;
   const skillMdPath = join(skillDir, "SKILL.md");
 
   let originalContent: string;
@@ -93,20 +95,32 @@ export async function repairSkill(
       const newDescription = response.content.trim();
       content = replaceDescription(content, newDescription);
 
-      // Score the new content
-      const { scoreTrigger } = await import("../skill-tester.js");
+      // Score the new content using direct import (not dynamic)
       score = scoreTrigger(newDescription);
 
+      // Quality gate: trigger score AND quality score must both pass
       if (score >= minTrigger) {
-        // Write repaired content
-        writeFileSync(skillMdPath, content, "utf-8");
-        return {
-          skillId: skillDir,
-          repaired: true,
-          attempts: attempt,
-          originalScore: currentScore,
-          finalScore: score,
-        };
+        // Validate quality score via testSkillSync if available
+        let qualityPasses = true;
+        try {
+          const testResult = testSkillSync("inline", content);
+          qualityPasses = (testResult.quality ?? 0) >= minQuality;
+        } catch {
+          // If quality check unavailable, accept trigger score alone
+        }
+
+        if (qualityPasses) {
+          // Write repaired content
+          writeFileSync(skillMdPath, content, "utf-8");
+          return {
+            skillId: skillDir,
+            repaired: true,
+            attempts: attempt,
+            originalScore: currentScore,
+            finalScore: score,
+          };
+        }
+        // Quality didn't pass — continue retry loop
       }
     } catch (err) {
       return {

@@ -12,6 +12,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { createReadStream, statSync, readFileSync, existsSync } from "node:fs";
 import { join, normalize, resolve, extname } from "node:path";
 import { success, failure, toErrorMessage } from "../output.js";
+import { rejectPathTraversal } from "../guards.js";
 import { analyzeProject } from "./analyzer.js";
 import { mapToTools } from "./mapper.js";
 import { executePipeline } from "./pipeline.js";
@@ -256,6 +257,17 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
 
   const keyLimiter = new TokenBucket(config.rateLimitPerKey, config.rateLimitPerKey / 60_000);
   const ipLimiter = new TokenBucket(config.rateLimitPerIp, config.rateLimitPerIp / 60_000);
+
+  // Lazy-cached unified store accessor (shared across all requests)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let _catalogStore: any = null;
+  async function getCatalogStore() {
+    if (_catalogStore) return _catalogStore;
+    const { createUnifiedStore } = await import("../db/unified-store.js");
+    const homeDir = (await import("os")).homedir();
+    _catalogStore = createUnifiedStore(join(homeDir, ".agents-cli"));
+    return _catalogStore;
+  }
 
   // TTL sweep — also clean stuck running jobs (>2x TTL)
   const sweepTimer = setInterval(() => {
@@ -857,17 +869,6 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
 
     // ── Catalog endpoints ──────────────────────────────────────
 
-    // Lazy-cached unified store accessor (avoids 3x dynamic imports)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let _catalogStore: any = null;
-    async function getCatalogStore() {
-      if (_catalogStore) return _catalogStore;
-      const { createUnifiedStore } = await import("../db/unified-store.js");
-      const homeDir = (await import("os")).homedir();
-      _catalogStore = createUnifiedStore(join(homeDir, ".agents-cli"));
-      return _catalogStore;
-    }
-
     // GET /api/catalog/domains — domain tree with counts
     if (method === "GET" && path === "/api/catalog/domains") {
       try {
@@ -883,7 +884,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     // GET /api/graph/:skillId — skill graph neighbors
     if (method === "GET" && path.startsWith("/api/graph/")) {
       const skillId = decodeURIComponent(path.slice("/api/graph/".length));
-      if (!skillId) { sendError(res, 400, "BAD_REQUEST", "Missing skillId", req); return; }
+      try { rejectPathTraversal(skillId, "skillId"); } catch { sendError(res, 400, "BAD_REQUEST", "Invalid skillId", req); return; }
       try {
         const uStore = await getCatalogStore();
         const edges = uStore.getNeighbors(skillId);
@@ -894,15 +895,21 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
       return;
     }
 
-    // GET /api/catalog — paginated with filters
+    // GET /api/catalog — paginated with filters (supports both ?page=1 and ?offset=0)
     if (method === "GET" && path === "/api/catalog") {
       try {
-        const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
         const q = url.searchParams.get("q") ?? undefined;
-        const offsetParam = parseInt(url.searchParams.get("offset") ?? "0", 10);
         const limitParam = parseInt(url.searchParams.get("limit") ?? "50", 10);
+        // Support both page-based and offset-based pagination
+        const pageParam = url.searchParams.get("page");
+        const offsetParam = pageParam
+          ? (Math.max(1, parseInt(pageParam, 10)) - 1) * limitParam
+          : parseInt(url.searchParams.get("offset") ?? "0", 10);
         const domainFilter = url.searchParams.getAll("domain");
         const productTypeFilter = url.searchParams.getAll("productType");
+        // Accept "type" as alias for "productType" (per CLAUDE.md: ?type=Y)
+        const typeAlias = url.searchParams.getAll("type");
+        const allTypes = [...productTypeFilter, ...typeAlias];
         const sort = url.searchParams.get("sort") as "name" | "quality" | "newest" | undefined;
         const minQuality = url.searchParams.has("minQuality") ? parseFloat(url.searchParams.get("minQuality")!) : undefined;
 
@@ -912,7 +919,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
           result = uStore.searchProducts({
             q, offset: offsetParam, limit: limitParam,
             domain: domainFilter.length ? domainFilter : undefined,
-            productType: productTypeFilter.length ? productTypeFilter : undefined,
+            productType: allTypes.length ? allTypes : undefined,
             minQuality, sort: sort ?? undefined,
           });
         } catch {
@@ -1020,6 +1027,7 @@ export function startServer(config: WebServiceConfig): { server: Server; stop: (
     console.log("    GET  /api/catalog          — Marketplace catalog (paginated)");
     console.log("    GET  /api/catalog/domains  — Domain tree with counts");
     console.log("    GET  /api/graph/:id        — Skill graph neighbors");
+    console.log("    GET  /api/invocations/stream — SSE invocation stream");
     console.log("    *    /*                    — Static files (saas-ui/)");
     console.log("");
   });

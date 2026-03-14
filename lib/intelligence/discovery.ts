@@ -198,14 +198,14 @@ function graphTraversalDiscovery(
   const visited = new Set<string>();
   const results: SkillRecord[] = [];
 
-  // BFS from seed skills
-  let frontier = [...seedSkills];
+  // BFS from seed skills, prioritized by edge weight
+  let frontier = [...seedSkills.map((id) => ({ id, weight: 1.0 }))];
   let depth = 0;
 
   while (frontier.length > 0 && results.length < limit && depth < maxDepth) {
-    const nextFrontier: string[] = [];
+    const nextFrontier: Array<{ id: string; weight: number }> = [];
 
-    for (const skillId of frontier) {
+    for (const { id: skillId } of frontier) {
       if (visited.has(skillId)) continue;
       visited.add(skillId);
 
@@ -214,16 +214,17 @@ function graphTraversalDiscovery(
         results.push(skill);
       }
 
-      // Get neighbors
+      // Get neighbors with weights
       const neighbors = store.getNeighbors(skillId);
       for (const n of neighbors) {
         if (!visited.has(n.id)) {
-          nextFrontier.push(n.id);
+          nextFrontier.push({ id: n.id, weight: n.weight });
         }
       }
     }
 
     // Sort next frontier by edge weight (highest first)
+    nextFrontier.sort((a, b) => b.weight - a.weight);
     frontier = nextFrontier;
     depth++;
   }
