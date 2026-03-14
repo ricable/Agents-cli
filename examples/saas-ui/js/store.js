@@ -72,7 +72,6 @@ export class AppStore {
         user: this.state.user,
         tier: this.state.tier,
         installed: this.state.installed,
-        searchFilters: this.state.searchFilters,
         earnings: this.state.earnings,
         agentKeys: this.state.agentKeys,
         monthlyInstalls: this.state.monthlyInstalls,
@@ -89,7 +88,6 @@ export class AppStore {
       if (data.user) this.state.user = data.user;
       if (data.tier) this.state.tier = data.tier;
       if (data.installed) this.state.installed = data.installed;
-      if (data.searchFilters) this.state.searchFilters = { ...this.state.searchFilters, ...data.searchFilters };
       if (data.earnings) this.state.earnings = data.earnings;
       if (data.agentKeys) this.state.agentKeys = data.agentKeys;
       if (data.monthlyInstalls) this.state.monthlyInstalls = data.monthlyInstalls;
